@@ -1,0 +1,72 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*~
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Logs and temp
+*.log
+tmp/
+temp/
+*.tmp
+
+# Build output
+dist/
+build/
+
+# Local working folders (media + derived content)
+sample-files/
+processed-files/
+transcriptions/
+splitting-samples/
+
+# Media files (keep archive content out of the repo)
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.mxf
+*.wav
+*.mp3
+*.flac
+*.aac
+*.m4a
+*.tif
+*.tiff
+*.raw
+*.cr2
+*.nef
+*.dng
+*.psd
+*.iso
+*.wma
+
+# Working/output directories
+output/
+cache/
+
+
