@@ -50,6 +50,25 @@ The WHAT in a filename (see filenaming-convention.md) starts with the scripture 
 | Bhagavad-gita, chapter 2, verse 51 | `BG-2-51` | https://vedabase.io/en/library/bg/2/51/ |
 | Srimad Bhagavatam, canto 4, chapter 4, verse 1 | `SB-4-4-1` | https://vedabase.io/en/library/sb/4/4/1/ |
 | Caitanya-caritamrta, Madhya-lila, chapter 20, verse 154 | `CC-Madhya-20-154` | https://vedabase.io/en/library/cc/madhya/20/154/ |
+| Srimad Bhagavatam, canto 9, chapter 20, verses 20 to 27 | `SB-9-20-20-27` | https://vedabase.io/en/library/sb/9/20/20/ to .../sb/9/20/27/ |
+
+### Verse ranges
+A class can discuss a sequence of verses. The range is written as the first verse followed by the last verse:
+- `SB-9-20-20-27`: canto 9, chapter 20, verses 20 to 27
+- `BG-2-51-53`: chapter 2, verses 51 to 53
+- `CC-Madhya-20-154-156`: Madhya-lila, chapter 20, verses 154 to 156
+
+How many numbers a single verse has depends on the scripture, so any extra number is the end of a range:
+
+| Scripture | Single verse | Range |
+|---|---|---|
+| BG | chapter-verse (2 numbers) | 3 numbers |
+| SB | canto-chapter-verse (3 numbers) | 4 numbers |
+| CC | lila-chapter-verse (lila + 2 numbers) | lila + 3 numbers |
+
+- The last verse is always higher than the first; otherwise the number is not a range and the file is flagged for review.
+- A title after the verse contains words, not numbers (`SB-9-20-20-27-Dont-waste-time`), so it never looks like a range.
+- Each verse in the range can be checked on vedabase.io.
 
 - The CC lila is written `Adi`, `Madhya` or `Antya`.
 - Source names use many variants of the same abbreviation (`S.B.`, `SB`, `Srimad-bhagavatam`, `B.G.`, `CC`, `Chaitanya Charitamrita`). The accepted variants per category are in the Baserow `category_terms_folder` table.
