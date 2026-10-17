@@ -22,7 +22,7 @@ If the singing continues throughout the whole recording it is a "kirtan recordin
 - Kirtan files are always moved to their final location in the default processed file location (see .env)
 - Video files must be processed first: the audio must be fully extracted and saved as a separate audio (mp3) in its original quality. The audio filename should be match the video filename.
 - A dry-run option must be added.
-- See @docs/references/recording-structure.md
+- See @docs/references/editing-standard.md
 - See @docs/references/recording-common-phrases.md
 
 ## Determining the mantra type

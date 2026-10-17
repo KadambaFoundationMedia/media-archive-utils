@@ -18,5 +18,10 @@ Semi or fully processed files will be moved to their final location. The .env de
 
 For example, the filename contains "SB". This is matched to the category "Srimad Bhagavatam" and the subfolder name is "Srimad-bhagavatam". See the Baserow table "category_terms_folder" and columns for matching purposes.
 
+Originals on the NAS are never moved: the organizer copies files into the processed root. Files without a WHAT are copied to `<processed root>/_unresolved/` and moved to their category folder when a later tool or reviewer discovers the WHAT. The history is kept in the local DB.
+
+## Name clashes
+When a different file (different size/content) already exists with the same final name, append `-2`, `-3`, ... before the extension and flag the file for review.
+
 # Duplicates filenames
 When duplicate filenames are discovered and the file size also matches, the duplicate file should be saved also with a _duplicate in the filename. For example "2018-01-09_KKS_SB-9-20-20_Vrindavan-in_duplicate.mp3".

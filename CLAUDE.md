@@ -6,6 +6,7 @@ Local tools for renaming and processing media files (audio/video) stored on a NA
 The goal is to build those tools and the media manager to discover and properly rename those files, categorise them and edit the recordings to our standards. These tools must be able to run locally in a MacOS or Windows environment and must be portable. The tools are coordinated by the media manager where the tooling can be executed to process files and folders in batches. Secondly any recordings that are flagged can be reviewed, edited and approved or rejected using the media manager.
 
 ## Key documents
+- Project specification (cross-cutting decisions, authoritative): @SPEC.md
 - Architecture: @ARCHITECTURE.md
 - Tool contract (jobs, results, errors): @CONTRACTS.md
 - Tool specs live in each tool's folder (tools/<name>/SPECS.md); read the relevant one before working on a tool.
@@ -24,7 +25,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Local DB helper (helpers/local-db/SPECS.md): This keeps track of the status of each file that is processed
 
 ## Tools
-- Media Manager (tools/media-archive-manager/): Webbased media manager for processing and reviewing media files
+- Media Manager (tools/media-manager/): Webbased media manager for processing and reviewing media files
 - Renamer (tools/renamer/): Find and rename files using our filename convention
 - Kirtan Splitter (tools/kirtan-splitter/): Review audio and split the file when a combination file is found.
 - Class discoverer (tools/class-discoverer/): Transcribe and analyse the type of class in the recording and compare it to the vedabase.io
@@ -43,13 +44,17 @@ The goal is to build those tools and the media manager to discover and properly 
 - trimming-samples/     sample files for the tools/kirtan-splitter/ and tools/class-discoverer/ tools
 
 ## Tech stack
-- Language/framework: [TBD]
-- Database: [TBD, e.g. SQLite on the local machine, never on the NAS share]
-- Audio/video processing: [TBD, e.g. ffmpeg]
+- Language/framework: Python (uv), FastAPI, Jinja2 + Bootstrap 5 + HTMX + Alpine.js, wavesurfer.js
+- Database: SQLite on the local machine, never on the NAS share
+- Audio/video processing: ffmpeg/ffprobe; transcription with mlx-whisper (macOS) or whisper.cpp (Windows)
+- LLM: pluggable provider, Claude API by default
 
 ## Commands
-- Run media manager: [TBD]
-- Run tests: [TBD]
+- Install: `uv sync`
+- Run media manager: `mam serve`
+- Run a tool: `mam <tool> --dry-run <path>`
+- Environment check: `mam doctor`
+- Run tests: `uv run pytest` (add `-m slow` for transcription integration tests)
 - Lint/format: [TBD]
 
 ## Rules (always follow)
@@ -63,4 +68,4 @@ The goal is to build those tools and the media manager to discover and properly 
 - [TBD: code style, naming, error handling, logging]
 
 ## Open decisions
-- [List anything undecided so Claude doesn't invent an answer]
+- See "Open decisions" in @SPEC.md
