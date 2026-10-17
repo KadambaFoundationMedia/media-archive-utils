@@ -81,6 +81,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - Kirtan-only outputs are `Skipped` for steps 3 to 5.
 - **Video:** the pipeline is audio-only. Video files are renamed and copied but never edited.
 - **Cutting:** splits and trims use stream copy in the original codec (no re-encode), because most sources are already lossy. Gain changes need a re-encode, written at the source codec, bitrate, sample rate and channel count.
+- **Loudness method:** loudness is measured with ffmpeg `ebur128`. When the peaks allow it, the gain is a pure linear change. When they don't, the gain is followed by a peak limiter running at 4× the sample rate (so inter-sample peaks are caught), with one corrective pass if limiting cost loudness. This was chosen over a two-pass `loudnorm` because it is about 7× faster with the same result. Files that needed the limiter are marked `dynamic` so they can be flagged.
 
 ### Renamer
 - **Evidence order:** filename > parent folder names > ID3/tags (medium to high confidence) > Baserow media table > travel schedule. Each W is resolved on its own.
@@ -105,13 +106,13 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Automation:** cuts automatically when every boundary scores above the learned threshold (see section 10). Otherwise the file goes to `Kirtan-splitter Review`.
 
 ### Class-discoverer
-- **Whole-recording gain:** runs the audio-optimizer and writes the result to the processed copy (encode #1).
+- **Whole-recording gain:** runs the audio-optimizer and writes the result to the processed copy (encode #1). The kirtan-splitter has already separated any kirtan, so the gain is measured on the class alone and loud singing cannot skew it.
 - **Verse discovery:** transcribes the recording, determines the scripture and verse, and confirms them on vedabase.io.
 - **Filename precedence:** if the transcript clearly shows a different verse than the filename, the name is kept and the file is flagged for review. The review shows both candidates with a transcript excerpt.
 - **Language:** transcribes as spoken, in any language. Detected languages are merged into the Baserow `language` field.
 
 ### Content-discoverer
-- 1 to 5 topics, each at most 2 words and not too general.
+- 1 to 5 topics, each at most 2 words and not too general. They are written to the Baserow `themes` column as one text value separated by a comma and a space (`Krishna Prema, Kali Yuga`), the format the existing rows already use.
 - A YouTube description in English, 2 to 3 paragraphs, always ending with the footer (current year).
 - A short English title, which goes into the WHAT.
 - All results are written to Baserow: the description to `media_description` (and `youtube_desc` set to true), per helpers/baserow/SPECS.md.
@@ -211,4 +212,4 @@ The kirtan-splitter examples (`oslo-noi`, a kept `-2` index, `ZOOM0004` as a WHA
 - **Refreshed:** it is rebuilt when new approved recordings add coverage, such as other years or other microphones.
 
 ## 11. Open decisions
-- The media table also has a `themes` column; confirm it is where the content-discoverer topics go.
+- None at the moment. Add new ones here instead of inventing an answer.
