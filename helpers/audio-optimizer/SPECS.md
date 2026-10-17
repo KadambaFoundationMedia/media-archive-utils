@@ -66,7 +66,6 @@ treatment of silence, room sound, setup speech and announcements;
 - fade-in/fade-out lengths;
 - codec, container, sample rate, bit depth and export quality;
 
-
 ### Audience timestamp example
 File: 'sample-files/2012/Radhadesh Jan 2012/2012-01-22_KKS_CC-Madhya-20-154_Radhadesh_be.mp3'
 Timestamps:

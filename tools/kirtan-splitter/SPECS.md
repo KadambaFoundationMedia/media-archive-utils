@@ -7,6 +7,7 @@
   - Filename convention per mantra type
 - Example of a split file and renaming
 - Examples of recordings with timestamps
+  -- File examples
 
 ## Goals
 A recording can be a combination of kirtan (singing) and the rest of the recording, which usually is the class or lecture. Standard recordings (during the morning and evening programs in ISKCON temples) always start with singing certain mantra's like "Jaya radha-madhava or Jaya Jaya sri Caitanya, Jaya Nityananda". The singing usually takes anywhere from 5-15 minutes. The goal is to determine if the recording is a combination of kirtan and class, and to split it into 2 parts. This tool must determine the exact timestamp where the kirtan ends and split it into 2 files; the kirtan and the class. Both files should be saved as separate files and renamed according to our filenaming convention.

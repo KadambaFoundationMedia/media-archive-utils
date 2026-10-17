@@ -2,13 +2,10 @@
 
 ## Table of contents
 - Introduction
-- Tool summary
+- Goals
 - Requirements
-- Standard verse structure
-- Class (recording) structure
-- Common phrases
-  - Exceptions
-- Generating a title
+- Evidence and confidence
+- Example file
 
 ## Introduction
 This tool will try to determine, or confirm, the type of class or the scripture/verse that is being discussed in the recording. The filename, the transcription and other metadata should provide evidence. And the evidence is compared, and possible enriched, by comparing it to the vedabase (https://vedabase.io) which is the authoritative source of vaisnava scriptures. The type of class/scripture/verse determines the "WHAT" part of the filename convention. When the filename already provides the "WHAT" information this is used by this tool to confirm it. When the filename does not provide enough evidence this tool will try to determine which type of scripture is discussed in the recording. When the "WHAT" is discovered, the filename is enriched with this new information. Last but not least the transcription will be analysed and a fitting title will be generated from the class.

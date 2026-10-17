@@ -42,7 +42,3 @@ After editing these sections should remain in the recording:
 7. Purport
 9. Explanation and discussion of the purport (the actual class)
 10. Questions and answers
-
-
-
-
