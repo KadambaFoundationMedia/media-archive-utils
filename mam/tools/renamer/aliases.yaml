@@ -1,0 +1,87 @@
+# Seed knowledge for the Renamer. Reviewers' repeated corrections are added automatically as
+# alias rules in the local DB (SPEC.md section 10); this file holds the starting set.
+# Keys are matched case-insensitively, without accents, with spaces/hyphens/underscores equal.
+
+# Spellings and local names of places -> place name as used in Baserow.
+places:
+  praha: Prague
+  koln: ISKCON-Cologne
+  cologne: ISKCON-Cologne
+  ljublana: ISKCON-Ljubljana
+  ljubljana: ISKCON-Ljubljana
+  rdesh: Radhadesh
+  farma kd: Farma-Krishna-Dvur
+  krishna dvur: Farma-Krishna-Dvur
+  manor: Bhaktivedanta-Manor
+  livestream: Zoom-livestream
+  zoom: Zoom-livestream
+  durban: ISKCON-Durban
+  cape town: ISKCON-Cape-Town
+  amsterdam: ISKCON-Amsterdam
+  london: ISKCON-London
+  new york: ISKCON-NYC
+  nyc: ISKCON-NYC
+
+# Places in Baserow that are not real locations or collide with other words.
+not_places:
+  - Home-program
+  - Summercamp
+  - Sumercamp
+  - Netherlands
+
+# Places that have no country (online recordings).
+no_country:
+  - Zoom-livestream
+
+# Words that point to a category (used for folders and names without a verse).
+categories:
+  kirtany: Kirtan
+  kirtana: Kirtan
+  kirtans: Kirtan
+  bhajans: Kirtan
+  bhajanas: Kirtan
+  bahjanas: Kirtan
+  maha mantra: Kirtan
+  radha madhava: Jaya-Radha-Madhava
+  radhamadhava: Jaya-Radha-Madhava
+  janmastami: Janmastami
+  radhastami: Radhastami
+  vyasa puja: Vyasa-puja
+  gaurapurnima: Gaura-purnima
+  gaura purnima: Gaura-purnima
+  krsnabook: Krsna-book
+  home program: Home-program
+  homeprogram: Home-program
+  sunday feast: Sunday-program
+  sunday class: Sunday-program
+
+# Language words in names -> Baserow language option.
+languages:
+  ger: German
+  german: German
+  deutsch: German
+  dutch: Dutch
+  nl: Dutch
+  nederlands: Dutch
+  czech: Czech
+  cz: Czech
+  slovak: Slovak
+  spanish: Spanish
+  esp: Spanish
+  french: French
+  hindi: Hindi
+  russian: Russian
+  serbian: Serbian
+  croatian: Croatian
+  hungarian: Hungarian
+  bulgarian: Bulgarian
+
+# Speaker acronyms. WHO is always KKS; another speaker in a name is flagged for review.
+kks: [KKS, Kadamba Kanana Swami, Kadambakanana Swami, Kadamba Kanana, Kadamba S]
+other_speakers: [SNS, BVS, KKD, KVS, BVPS, RNS]
+
+# Words dropped from the WHAT (honorifics, recorder and format words).
+noise: [hh, his, holiness, mp3, wav, stereo, jet, clean, copy, unedited]
+
+# Generic words dropped from the WHAT when a verse is present ("SB 3.1.20 class").
+generic_with_verse: [class, lecture, lekce, lecture-class, predavanje, vortrag, lezing]

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set proposal = (f.meta or {}).get('proposal') %}
+{% block title %}{{ f.current_name or (f.original_path | basename) }} · Media Archive{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-start gap-2 mb-3">
+  <div class="me-auto">
+    <h1 class="h5 mb-1 text-break">{{ f.current_name or (f.original_path | basename) }}</h1>
+    <div class="small text-body-secondary text-break">{{ f.original_path }}</div>
+  </div>
+  {% with s=f.status %}{% include "_status.html" %}{% endwith %}
+  {% for r in reviews if r.outcome == 'pending' %}
+    <a class="btn btn-sm btn-warning" href="/review/{{ r.id }}"><i class="fa-solid fa-flag me-1"></i>Review</a>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">Details</div>
+      <div class="card-body">
+        <dl class="row small mb-0">
+          <dt class="col-4">Date</dt><dd class="col-8">{{ f.rec_date or '–' }}</dd>
+          <dt class="col-4">WHAT / title</dt><dd class="col-8">{{ f.title or '–' }}</dd>
+          <dt class="col-4">Location</dt><dd class="col-8">{{ f.location or '–' }}</dd>
+          <dt class="col-4">Category</dt><dd class="col-8">{{ f.category or '–' }}</dd>
+          <dt class="col-4">Processed copy</dt><dd class="col-8 text-break">{{ f.processed_path or '–' }}</dd>
+          <dt class="col-4">Type / size</dt><dd class="col-8">{{ f.kind }}, {{ (f.size / 1048576) | round(1) }} MB</dd>
+          <dt class="col-4">Baserow row</dt><dd class="col-8">{{ f.baserow_row_id or '–' }}</dd>
+          <dt class="col-4">Fingerprint</dt><dd class="col-8 font-monospace text-break">{{ f.fingerprint }}</dd>
+          {% if f.meta and f.meta.loudness %}
+          <dt class="col-4">Loudness</dt>
+          <dd class="col-8">{{ f.meta.loudness.integrated }} LUFS, peak {{ f.meta.loudness.true_peak }} dBTP</dd>
+          {% endif %}
+        </dl>
+        {% if aliases %}
+        <div class="small mt-2"><strong>Identical copies:</strong>
+          <ul class="mb-0">{% for a in aliases %}<li class="text-break">{{ a.path }}</li>{% endfor %}</ul>
+        </div>{% endif %}
+      </div>
+    </div>
+
+    {% if proposal %}
+    <div class="card mb-3">
+      <div class="card-header">Last Renamer proposal {% if proposal.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}</div>
+      <div class="card-body small">
+        <div class="font-monospace mb-2 text-break">{{ proposal.new_name }}</div>
+        {% if proposal.flags %}
+        <ul class="mb-0 text-warning-emphasis">{% for fl in proposal.flags %}<li>{{ fl }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if proposal.notes %}
+        <ul class="mb-0 text-body-secondary">{% for n in proposal.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-3">
+      <div class="card-header">Listen</div>
+      <div class="card-body">
+        {% if f.kind == 'audio' %}
+        <audio controls preload="none" class="w-100" src="/files/{{ f.id }}/audio"></audio>
+        <div class="small text-body-secondary mt-1">Browsers cannot play WMA files.</div>
+        {% else %}
+        <video controls preload="none" class="w-100" src="/files/{{ f.id }}/audio"></video>
+        {% endif %}
+      </div>
+    </div>
+
+    <form method="post" action="/actions" class="card mb-3">
+      <div class="card-header">Run a tool on this file</div>
+      <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <input type="hidden" name="ids" value="{{ f.id }}">
+        <input type="hidden" name="back" value="/files/{{ f.id }}">
+        <select class="form-select form-select-sm w-auto" name="tool" aria-label="Tool" required>
+          {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
+        </select>
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" role="switch" id="dry_run_one" name="dry_run" checked>
+          <label class="form-check-label small" for="dry_run_one">Dry run</label>
+        </div>
+        <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    {% if evidence %}
+    <div class="card mb-3">
+      <div class="card-header">Evidence</div>
+      <div class="table-responsive"><table class="table table-sm mb-0 small">
+        <thead><tr><th>Field</th><th>Value</th><th>Source</th><th>Score</th></tr></thead>
+        <tbody>{% for e in evidence %}
+        <tr class="{% if e.selected %}fw-semibold{% endif %}">
+          <td>{{ e.field }}</td><td class="text-break">{{ e.value }}</td><td>{{ e.source }}</td><td>{{ '%.2f' % e.score }}</td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+    {% endif %}
+
+    {% if children %}
+    <div class="card mb-3"><div class="card-header">Derived files</div>
+      <ul class="list-group list-group-flush small">{% for c in children %}
+        <li class="list-group-item text-break">{{ c.derivation }}: {{ c.current_name }}</li>{% endfor %}</ul>
+    </div>{% endif %}
+
+    <div class="card mb-3"><div class="card-header">Jobs</div>
+      <ul class="list-group list-group-flush small">{% for j in jobs %}
+        <li class="list-group-item">
+          <strong>{{ tools[j.tool].label if j.tool in tools else j.tool }}</strong>
+          {% if j.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}
+          <span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'info' }}">{{ j.state }}</span>
+          <span class="text-body-secondary">{{ j.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          {% if j.result %}<div>{{ j.result.summary }}</div>{% endif %}
+          {% if j.error %}<pre class="small text-danger mb-0 text-wrap">{{ j.error.split('\n')[0] }}</pre>{% endif %}
+        </li>{% else %}<li class="list-group-item text-body-secondary">No jobs yet</li>{% endfor %}</ul>
+    </div>
+
+    <div class="card mb-3"><div class="card-header">History</div>
+      <ul class="list-group list-group-flush small">
+        {% for e in events %}
+        <li class="list-group-item text-break">
+          <span class="text-body-secondary">{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          {{ e.tool }}: {{ e.action }}{% if e.dry_run %} (dry run){% endif %}
+          {% if e.dst %}→ {{ e.dst }}{% endif %}
+        </li>{% endfor %}
+        {% for h in history %}
+        <li class="list-group-item">
+          <span class="text-body-secondary">{{ h.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          {{ h.old_status }} → {{ h.new_status }}{% if h.note %} <span class="text-body-secondary">({{ h.note }})</span>{% endif %}
+        </li>{% endfor %}
+        {% for w in baserow_writes %}
+        <li class="list-group-item text-break">
+          <span class="text-body-secondary">{{ w.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          Baserow {{ w.action }}{% if w.dry_run %} (dry run){% endif %}{% if w.row_id %} row {{ w.row_id }}{% endif %}:
+          <span class="font-monospace">{{ w.payload | tojson }}</span>
+        </li>{% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<form id="filters" class="row g-2 align-items-end mb-3" method="get" action="/"
+      hx-get="/files/rows" hx-target="#file-table" hx-trigger="change, keyup changed delay:400ms from:#q" hx-push-url="true">
+  <div class="col-12 col-md-4">
+    <label class="form-label small mb-0" for="q">Search</label>
+    <input class="form-control form-control-sm" id="q" name="q" value="{{ flt.q }}" placeholder="name, path, title, place">
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small mb-0" for="status">Status</label>
+    <select class="form-select form-select-sm" id="status" name="status">
+      <option value="">All</option>
+      <option value="__review" {% if flt.status == '__review' %}selected{% endif %}>Needs review</option>
+      <option value="__failed" {% if flt.status == '__failed' %}selected{% endif %}>Failed</option>
+      {% for s in facets.statuses %}<option {% if flt.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small mb-0" for="category">Category</label>
+    <select class="form-select form-select-sm" id="category" name="category">
+      <option value="">All</option>
+      {% for c in facets.categories %}<option {% if flt.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-1">
+    <label class="form-label small mb-0" for="kind">Type</label>
+    <select class="form-select form-select-sm" id="kind" name="kind">
+      <option value="">All</option>
+      <option value="audio" {% if flt.kind == 'audio' %}selected{% endif %}>Audio</option>
+      <option value="video" {% if flt.kind == 'video' %}selected{% endif %}>Video</option>
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <label class="form-label small mb-0" for="sort">Sort</label>
+    <div class="input-group input-group-sm">
+      <select class="form-select" id="sort" name="sort">
+        {% for key, label in [('path','Path'),('date','Date'),('name','New name'),('status','Status'),('category','Category'),('updated','Updated')] %}
+        <option value="{{ key }}" {% if flt.sort == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="checkbox" class="btn-check" id="desc" name="desc" value="1" {% if flt.desc %}checked{% endif %}>
+      <label class="btn btn-outline-secondary" for="desc" title="Descending"><i class="fa-solid fa-arrow-down-wide-short"></i></label>
+    </div>
+  </div>
+  {% if flt.folder %}<input type="hidden" name="folder" value="{{ flt.folder }}">{% endif %}
+  <div class="col-12 col-md-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/">Reset</a></div>
+</form>
+
+<form id="actions" method="post" action="/actions" x-data="{ scope: 'selected' }">
+  <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+  {% for k, v in flt.query_args().items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <select class="form-select form-select-sm w-auto" name="tool" aria-label="Action" required>
+      <option value="" disabled selected>Action…</option>
+      <option value="__pipeline">Run full pipeline</option>
+      {% for t in menu %}<option value="{{ t.name }}" title="{{ t.description }}">{{ t.label }}</option>{% endfor %}
+    </select>
+    <select class="form-select form-select-sm w-auto" name="scope" x-model="scope" aria-label="Which files">
+      <option value="selected">Selected files</option>
+      <option value="all">All {{ total }} matching files</option>
+    </select>
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" role="switch" id="dry_run" name="dry_run" checked>
+      <label class="form-check-label small" for="dry_run">Dry run</label>
+    </div>
+    <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run</button>
+    <span class="small text-body-secondary ms-auto">{{ total }} files</span>
+  </div>
+  <div id="file-table">
+    {% include "_file_rows.html" %}
+  </div>
+</form>
+{% endblock %}

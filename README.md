@@ -18,9 +18,21 @@ uv run mam db migrate     # creates the local database (~/.mam/mam.sqlite)
 Everything that changes files or Baserow is a dry run unless you pass `--no-dry-run`
 (files) or set `BASEROW_APPLY=true` (Baserow).
 
+## Media manager
+
+```bash
+uv run mam serve          # http://127.0.0.1:8000
+```
+
+1. **Import**: browse to a folder (sample files, trimming samples, inbox or the NAS) and import it. Files are only indexed; originals are never changed.
+2. **Files**: filter and select files, pick an action (Renamer, Verify, Measure loudness, Run full pipeline) and run it. Leave **Dry run** on to see the proposed names first.
+3. **Review**: files the Renamer could not settle on its own wait here. Edit the date, WHAT and place with a live filename preview, then approve, reject the result or exclude the file.
+4. **Jobs**: the queue, with errors and a retry button.
+
 ## Useful commands
 
 ```bash
+uv run mam rename <file-or-folder>               # Renamer proposals (dry run)
 uv run mam organize <file> --what SB-1-19-31     # where the file organizer would put a file
 uv run mam audio probe <file>                    # codec, bitrate, sample rate, duration
 uv run mam audio measure <file>                  # loudness (LUFS) and true peak

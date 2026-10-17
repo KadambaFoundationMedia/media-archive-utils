@@ -1,0 +1,351 @@
+"""FastAPI application for the media manager."""
+
+from __future__ import annotations
+
+import logging
+import re
+import shutil
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
+
+from mam.config import get_settings
+from mam.helpers.local_db import migrate, session_scope
+from mam.helpers.local_db import models as m
+from mam.helpers.local_db.repo import media_kind
+from mam.manager import queries
+from mam.manager.queue import JobQueue, enqueue
+from mam.manager.tools import TOOLS, menu_tools, pipeline_start
+
+log = logging.getLogger(__name__)
+HERE = Path(__file__).parent
+
+templates = Jinja2Templates(directory=HERE / "templates")
+
+STATUS_COLORS = {
+    "Not processed": "secondary",
+    "Corrupted": "danger",
+    "Excluded": "dark",
+    "Skipped": "light",
+    "Processing complete": "success",
+}
+
+
+def status_color(status: str) -> str:
+    if status in STATUS_COLORS:
+        return STATUS_COLORS[status]
+    if status.endswith(" Review"):
+        return "warning"
+    if status.endswith(" Failed"):
+        return "danger"
+    if status.startswith(("Processing ", "Queued ")):
+        return "info"
+    if status.endswith(" Done"):
+        return "primary"
+    return "secondary"
+
+
+templates.env.globals.update(status_color=status_color, tools=TOOLS)
+templates.env.filters["basename"] = lambda p: Path(p).name if p else ""
+templates.env.filters["dirname"] = lambda p: str(Path(p).parent) if p else ""
+
+
+def create_app(start_queue: bool = True) -> FastAPI:
+    settings = get_settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        settings.ensure_dirs()
+        migrate()
+        queue = JobQueue(settings)
+        app.state.queue = queue
+        if start_queue:
+            queue.start()
+        yield
+        if start_queue:
+            queue.stop()
+
+    app = FastAPI(title="Media Archive Manager", lifespan=lifespan)
+    app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
+
+    def render(request: Request, name: str, **context) -> HTMLResponse:
+        if "rows" in context and "active" not in context:
+            context["active"] = any(
+                r.status.startswith(("Queued ", "Processing ")) for r in context["rows"]
+            )
+        with session_scope() as session:
+            context.setdefault("counts", queries.counts(session))
+        context["settings"] = settings
+        return templates.TemplateResponse(request, name, context)
+
+    def notify(request: Request) -> None:
+        queue: JobQueue | None = getattr(request.app.state, "queue", None)
+        if queue:
+            queue.notify()
+
+    # ------------------------------------------------------------- file list
+    @app.get("/", response_class=HTMLResponse)
+    def files_page(request: Request):
+        flt = queries.FileFilter.from_params(request.query_params)
+        with session_scope() as session:
+            rows, total = queries.list_files(session, flt)
+            facets = queries.facet_values(session)
+        return render(
+            request,
+            "files.html",
+            rows=rows,
+            total=total,
+            flt=flt,
+            facets=facets,
+            page_size=queries.PAGE_SIZE,
+            menu=menu_tools(),
+        )
+
+    @app.get("/files/rows", response_class=HTMLResponse)
+    def files_rows(request: Request):
+        flt = queries.FileFilter.from_params(request.query_params)
+        with session_scope() as session:
+            rows, total = queries.list_files(session, flt)
+        return render(
+            request,
+            "_file_rows.html",
+            rows=rows,
+            total=total,
+            flt=flt,
+            page_size=queries.PAGE_SIZE,
+        )
+
+    @app.post("/actions")
+    async def run_action(request: Request):
+        form = await request.form()
+        tool = form.get("tool", "")
+        dry_run = form.get("dry_run") == "on"
+        pipeline = tool == "__pipeline"
+        if pipeline:
+            tool = pipeline_start()
+        if tool not in TOOLS or not TOOLS[tool].per_file:
+            raise HTTPException(400, f"Unknown tool {tool}")
+        with session_scope() as session:
+            if form.get("scope") == "all":
+                ids = queries.matching_ids(session, queries.FileFilter.from_params(form))
+            else:
+                ids = [int(i) for i in form.getlist("ids")]
+            queued = enqueue(session, tool, ids, dry_run=dry_run, pipeline=pipeline)
+        notify(request)
+        label = "Full pipeline" if pipeline else TOOLS[tool].label
+        msg = f"{label}: {queued} file(s) queued" + (" as a dry run" if dry_run else "")
+        back = re.sub(r"[?&]msg=[^&]*", "", form.get("back") or "/")
+        sep = "&" if "?" in back else "?"
+        return RedirectResponse(f"{back}{sep}msg={msg}", status_code=303)
+
+    # ----------------------------------------------------------- file detail
+    @app.get("/files/{file_id}", response_class=HTMLResponse)
+    def file_page(request: Request, file_id: int):
+        with session_scope() as session:
+            record = session.get(m.MediaFile, file_id)
+            if record is None:
+                raise HTTPException(404)
+            context = {
+                "f": record,
+                "aliases": list(record.aliases),
+                "children": session.scalars(
+                    select(m.MediaFile).where(m.MediaFile.parent_id == file_id)
+                ).all(),
+                "history": session.scalars(
+                    select(m.StatusHistory)
+                    .where(m.StatusHistory.media_file_id == file_id)
+                    .order_by(m.StatusHistory.id.desc())
+                ).all(),
+                "events": session.scalars(
+                    select(m.FileEvent)
+                    .where(m.FileEvent.media_file_id == file_id)
+                    .order_by(m.FileEvent.id.desc())
+                    .limit(50)
+                ).all(),
+                "jobs": session.scalars(
+                    select(m.Job).where(m.Job.media_file_id == file_id).order_by(m.Job.id.desc())
+                ).all(),
+                "evidence": session.scalars(
+                    select(m.WEvidence)
+                    .where(m.WEvidence.media_file_id == file_id)
+                    .order_by(m.WEvidence.field, m.WEvidence.score.desc())
+                ).all(),
+                "reviews": session.scalars(
+                    select(m.Review)
+                    .where(m.Review.media_file_id == file_id)
+                    .order_by(m.Review.id.desc())
+                ).all(),
+                "baserow_writes": session.scalars(
+                    select(m.BaserowWriteLog)
+                    .where(m.BaserowWriteLog.media_file_id == file_id)
+                    .order_by(m.BaserowWriteLog.id.desc())
+                ).all(),
+            }
+        return render(request, "file.html", menu=menu_tools(), **context)
+
+    @app.get("/files/{file_id}/audio")
+    def file_audio(file_id: int, which: str = "original"):
+        with session_scope() as session:
+            record = session.get(m.MediaFile, file_id)
+            if record is None:
+                raise HTTPException(404)
+            path = record.processed_path if which == "processed" else record.original_path
+        if not path or not Path(path).exists():
+            raise HTTPException(404, "File not available")
+        return FileResponse(path)
+
+    # ------------------------------------------------------------------ jobs
+    @app.get("/jobs", response_class=HTMLResponse)
+    def jobs_page(request: Request):
+        return render(request, "jobs.html", **_jobs_context(request))
+
+    @app.get("/jobs/rows", response_class=HTMLResponse)
+    def jobs_rows(request: Request):
+        return render(request, "_job_rows.html", **_jobs_context(request))
+
+    def _jobs_context(request: Request) -> dict:
+        state = request.query_params.get("state", "")
+        with session_scope() as session:
+            stmt = select(m.Job).order_by(m.Job.id.desc()).limit(200)
+            if state:
+                stmt = stmt.where(m.Job.state == state)
+            jobs = session.scalars(stmt).all()
+            names = {
+                f.id: f.current_name or Path(f.original_path or "").name
+                for f in session.scalars(
+                    select(m.MediaFile).where(
+                        m.MediaFile.id.in_({j.media_file_id for j in jobs if j.media_file_id})
+                    )
+                )
+            }
+        active = any(j.state in ("queued", "running") for j in jobs)
+        return {"jobs": jobs, "names": names, "state": state, "active": active}
+
+    @app.post("/jobs/{job_id}/retry")
+    def retry_job(request: Request, job_id: int):
+        with session_scope() as session:
+            job = session.get(m.Job, job_id)
+            if job is None:
+                raise HTTPException(404)
+            if job.tool == "scan":
+                enqueue(session, "scan", dry_run=job.dry_run, params=job.params)
+            else:
+                enqueue(
+                    session,
+                    job.tool,
+                    [job.media_file_id],
+                    dry_run=job.dry_run,
+                    pipeline=job.pipeline,
+                    params=job.params,
+                )
+        notify(request)
+        return RedirectResponse("/jobs", status_code=303)
+
+    @app.post("/jobs/cancel")
+    def cancel_queued(request: Request):
+        with session_scope() as session:
+            for job in session.scalars(select(m.Job).where(m.Job.state == "queued")):
+                job.state = "cancelled"
+                if job.media_file_id and not job.dry_run and TOOLS[job.tool].sets_status:
+                    record = session.get(m.MediaFile, job.media_file_id)
+                    if record.status.startswith("Queued "):
+                        from mam.helpers.local_db.repo import set_status
+
+                        last = session.scalar(
+                            select(m.StatusHistory.old_status)
+                            .where(m.StatusHistory.media_file_id == record.id)
+                            .order_by(m.StatusHistory.id.desc())
+                        )
+                        set_status(session, record, last or "Not processed", job.tool, "cancelled")
+        return RedirectResponse("/jobs", status_code=303)
+
+    # ---------------------------------------------------------------- import
+    @app.get("/import", response_class=HTMLResponse)
+    def import_page(request: Request, root: int = 0, path: str = ""):
+        roots = settings.import_roots
+        if not 0 <= root < len(roots):
+            raise HTTPException(404)
+        label, base = roots[root]
+        current = _safe_join(base, path)
+        folders, media_count = [], 0
+        if current.is_dir():
+            for child in sorted(current.iterdir(), key=lambda p: p.name.lower()):
+                if child.name.startswith("."):
+                    continue
+                if child.is_dir():
+                    folders.append(child.name)
+                elif media_kind(child):
+                    media_count += 1
+        crumbs = []
+        parts = Path(path).parts if path else ()
+        for i in range(len(parts)):
+            crumbs.append((parts[i], "/".join(parts[: i + 1])))
+        return render(
+            request,
+            "import.html",
+            roots=roots,
+            root=root,
+            root_label=label,
+            path=path,
+            current=current,
+            exists=current.is_dir(),
+            folders=folders,
+            media_count=media_count,
+            crumbs=crumbs,
+        )
+
+    @app.post("/import")
+    def import_folder(
+        request: Request, root: Annotated[int, Form()], path: Annotated[str, Form()] = ""
+    ):
+        _, base = settings.import_roots[root]
+        folder = _safe_join(base, path)
+        with session_scope() as session:
+            enqueue(session, "scan", dry_run=False, params={"path": str(folder)})
+        notify(request)
+        return RedirectResponse(f"/jobs?msg=Scanning {folder.name or folder}", status_code=303)
+
+    @app.post("/upload")
+    async def upload(request: Request, files: list[UploadFile]):
+        inbox = settings.inbox_path
+        inbox.mkdir(parents=True, exist_ok=True)
+        saved = 0
+        for upload_file in files:
+            name = Path(upload_file.filename or "").name
+            if not name or media_kind(Path(name)) is None:
+                continue
+            target = inbox / name
+            n = 2
+            while target.exists():
+                target = inbox / f"{Path(name).stem}-{n}{Path(name).suffix}"
+                n += 1
+            with target.open("wb") as out:
+                shutil.copyfileobj(upload_file.file, out)
+            saved += 1
+        with session_scope() as session:
+            enqueue(session, "scan", dry_run=False, params={"path": str(inbox)})
+        notify(request)
+        return RedirectResponse(f"/jobs?msg={saved} file(s) uploaded to the inbox", status_code=303)
+
+    @app.get("/health")
+    def health() -> Response:
+        return Response("ok")
+
+    from mam.manager.review import register_review_routes
+
+    register_review_routes(app, render, notify)
+    return app
+
+
+def _safe_join(base: Path, rel: str) -> Path:
+    target = (base / rel).resolve()
+    base = base.resolve()
+    if target != base and base not in target.parents:
+        raise HTTPException(400, "Path outside the import root")
+    return target

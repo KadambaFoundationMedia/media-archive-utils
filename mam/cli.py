@@ -190,3 +190,81 @@ def baserow_undo(log_id: int, dry_run: DryRun = True) -> None:
     console.print(
         f"undo{' (dry-run)' if result.dry_run else ''}: {result.payload or 'row deleted'}"
     )
+
+
+# ------------------------------------------------------------------- manager
+@app.command()
+def serve(
+    port: Annotated[int, typer.Option(help="Port on 127.0.0.1")] = 8000,
+    reload: Annotated[bool, typer.Option(help="Reload on code changes (development)")] = False,
+) -> None:
+    """Start the media manager at http://127.0.0.1:<port>."""
+    import uvicorn
+
+    console.print(f"Media manager on http://127.0.0.1:{port}")
+    uvicorn.run(
+        "mam.manager.app:create_app",
+        factory=True,
+        host="127.0.0.1",
+        port=port,
+        reload=reload,
+        log_level="info",
+    )
+
+
+@app.command()
+def rename(
+    path: Path,
+    dry_run: DryRun = True,
+) -> None:
+    """Run the Renamer on a file or folder from the command line (dry run by default)."""
+    from mam.helpers.local_db import session_scope
+    from mam.helpers.local_db.repo import register_original
+    from mam.manager.queue import JobQueue, enqueue
+    from mam.manager.scanner import scan_folder
+
+    _ready_db()
+    with session_scope() as session:
+        if path.is_dir():
+            scan_folder(session, path)
+            from sqlalchemy import select
+
+            from mam.helpers.local_db import models as m
+
+            ids = list(
+                session.scalars(
+                    select(m.MediaFile.id).where(
+                        m.MediaFile.original_path.like(f"{path.resolve()}/%")
+                    )
+                )
+            )
+        else:
+            record = register_original(session, path)
+            ids = [record.id] if record else []
+        jobs = enqueue(session, "renamer", ids, dry_run=dry_run)
+    queue = JobQueue()
+    queue.start()
+    import time
+
+    from sqlalchemy import func, select
+
+    from mam.helpers.local_db import models as m
+
+    while True:
+        with session_scope() as session:
+            left = session.scalar(
+                select(func.count(m.Job.id)).where(m.Job.state.in_(("queued", "running")))
+            )
+        if not left:
+            break
+        time.sleep(0.5)
+    queue.stop()
+    with session_scope() as session:
+        rows = session.scalars(
+            select(m.Job).where(m.Job.tool == "renamer").order_by(m.Job.id.desc()).limit(jobs)
+        ).all()
+        for job in reversed(rows):
+            line = job.result["summary"] if job.result else job.error.splitlines()[0]
+            console.print(f"[{'red' if job.state == 'failed' else 'green'}]{job.state}[/] {line}")
+            for flag in (job.result or {}).get("flags", []):
+                console.print(f"   [yellow]⚑ {flag}[/yellow]")

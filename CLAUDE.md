@@ -35,7 +35,8 @@ The goal is to build those tools and the media manager to discover and properly 
 ## Repository layout
 - mam/                  Python package with all code (`mam` CLI, config, logging)
 - mam/helpers/<name>/   helper code (underscored names, e.g. mam/helpers/local_db/)
-- mam/tools/<name>/     tool code (added as tools are built)
+- mam/manager/          media manager: FastAPI app, job queue, templates
+- mam/tools/<name>/     tool code (e.g. mam/tools/renamer/)
 - tests/                pytest suite; tests/fixtures/golden.yaml holds the spec examples
 - tools/media-manager/  webbased file reviewer (specs)
 - tools/<name>/         one folder per tool (SPECS.md, CLAUDE.md)
@@ -55,8 +56,8 @@ The goal is to build those tools and the media manager to discover and properly 
 
 ## Commands
 - Install: `uv sync`
-- Run media manager: `mam serve`
-- Run a tool: `mam <tool> --dry-run <path>`
+- Run media manager: `uv run mam serve` (http://127.0.0.1:8000)
+- Run the Renamer from the command line: `uv run mam rename <file-or-folder>` (dry run; add `--no-dry-run` to copy)
 - Environment check: `mam doctor`
 - Run tests: `uv run pytest` (add `-m slow` for transcription integration tests)
 - Lint/format: `uv run ruff check .` and `uv run ruff format .`

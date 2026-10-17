@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <h1 class="h5 mb-0 me-auto">Jobs</h1>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Filter">
+    {% for s, label in [('', 'All'), ('queued', 'Queued'), ('running', 'Running'), ('done', 'Done'), ('failed', 'Failed')] %}
+    <a class="btn btn-outline-secondary {% if state == s %}active{% endif %}" href="/jobs{% if s %}?state={{ s }}{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <form method="post" action="/jobs/cancel"><button class="btn btn-sm btn-outline-danger" type="submit">Cancel queued</button></form>
+</div>
+<div id="job-table">{% include "_job_rows.html" %}</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h5">Import</h1>
+<ul class="nav nav-tabs mb-3">
+  {% for label, p in roots %}
+  <li class="nav-item"><a class="nav-link {% if loop.index0 == root %}active{% endif %}" href="/import?root={{ loop.index0 }}">{{ label }}</a></li>
+  {% endfor %}
+</ul>
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/import?root={{ root }}">{{ root_label }}</a></li>
+    {% for name, rel in crumbs %}<li class="breadcrumb-item"><a href="/import?root={{ root }}&path={{ rel | urlencode }}">{{ name }}</a></li>{% endfor %}
+  </ol>
+</nav>
+<div class="small text-body-secondary mb-2 text-break">{{ current }}</div>
+{% if not exists %}
+  <div class="alert alert-warning">This folder does not exist (check the path in .env).</div>
+{% else %}
+<form method="post" action="/import" class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+  <input type="hidden" name="root" value="{{ root }}">
+  <input type="hidden" name="path" value="{{ path }}">
+  <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass me-1"></i>Import this folder and all subfolders</button>
+  <span class="small text-body-secondary">{{ media_count }} media file(s) directly in this folder. Other files are ignored; originals are never changed.</span>
+</form>
+<div class="list-group mb-4">
+  {% for name in folders %}
+  <a class="list-group-item list-group-item-action" href="/import?root={{ root }}&path={{ ((path ~ '/' if path else '') ~ name) | urlencode }}">
+    <i class="fa-regular fa-folder me-2"></i>{{ name }}</a>
+  {% else %}<div class="list-group-item text-body-secondary">No subfolders</div>{% endfor %}
+</div>
+{% endif %}
+
+<h2 class="h6">Upload to the inbox</h2>
+<form method="post" action="/upload" enctype="multipart/form-data" class="dropzone p-4 border border-2 border-dashed rounded text-center" id="dropzone">
+  <i class="fa-solid fa-cloud-arrow-up fa-2x mb-2 text-body-secondary"></i>
+  <div class="mb-2">Drop audio or video files here, or choose them</div>
+  <input class="form-control form-control-sm mx-auto" style="max-width:24rem" type="file" name="files" multiple accept="audio/*,video/*,.wma,.mts" id="upload-input">
+  <button class="btn btn-sm btn-outline-primary mt-2" type="submit">Upload</button>
+  <div class="small text-body-secondary mt-1">Saved to {{ settings.inbox_path }} and registered automatically.</div>
+</form>
+{% endblock %}

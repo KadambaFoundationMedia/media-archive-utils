@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <h1 class="h5 mb-0 me-auto">Review</h1>
+  <div class="btn-group btn-group-sm">
+    <a class="btn btn-outline-secondary {% if show == 'pending' %}active{% endif %}" href="/reviews">Open</a>
+    <a class="btn btn-outline-secondary {% if show == 'all' %}active{% endif %}" href="/reviews?show=all">All</a>
+  </div>
+</div>
+<div class="table-responsive">
+<table class="table table-sm align-middle">
+  <thead><tr><th>File</th><th>Tool</th><th>Why</th><th>Proposed name</th><th>Outcome</th></tr></thead>
+  <tbody>
+  {% for r in reviews %}{% set f = files.get(r.media_file_id) %}
+    <tr>
+      <td class="text-break"><a href="/review/{{ r.id }}">{{ f.original_path | basename if f else r.media_file_id }}</a>
+        <div class="small text-body-secondary text-break">{{ f.original_path | dirname if f else '' }}</div></td>
+      <td>{{ tools[r.tool].label if r.tool in tools else r.tool }}</td>
+      <td class="small">{% for line in r.reason.split('\n') %}<div>{{ line }}</div>{% endfor %}</td>
+      <td class="small font-monospace text-break">{{ r.proposal.final_name or r.proposal.new_name }}</td>
+      <td><span class="badge text-bg-{{ 'warning' if r.outcome == 'pending' else 'success' if r.outcome in ('approved','edited') else 'secondary' }}">{{ r.outcome }}</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="text-center text-body-secondary py-4">Nothing to review</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

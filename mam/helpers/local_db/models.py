@@ -35,6 +35,14 @@ class MediaFile(Base):
     derivation: Mapped[str | None] = mapped_column(String(32))  # kirtan | class | trimmed | ...
     status: Mapped[str] = mapped_column(String(64), default="Not processed", index=True)
     baserow_row_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    # Display fields filled by the tools (the full proposal and evidence live in `meta`).
+    rec_date: Mapped[str | None] = mapped_column(
+        String(10), index=True
+    )  # YYYY-MM-DD, may hold placeholders
+    title: Mapped[str | None] = mapped_column(Text)
+    location: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(64), index=True)
+    meta: Mapped[dict[str, Any] | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

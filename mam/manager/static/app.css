@@ -1,0 +1,9 @@
+.file-table td, .file-table th { vertical-align: top; }
+.file-table td:nth-child(2) { min-width: 14rem; }
+.file-table td:nth-child(3) { min-width: 14rem; }
+.border-dashed { border-style: dashed !important; }
+.dropzone.dragover { background: var(--bs-tertiary-bg); }
+.evidence-chip { cursor: pointer; }
+@media (max-width: 576px) {
+  main.container-fluid { padding-left: 1rem; padding-right: 1rem; }
+}

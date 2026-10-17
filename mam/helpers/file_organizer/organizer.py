@@ -111,8 +111,14 @@ class FileOrganizer:
     def root(self) -> Path:
         return self.settings.media_processed_files_path
 
-    def target_folder(self, what: str | None) -> tuple[Path, CategoryMatch | None]:
+    def target_folder(
+        self, what: str | None, category: str | None = None
+    ) -> tuple[Path, CategoryMatch | None]:
+        """Folder for a WHAT; a known `category` name wins when the WHAT does not match."""
         match = self.matcher.match(what)
+        if match is None and category:
+            found = self.matcher.by_name(category)
+            match = CategoryMatch(found, category, 0) if found else None
         folder = match.category.folder if match else UNRESOLVED
         return self.root / folder, match
 
@@ -125,8 +131,9 @@ class FileOrganizer:
         tool: str,
         dry_run: bool = True,
         media_file_id: int | None = None,
+        category: str | None = None,
     ) -> OrganizeResult:
-        folder, match = self.target_folder(what)
+        folder, match = self.target_folder(what, category)
         assert_writable(folder, self.settings)
         # Anything outside the processed root is treated as an original and only copied.
         is_original = not _is_below(src, [self.root.resolve()])
