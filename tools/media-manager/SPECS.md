@@ -31,7 +31,7 @@ Items that need reviewing have a separate detail page where data can be updated 
 The class trimmer tool determines the timestamps to trim the recording. But if the trimmer tool flags a file for review the media manager must provide a visual waveform with the trimming timestamps. The user must be able to review (listen to) the audio. The user can move each trimming section and approve each one manually. After approving the timestamps the class trimmer will trim the sections and approve the file.
 
 ## Action menu
-The action menu lists all the available tools for file processing. See docs/tooling-overview.md#edia Archive Manager tool (docs/media-archive-manager-tool.md) for all the tools
+The action menu lists all the available tools for file processing. See @CONTRACTS.md (Media File Processing flow) for all the tools, plus a "Run full pipeline" action. See @SPEC.md section 8 for the full UI spec.
 
 ## File statuses
 Each media file can have one of these statuses:

@@ -11,7 +11,6 @@
 - Class discoverer tool
 - Content discoverer tool
 - Class trimmer
-- Gain booster
 
 ## Helpers
 - helpers/audio-optimizer/
@@ -26,10 +25,16 @@ The tools/media-manager/ coordinates and executes these tools:
 
 1. tools/renamer/
 2. tools/kirtan-splitter/
-3. tools/gain-booster/
-4. tools/class-discoverer/
+3. tools/class-discoverer/
+4. tools/content-discoverer
 5. tools/class-trimmer/
 
+
+## Pipeline behaviour
+- Each tool runs on its own (single file or batch) or chained by the media manager.
+- A flagged file pauses on its own; other files continue. After approval it resumes at the next step.
+- Kirtan-only outputs are `Skipped` for class-discoverer, content-discoverer and class-trimmer.
+- File statuses and the full rules are in @SPEC.md (sections 4 and 7).
 
 ## Tool dependencies
 
@@ -43,7 +48,7 @@ The tools/media-manager/ coordinates and executes these tools:
 
 - tools/kirtan-splitter/
     - Dependency: tools/class-discoverer/SPECS.md
-    - Dependency: docs/references/recording-structure.md
+    - Dependency: docs/references/editing-standard.md
     - Dependency: docs/references/verse-structure.md
     - Dependency: helpers/baserow/SPECS.md
     - Dependency: helpers/file-organizer/SPECS.md
@@ -53,7 +58,7 @@ The tools/media-manager/ coordinates and executes these tools:
     - Dependency: tools/renamer/SPECS.md
     - Dependency: helpers/file-organizer/SPECS.md
     - Dependency: helpers/audio-optimizer/SPECS.md
-    - Dependency: docs/references/recording-structure.md
+    - Dependency: docs/references/editing-standard.md
     - Dependency: docs/references/verse-structure.md
     - Dependency: docs/references/recording-common-phrases.md
     - Dependency: https://vedabase.io
@@ -64,7 +69,7 @@ The tools/media-manager/ coordinates and executes these tools:
     - Dependency: docs/references/recording-common-phrases.md
 
 - tools/class-trimmer/
-    - Dependency: docs/references/recording-structure.md
+    - Dependency: docs/references/editing-standard.md
     - Dependency: docs/references/verse-structure.md
     - Dependency: docs/references/recording-common-phrases.md
     - Dependency: transcriptions/<transcrip file>
