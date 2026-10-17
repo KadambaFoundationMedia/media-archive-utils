@@ -114,7 +114,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - 1 to 5 topics, each at most 2 words and not too general.
 - A YouTube description in English, 2 to 3 paragraphs, always ending with the footer (current year).
 - A short English title, which goes into the WHAT.
-- All results are written to Baserow.
+- All results are written to Baserow: the description to `media_description` (and `youtube_desc` set to true), per helpers/baserow/SPECS.md.
 
 ### Class-trimmer
 - **Sections:** detects them per docs/references/editing-standard.md and cuts by stream copy.
@@ -211,4 +211,4 @@ The kirtan-splitter examples (`oslo-noi`, a kept `-2` index, `ZOOM0004` as a WHA
 - **Refreshed:** it is rebuilt when new approved recordings add coverage, such as other years or other microphones.
 
 ## 11. Open decisions
-- None at the moment. Add new ones here instead of inventing an answer.
+- The media table also has a `themes` column; confirm it is where the content-discoverer topics go.

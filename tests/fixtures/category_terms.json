@@ -1,0 +1,158 @@
+[
+ {
+  "category": "App-Disapp",
+  "filename_terms": "Appearance,disappearance, app, disapp",
+  "folder_name": "App-Disapp",
+  "color": "orange"
+ },
+ {
+  "category": "Bhagavad-gita",
+  "filename_terms": "BG, B.G., bhag-gita, gita",
+  "folder_name": "Bhagavad-gita",
+  "color": "blue"
+ },
+ {
+  "category": "Book-discussions",
+  "filename_terms": "Reading from, purana, KSH, krsna book",
+  "folder_name": "Book-discussions",
+  "color": "red"
+ },
+ {
+  "category": "Caitanya-caritamrta",
+  "filename_terms": "CC, Chaitanya Charitamrita, caitanya-caritamrta, chaitanya caritamrta",
+  "folder_name": "Caitanya-caritamrta",
+  "color": "darker-brown"
+ },
+ {
+  "category": "CC-Adi-lila",
+  "filename_terms": "CC Adi Lila, caitanya-caritamrta adi-lila, adi",
+  "folder_name": "CC-Adi-lila",
+  "color": "brown"
+ },
+ {
+  "category": "CC-Antya-lila",
+  "filename_terms": "CC Anthya lila, anthya,",
+  "folder_name": "CC-Antya-lila",
+  "color": "light-pink"
+ },
+ {
+  "category": "CC-Madhya-lila",
+  "filename_terms": "CC Madhya Lila, madhya",
+  "folder_name": "CC-Madhya-lila",
+  "color": "gray"
+ },
+ {
+  "category": "Festivals",
+  "filename_terms": "summer camp, festival",
+  "folder_name": "Festivals",
+  "color": "dark-blue"
+ },
+ {
+  "category": "Gaura-purnima",
+  "filename_terms": "Gaur purnima",
+  "folder_name": "Gaura-purnima",
+  "color": "dark-brown"
+ },
+ {
+  "category": "Home-program",
+  "filename_terms": "Home program, home-program, house-program",
+  "folder_name": "Home-program",
+  "color": "cyan"
+ },
+ {
+  "category": "Initiations",
+  "filename_terms": "Initiation, Initiations",
+  "folder_name": "Initiations",
+  "color": "light-orange"
+ },
+ {
+  "category": "Interview",
+  "filename_terms": "Interview",
+  "folder_name": "Interview",
+  "color": "dark-purple"
+ },
+ {
+  "category": "Janmastami",
+  "filename_terms": "Janmastami",
+  "folder_name": "Janmastami",
+  "color": "green"
+ },
+ {
+  "category": "Kirtan",
+  "filename_terms": "Kirtan, kirtana, bhajan, mellows, maha mantra, kirtany, Gaura arati, Samsara, guru puja, bhajana, bhajanas, bahjanas",
+  "folder_name": "Kirtan",
+  "color": "darker-red"
+ },
+ {
+  "category": "Krsna-book",
+  "filename_terms": "Krishna book, krsnabook, krsna book,",
+  "folder_name": "Krsna-book",
+  "color": "darker-gray"
+ },
+ {
+  "category": "Nrsimha-caturdasi",
+  "filename_terms": "Nrsimha caturdasi",
+  "folder_name": "Nrsimha-caturdasi",
+  "color": "dark-cyan"
+ },
+ {
+  "category": "Parikrama",
+  "filename_terms": "Parikrama, braj-parikrama",
+  "folder_name": "Parikrama",
+  "color": "light-blue"
+ },
+ {
+  "category": "Radhastami",
+  "filename_terms": "Radhastami",
+  "folder_name": "Radhastami",
+  "color": "darker-cyan"
+ },
+ {
+  "category": "Retreat",
+  "filename_terms": "Retreat",
+  "folder_name": "Retreat",
+  "color": "dark-green"
+ },
+ {
+  "category": "Seminars",
+  "filename_terms": "Seminar, seminars, workshop",
+  "folder_name": "Seminars",
+  "color": "yellow"
+ },
+ {
+  "category": "Srimad-bhagavatam",
+  "filename_terms": "SB, S.B., Srimad-bhagavatam, srimad bhagavatam, S-B",
+  "folder_name": "Srimad-bhagavatam",
+  "color": "light-red"
+ },
+ {
+  "category": "Sunday-program",
+  "filename_terms": "Sunday Feast, sunday class",
+  "folder_name": "Sunday-program",
+  "color": "darker-green"
+ },
+ {
+  "category": "Unknown",
+  "filename_terms": "Unknown",
+  "folder_name": "Unknown",
+  "color": "darker-gray"
+ },
+ {
+  "category": "Various",
+  "filename_terms": "Govinda",
+  "folder_name": "Various",
+  "color": "dark-orange"
+ },
+ {
+  "category": "Vyasa-puja",
+  "filename_terms": "VP, vyasapuja, vyasa-puja",
+  "folder_name": "Vyasa-puja",
+  "color": "darker-orange"
+ },
+ {
+  "category": "Jaya-Radha-Madhava",
+  "filename_terms": "JRM, Jaya Radha Madhava",
+  "folder_name": "Jaya-Radha-Madhava",
+  "color": "darker-red"
+ }
+]
