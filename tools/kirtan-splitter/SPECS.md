@@ -6,7 +6,6 @@
 - Determining the mantra type
   - Filename convention per mantra type
 - Example of a split file and renaming
-- Common markers
 - Examples of recordings with timestamps
 
 ## Goals
@@ -15,14 +14,15 @@ If the singing continues throughout the whole recording it is a "kirtan recordin
 
 ## Requirements
 - Determine the timestamp where the kirtan (the singing) start and ends.
+  - Use common phrases to determine timestamps
 - Split the recording into 2 files: kirtan and class
 - Trim any silence before the kirtan (singing) starts
 - Both files should be renamed again by the "Renamer Tool" and the media table should be updated accordingly!
 - Kirtan files are always moved to their final location in the default processed file location (see .env)
 - Video files must be processed first: the audio must be fully extracted and saved as a separate audio (mp3) in its original quality. The audio filename should be match the video filename.
 - A dry-run option must be added.
-- Review docs/recording-structure.md
-- Review docs/class-discovery-tool.md #common-markers-in-recordings
+- See @docs/references/recording-structure.md
+- See @docs/references/recording-common-phrases.md
 
 ## Determining the mantra type
 The type of mantra in a recording could be anything but there are standard mantra’s that are sung. Here is a list:
@@ -38,15 +38,6 @@ example: https://srimayapurdhama.com/vsong/nrsimhadeva-arati/
 - Jaya radha-madhava → Jaya-radha-madhava
 - Sri Panca-tattva → Jaya-Jaya-Sri-Caitanya
 - Nrishmadeva → Nrsimha-pranama
-
-## Common phrases
-Common phrases by the speaker are good markers to determine when the class starts. Search for these phrases:
-- "We are reading from" or "Reading from"
-- "Bhagavad-gita as it is"
-- "Srimad Bhagavatam"
-- "Om namo bhagavate vasudeva ajam"
-
-More prhases can be found here: "docs/class-discovery-tool.md#Common-phrases"
 
 ## Examples of recordings with timestamps
 - See folder /splitting-samples/ for the review media files. Do not split these files!

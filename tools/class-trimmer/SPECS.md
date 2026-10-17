@@ -1,42 +1,54 @@
 # Class Trimmer Tool
 
 ## Table of contents
+- Introduction
 - Goals
 - Requirements
-- Trimming example
-  - Trimming timestamps
+- File trimming example
+  - Unedited Trimming timestamps
+  - Edited sections
+- Increase audibility of audience questions
+
+## Introduction
+You are working with live recordings of classes, seminars, workshops and other events. These recordings are from the morning/evening programs in ISKCON temples or at festivals and venues. The recording topics are based on Vaisnava literature like the Bhagavad-gita, Srimad-bhagavatam and others by A.C. Bhaktivedante Swami Prabhupada (BBT) and other acaryas (guru’s). Most recordings contain sanskrit verses. The Vedabase https://vedabase.io/en/ provides access to all the books that are discussed in these recordings. The Class Trimmer will determine what sections are available in the recording and edit them to our editing standards.
 
 ## Goals
-
-
+The class trimmer will determine the sections of each recording and their timestamps. Next it will trim out the unwanted sections. After trimming it will also increase the audibility of the audience questions. The file trimming example below provides an example of the timestamps that need to be discovered. Afterwards the unwanted sections should be trimmed. 
 
 ## Requirements
+- Use @docs/references/editing-standards.md
+- Use @docs/references/recording-common-phrases.md
+- Use @docs/references/verse-structure.md
+- Use the transcriptions/<file> for this recording
 
+## File trimming example
+file: sample-files/2011-08-20_KKS_SB-1-19-31_fi.mp3
+Warning: The timestamps below describe **only this example**; Other recordings will have different timestamps.
 
-## File example
-file: sample-files/KKS_S.B. 1.19.31(with Radha Madhava)_Oslo_29.8.11.WMA
+### Unedited Trimming timestamps
 
-These timestamps describe **only this recording**; another recording needs
-its own Tool 5 evidence and cut point. Tool 6 cuts at the end of singing and
-trims only actual leading silence in either result. The additional internal
-class edits shown below are for later class-processing tools, not permission
-for Tool 6 to remove meaningful speech or prayers.
+11:44:122 - Kirtan (singing) ends (Kirtan will be split by the kirtan-splitter tool eventually)
+11:44:122 - 11:53:666 background ambience - TRIM
+11:53:666 - 12:16:034 "Om namo bhagavate vasudeva ajam" - TRIM
+12:16:034 - 12:23:478 Book and verse introdction - "First canto, chapter nine ..." (So this is a srimad Bhagavatam class) - KEEP
+12:29 - 12:54 Background - TRIM
+12:54 - 13:32 1x sanskrit verse by speaker - KEEP
+13:32 - 17:32 Repeated sanskrit verse - TRIM
+17:32 - 18:46 Synonyms - KEEP
+18:46 - 19:05 English verse translation - KEEP
+19:05 - 20:25 Purport - KEEP
+20:25 - 21:15 Oblations - "Om ajnana timeranda shaj" - TRIM
+21:15 - 01:43:33 Explanation and discussion and audience questions (the actual class) - KEEP
 
-### Trimming timestamps
+### Edited sections
+When the file example is edited these sections should remain
 
-| Timestamp | Explanation | Action |
-| :---- | :---- | :---- |
-| 00:00 \- 11:41 | Jaya radha-madhava and maha mantra singing | Split and safe to separate file |
-| 11:41 \- 11:53 | Background ambience | Trim |
-| 11:53 \- 12:16 | Oblations mantra \- Om namo bhagavate vasudeva ajam | Trim |
-| 12:16 \- 12:23 | Background | Trim |
-| 12:23 \- 12:29 | (Reading from) Canto 1, chapter 19, etc | Keep |
-| 12:29 \- 12:54 | Background | Trim |
-| 12:54 \- 13:32 | 1st reading of sanskrit verse (roman) | Keep |
-| 13:32 \- 17:32 | Repeated sanskrit verse | Trim |
-| 17:32 \- 18:46 | Word by word translation | Keep |
-| 18:46 \- 19:05 | Translation | Keep |
-| 19:05 \- 20:25 | Purport | Keep |
-| 20:25 \- 21:15 | Oblations \- Om ajnana timeranda shaj | Trim |
-| 21:15 \- 01:43:33 | Start of class | Keep |
-| 01:43:33 \- end | Rest of the class mixed with Questions and answers | Keep |
+- Book and verse introdction - "First canto, chapter nine ..."
+- 1x sanskrit verse by speaker
+- Synonyms
+- English verse translation
+- Purport
+- Explanation and discussion of the purport (the actual class)
+
+## Increase audibility of audience questions
+Usually after the verse discussion is over the speaker will inquire from the audience if there are questions about his class. The gain level of those questions is usually much lower compared to the speaker. The goals is to increase the gain level of the questions to the same level as the speaker to make it more audible.

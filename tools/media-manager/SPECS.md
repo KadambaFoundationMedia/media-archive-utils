@@ -27,5 +27,19 @@ Each row in the list should show the original file name and path, the renamed fi
 - item detail page
 Items that need reviewing have a separate detail page where data can be updated and saved
 
+## Audio reviewing
+The class trimmer tool determines the timestamps to trim the recording. But if the trimmer tool flags a file for review the media manager must provide a visual waveform with the trimming timestamps. The user must be able to review (listen to) the audio. The user can move each trimming section and approve each one manually. After approving the timestamps the class trimmer will trim the sections and approve the file.
+
 ## Action menu
 The action menu lists all the available tools for file processing. See docs/tooling-overview.md#edia Archive Manager tool (docs/media-archive-manager-tool.md) for all the tools
+
+## File statuses
+Each media file can have one of these statuses:
+
+- <Tool name> Review
+- Not processed
+- Processing <tool name>
+- Processing complete
+- Corrupted
+
+If more statuses are required just propose them to the user. 
