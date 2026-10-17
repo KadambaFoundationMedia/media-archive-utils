@@ -14,7 +14,8 @@ Items under "Open decisions" are not decided: ask instead of guessing.
 7. File statuses
 8. Media manager UI
 9. Testing and development safety
-10. Open decisions
+10. Confidence and learning
+11. Open decisions
 
 ## 1. Stack and runtime
 - **Language:** Python, managed with `uv`.
@@ -32,7 +33,7 @@ Items under "Open decisions" are not decided: ask instead of guessing.
 - **Local database:** SQLite on the local disk, never on the NAS share. Export and import use the SQLite file plus a JSON/CSV dump command.
 - **LLM:** a pluggable provider interface. The default is the Claude API (latest model, key in `.env`); a local model is optional. Results are cached by (input hash, prompt version) so re-runs are not billed again.
   - The Renamer is deterministic (date parsing, regexes, lookups). It uses the LLM only as a fallback for unusual or foreign-language folder and file names.
-- **Speaker separation:** lightweight speaker embeddings (for example SpeechBrain ECAPA) are compared against a KKS voice profile built from known clips. A segment that is "not KKS" is an audience candidate.
+- **Speaker separation:** lightweight speaker embeddings (for example SpeechBrain ECAPA) are compared against a KKS voice profile built from the sample files (see section 10). A segment that is "not KKS" is an audience candidate.
 - **Vedabase:** verse pages are fetched on demand and cached in the local DB indefinitely. Requests are limited to 1 per second and send a clear User-Agent.
 - **Concurrency:** a job queue persisted in SQLite, with a worker pool per resource. Defaults: 1 ML worker (transcription, embeddings), a few ffmpeg/CPU workers, and I/O workers for copies and Baserow. All sizes are configurable in `.env`. The queue survives restarts, so the Renamer can process hundreds of files while ML work runs one file at a time.
 - **Users:** one operator on localhost. The server binds to 127.0.0.1 with no authentication. The operator name from config is recorded on every approval.
@@ -101,7 +102,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - common phrases
 - **No split:** a recording that is singing throughout is not split.
 - **Cutting:** by stream copy. Kirtan files are named by mantra type, as in its SPECS.md.
-- **Automation:** cuts automatically when every boundary is confident and anchored by a phrase. Otherwise the file goes to `Kirtan-splitter Review`.
+- **Automation:** cuts automatically when every boundary scores above the learned threshold (see section 10). Otherwise the file goes to `Kirtan-splitter Review`.
 
 ### Class-discoverer
 - **Whole-recording gain:** runs the audio-optimizer and writes the result to the processed copy (encode #1).
@@ -121,7 +122,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - target −18 LUFS ±1 LU, ceiling −1 dBTP
   - a required gain above 12 dB always goes to review
 - **Non-verse recordings** (festivals, seminars, workshops): trims only the leading and trailing ambience and the intro mantra, applies the Q&A gain and the final pass, and flags the file if the structure is unclear.
-- **Automation:** cuts automatically when confident. Otherwise the file goes to `Class-trimmer Review`.
+- **Automation:** cuts automatically when every boundary scores above the learned threshold (see section 10). Otherwise the file goes to `Class-trimmer Review`.
 
 ## 5. Transcripts
 - **Files:** `transcriptions/<final-base-name>.md`, Markdown with a `[hh:mm:ss.mmm]` timestamp on each segment. The transcript is renamed whenever its audio file is renamed.
@@ -176,9 +177,38 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Test speed:** fast unit tests cover parsing and naming. Integration tests marked `slow` run real transcription on `trimming-samples/`.
 - **Dev safety:** development runs use only `sample-files/`, and every tool and helper that changes files has a dry-run mode.
 
-## 10. Open decisions
-- Exact confidence scores and thresholds for automatic split/trim cuts (to be tuned against the fixtures).
-- Which clips make up the KKS voice profile.
-- Inconsistencies in the kirtan-splitter spec, to confirm with the user:
-  - the example names `oslo-noi`, and `2008-01-04-2_KKS_class.mp3` (which conflicts with the rule that unknown segments are omitted)
-  - the sample folder is called `splitting-samples/` in the spec but `trimming-samples/` in the repo
+## 10. Confidence and learning
+Thresholds are learned from labeled examples, not hard-coded. The goal is a balance: automate what the tools reliably get right and flag only what is genuinely uncertain.
+
+### Labeled examples
+- **Seed set:** the documented examples in the tool specs (the kirtan-splitter and class-trimmer timestamps, and the renamer and class-discoverer names) are stored in the golden fixtures.
+- **Growing set:** every review outcome becomes a new labeled example. Approved unchanged confirms the tool, edited records the correction, and rejected marks a failure. Each is stored in the local DB with the tool's original proposal and its features.
+
+### Confidence scores
+- Each tool combines its evidence into one score per decision: a boundary for the splitter or trimmer, or a W for the renamer.
+  - Splitter and trimmer evidence: common-phrase anchors, music/speech classifier margin, silence gap at the boundary, speaker-change evidence, and agreement between sources.
+- Scores are calibrated against the labeled examples, so a score of 0.9 means about 90% of past decisions at that score were correct.
+
+### Auto/review thresholds
+- **Per tool:** each tool's threshold is the lowest score at which auto-applied decisions on the labeled set still reach the target precision. The default target is 95% of auto-applied cuts within ±1.5 s of the approved timestamp.
+- **Below threshold:** the file is flagged for review.
+- **Too few examples:** while a tool has fewer than 20 labeled examples, everything below a conservative starting threshold (0.9) goes to review.
+- **Recalibration:** thresholds are recalculated automatically every 25 new review outcomes, and on demand with `mam calibrate`.
+- **Spot checks:** a small share of auto-applied files (default 5%) is sent to review anyway, so the precision estimate stays honest.
+- **Dashboard:** the media manager shows, per tool, the auto rate, the review rate and the measured precision. The target precision and spot-check rate are configurable in `.env`.
+
+### Naming mismatches
+The kirtan-splitter examples (`oslo-noi`, a kept `-2` index, `ZOOM0004` as a WHAT) show that real names are messy. The tools handle them with validation instead of fixed rules:
+- **Validation:** each segment is checked against known values: ISO country codes, `travel_schedule` places, Baserow categories and verse patterns.
+- **Auto-correct:** when exactly one valid correction exists, the tool applies it and records it in `notes`, for example `noi` → `no` (Norway, Oslo is in the travel schedule).
+- **Review:** when no correction exists or several do, the file is flagged.
+- **Meaningless parts dropped:** source indexes (`-2`) and device names (`ZOOM0004`, `R09_0003`) are removed from the new name, which follows the omit-unknown rule. The original name is always kept in the local DB and Baserow.
+- **Learning:** corrections that reviewers make repeatedly (the same wrong token fixed the same way at least 3 times) are added as alias rules, so the same mistake is auto-corrected next time.
+
+### KKS voice profile
+- **Built from samples:** made from main-speaker segments of any file in `sample-files/` or `trimming-samples/`. The main speaker is the dominant speaker cluster in a class, confirmed by the class sections in the transcript.
+- **Stored locally:** the profile is saved in the local DB.
+- **Refreshed:** it is rebuilt when new approved recordings add coverage, such as other years or other microphones.
+
+## 11. Open decisions
+- None at the moment. Add new ones here instead of inventing an answer.

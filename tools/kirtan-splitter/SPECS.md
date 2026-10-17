@@ -41,9 +41,9 @@ example: https://srimayapurdhama.com/vsong/nrsimhadeva-arati/
 - Nrishmadeva → Nrsimha-pranama
 
 ## Examples of recordings with timestamps
-- See folder /splitting-samples/ for the review media files. Do not split these files!
+- See folder trimming-samples/ for the review media files. Do not split these files!
 
-### File: splitting-samples/2008-01-04-2.mp3
+### File: trimming-samples/2008-01-04-2.mp3
 Kirtan ends: 28:13:048
 Splitting timestamp: 28:13:048
 Class starts: 29:19:929
@@ -51,7 +51,7 @@ Common marker: Not available
 - Kirtan filename: 2008-01-04-2_KKS_<kirtan type>.mp3
 - Class filename: 2008-01-04-2_KKS_class.mp3
 
-### File: splitting-samples/2012-01-02_KKS_CC-Talk_Simhachalam_de.mp3
+### File: trimming-samples/2012-01-02_KKS_CC-Talk_Simhachalam_de.mp3
 Kirtan ends: 7:39:592
 Splitting timestamp: 7:39:592
 Class starts: 7:59:918
@@ -59,7 +59,7 @@ Common marker: Not available
 - Kirtan filename: 2008-01-04-2_KKS_<kirtan type>.mp3
 - Class filename: 2008-01-04-2_KKS_class.mp3
 
-### File: splitting-samples/HH Kadamba Kanana Swami - SB 3.6.6 - Sweden - 27_8_15.mp3
+### File: trimming-samples/HH Kadamba Kanana Swami - SB 3.6.6 - Sweden - 27_8_15.mp3
 Kirtan ends: 2:29:396
 Splitting timestamp: 2:29:396
 Class starts: 2:30:189
@@ -67,7 +67,7 @@ Common marker: "om namo bhagavate vasudeva ajam"
 - Kirtan filename: 2015-08-27_KKS_Jaya-radha-madhava_se.mp3
 - Class filename: 2015-08-27_KKS_SB-3-6-6_se.mp3
 
-### File: splitting-samples/KKS_S.B. 1.19.31(with Radha Madhava)_Oslo_29.8.11.WMA
+### File: trimming-samples/KKS_S.B. 1.19.31(with Radha Madhava)_Oslo_29.8.11.WMA
 Kirtan ends: 11:44:176
 Splitting timestamp: 11:44:176
 Class starts: 12:20:945
@@ -75,7 +75,7 @@ Common marker: Not availabe but speaker starts with "Its thirthy one, first cant
 - Kirtan filename: 2011-08-29_KKS_Jaya-radha-madhava_oslo-noi.mp3
 - Class filename:  2011-08-29_KKS_SB-1-19-31_Oslo-no.mp3
 
-### File: splitting-samples/Vyasa-puja 2015/ZOOM0004.MP3
+### File: trimming-samples/Vyasa-puja 2015/ZOOM0004.MP3
 Kirtan ends: 6:21:927
 Splitting timestamp: 6:21:927
 Class starts: 7:30:397
