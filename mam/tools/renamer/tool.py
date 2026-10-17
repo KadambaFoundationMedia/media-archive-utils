@@ -1,0 +1,381 @@
+"""Renamer job: propose, copy into processed-files, record evidence, flag or write Baserow."""
+
+from __future__ import annotations
+
+import logging
+import re
+from datetime import UTC, date, datetime
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import delete, select, update
+from sqlalchemy.orm import Session
+
+from mam.config import Settings, get_settings
+from mam.errors import MamError
+from mam.helpers.file_organizer import FileOrganizer
+from mam.helpers.local_db import models as m
+from mam.helpers.local_db.db import session_scope
+from mam.helpers.local_db.repo import set_status
+from mam.manager.tools import JobContext, ToolOutcome
+from mam.tools.renamer.dates import DateValue
+from mam.tools.renamer.knowledge import Reference, get_reference, norm_key
+from mam.tools.renamer.naming import build_name, format_where, problems
+from mam.tools.renamer.resolve import Proposal, Resolver
+
+log = logging.getLogger(__name__)
+TOOL = "renamer"
+ALIAS_ACTIVATION = 3  # a correction made this many times becomes a rule (SPEC.md section 10)
+
+
+def resolver(settings: Settings | None = None) -> Resolver:
+    settings = settings or get_settings()
+    return Resolver(get_reference(), [p for _, p in settings.import_roots])
+
+
+def source_path(record: m.MediaFile) -> Path:
+    """The file to rename: the processed copy if there is one, otherwise the original."""
+    if record.processed_path and Path(record.processed_path).exists():
+        return Path(record.processed_path)
+    return Path(record.original_path)
+
+
+def archive_path(path: Path, settings: Settings) -> str:
+    try:
+        return (
+            "/"
+            + path.resolve().relative_to(settings.media_processed_files_path.resolve()).as_posix()
+        )
+    except ValueError:
+        return str(path)
+
+
+# ------------------------------------------------------------------ Baserow
+def baserow_values(
+    proposal: dict[str, Any], final_path: Path, kind: str, ref: Reference, settings: Settings
+) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "title": proposal["title"],
+        "tag": proposal.get("verse_tag"),
+        "language": [lang for lang in proposal["languages"] if lang in ref.language_options],
+        ("video_file_location" if kind == "video" else "audio_file_location"): archive_path(
+            final_path, settings
+        ),
+        "notes": f"Renamer: {Path(proposal['original_path']).name} -> {final_path.name}",
+    }
+    when = DateValue(*_date_parts(proposal["when"]))
+    if when.is_full:
+        values["date"] = when.text()
+    if proposal.get("category") in ref.category_options:
+        values["category"] = proposal["category"]
+    if proposal.get("place_name") in ref.place_options:
+        values["place_location"] = proposal["place_name"]
+    country = ref.country_option(proposal.get("cc"))
+    if country:
+        values["country"] = country
+    return {k: v for k, v in values.items() if v not in (None, "", [])}
+
+
+def _date_parts(text: str) -> tuple[int | None, int | None, int | None]:
+    parts = text.split("-")
+    return tuple(int(p) if p.isdigit() else None for p in parts)  # type: ignore[return-value]
+
+
+def write_baserow(
+    record: m.MediaFile,
+    proposal: dict[str, Any],
+    final_path: Path,
+    settings: Settings,
+    dry_run: bool,
+) -> dict[str, Any]:
+    from mam.helpers.baserow import BaserowClient
+
+    ref = get_reference()
+    values = baserow_values(proposal, final_path, record.kind, ref, settings)
+    with BaserowClient(settings) as client:
+        apply = settings.baserow_apply and not dry_run
+        row_id = proposal.get("baserow_row_id") or record.baserow_row_id
+        if row_id:
+            result = client.update_row(
+                client.media_table,
+                row_id,
+                values,
+                tool=TOOL,
+                media_file_id=record.id,
+                dry_run=not apply,
+            )
+            action = "update"
+        else:
+            values.update(
+                {
+                    "status_media": "Not-started",
+                    "status_thumb": "Not-started",
+                    "status_transcript": "Not-started",
+                    "imported_on": date.today().isoformat(),
+                }
+            )
+            result = client.create_row(
+                client.media_table, values, tool=TOOL, media_file_id=record.id, dry_run=not apply
+            )
+            action = "create"
+    return {
+        "action": action,
+        "row_id": result.row_id,
+        "dry_run": result.dry_run,
+        "conflicts": {k: list(v) for k, v in (result.conflicts or {}).items()},
+    }
+
+
+# ------------------------------------------------------------------- the job
+def run_renamer(ctx: JobContext) -> ToolOutcome:
+    record = ctx.media_file
+    if record is None or not record.original_path:
+        raise MamError("The Renamer needs an original file")
+    settings = ctx.settings
+    res = resolver(settings)
+    proposal = res.propose(Path(record.original_path))
+
+    # Release the session before helpers write through their own sessions (SQLite locking).
+    ctx.session.commit()
+    organizer = FileOrganizer(res.ref.matcher, settings)
+    placed = organizer.organize(
+        source_path(record),
+        proposal.new_name,
+        proposal.what,
+        tool=TOOL,
+        dry_run=ctx.dry_run,
+        media_file_id=record.id,
+        category=proposal.category,
+    )
+    if placed.clash:
+        proposal.flags.append(
+            f"Another file already has the name {proposal.new_name}; saved as {placed.dst.name}."
+        )
+    if placed.duplicate:
+        proposal.notes.append(
+            f"Same name and size as an existing file; saved as {placed.dst.name}."
+        )
+    data = proposal.to_dict(dry_run=ctx.dry_run, final_name=placed.dst.name, target=str(placed.dst))
+
+    if not ctx.dry_run:
+        # Persist the new location at once, so a retry after a Baserow error renames in place.
+        with session_scope() as s:
+            s.execute(
+                update(m.MediaFile)
+                .where(m.MediaFile.id == record.id)
+                .values(processed_path=str(placed.dst), current_name=placed.dst.name)
+            )
+        if not proposal.flags:
+            data["baserow"] = write_baserow(record, data, placed.dst, settings, dry_run=False)
+    else:
+        data["baserow"] = {
+            "action": "update" if proposal.baserow_row_id else "create",
+            "dry_run": True,
+        }
+
+    meta = dict(record.meta or {})
+    meta["proposal"] = data
+    record.meta = meta
+    summary = f"{'Would rename' if ctx.dry_run else 'Renamed'} to {placed.dst.name}"
+    if proposal.flags:
+        summary += f" — {len(proposal.flags)} item(s) to review"
+    if ctx.dry_run:
+        return ToolOutcome("info", summary, {"new_name": placed.dst.name, "flags": proposal.flags})
+
+    _store_evidence(ctx.session, record, proposal)
+    _apply_display(record, data, placed.dst)
+    if data.get("baserow", {}).get("row_id"):
+        record.baserow_row_id = data["baserow"]["row_id"]
+    if proposal.flags:
+        _open_review(ctx.session, record, data, proposal)
+        return ToolOutcome(
+            "review", summary, {"new_name": placed.dst.name, "flags": proposal.flags}
+        )
+    return ToolOutcome("done", summary, {"new_name": placed.dst.name})
+
+
+def _store_evidence(session: Session, record: m.MediaFile, proposal: Proposal) -> None:
+    session.execute(
+        delete(m.WEvidence).where(m.WEvidence.media_file_id == record.id, m.WEvidence.tool == TOOL)
+    )
+    for e in proposal.evidence:
+        session.add(
+            m.WEvidence(
+                media_file_id=record.id,
+                field=e.field,
+                value=e.value,
+                source=e.source,
+                score=e.score,
+                tool=TOOL,
+                selected=e.selected,
+                detail=e.detail,
+            )
+        )
+
+
+def _apply_display(record: m.MediaFile, data: dict[str, Any], final: Path) -> None:
+    record.processed_path = str(final)
+    record.current_name = final.name
+    record.rec_date = data["when"]
+    record.title = data.get("what")
+    record.location = data.get("where")
+    record.category = data.get("category")
+
+
+def _open_review(session: Session, record: m.MediaFile, data: dict[str, Any], proposal) -> None:
+    for old in session.scalars(
+        select(m.Review).where(
+            m.Review.media_file_id == record.id,
+            m.Review.tool == TOOL,
+            m.Review.outcome == "pending",
+        )
+    ):
+        old.outcome = "superseded"
+        old.decided_at = datetime.now(UTC)
+    session.add(
+        m.Review(
+            media_file_id=record.id,
+            tool=TOOL,
+            reason="\n".join(proposal.flags),
+            proposal=data,
+            features={"evidence": [e.__dict__ for e in proposal.evidence]},
+        )
+    )
+
+
+# ------------------------------------------------------------------ reviews
+WHEN_RE = re.compile(r"^(\d{4}|YYYY)-(\d{2}|MM)-(\d{2}|DD)$")
+
+
+def valid_when(text: str) -> bool:
+    match = WHEN_RE.match(text)
+    if not match:
+        return False
+    y, mo, d = (int(g) if g.isdigit() else None for g in match.groups())
+    if (mo is not None and not 1 <= mo <= 12) or (d is not None and not 1 <= d <= 31):
+        return False
+    if None not in (y, mo, d):
+        try:
+            date(y, mo, d)
+        except ValueError:
+            return False
+    return True
+
+
+def preview(values: dict[str, str], ext: str) -> dict[str, Any]:
+    """Filename for edited review values, with convention problems and the target folder."""
+    when = (values.get("when") or "YYYY-MM-DD").strip() or "YYYY-MM-DD"
+    what = (values.get("what") or "").strip() or None
+    ref = get_reference()
+    place_text = (values.get("place") or "").strip() or None
+    cc = (values.get("cc") or "").strip().lower() or None
+    place = ref.find_place(place_text) if place_text else None
+    if place:
+        place_text = place.display  # 'ISKCON-Ljubljana' or 'ljubljana' -> 'Ljubljana'
+        cc = cc or place.cc  # a known place brings its country
+    where = format_where(place_text, cc)
+    name = build_name(when, what, where, ext)
+    issues = problems(name)
+    if not valid_when(when):
+        issues.insert(0, "date must be YYYY-MM-DD (YYYY, MM and DD may be placeholders)")
+    match = ref.matcher.match(what)
+    category = match.category.name if match else values.get("category") or None
+    return {"name": name, "problems": issues, "category": category, "where": where, "cc": cc}
+
+
+def approve_review(
+    session: Session, review: m.Review, values: dict[str, str], operator: str
+) -> m.MediaFile:
+    record = session.get(m.MediaFile, review.media_file_id)
+    proposal = dict(review.proposal)
+    result = preview(values, proposal["ext"])
+    if result["problems"]:
+        raise MamError("; ".join(result["problems"]))
+    settings = get_settings()
+    ref = get_reference()
+    session.commit()  # release before helpers write
+    organizer = FileOrganizer(ref.matcher, settings)
+    placed = organizer.organize(
+        source_path(record),
+        result["name"],
+        values.get("what") or None,
+        tool="renamer-review",
+        dry_run=False,
+        media_file_id=record.id,
+        category=result["category"],
+    )
+    place_text = (values.get("place") or "").strip() or None
+    place = ref.find_place(place_text) if place_text else None
+    approved = {
+        **proposal,
+        "when": values.get("when") or "YYYY-MM-DD",
+        "what": values.get("what") or None,
+        "place": place_text,
+        "place_name": place.name if place else None,
+        "cc": result["cc"],
+        "where": result["where"],
+        "category": result["category"],
+        "title": values.get("title") or proposal["title"],
+        "baserow_row_id": int(values["baserow_row_id"]) if values.get("baserow_row_id") else None,
+        "final_name": placed.dst.name,
+        "dry_run": False,
+    }
+    approved["baserow"] = write_baserow(record, approved, placed.dst, settings, dry_run=False)
+
+    edited = any(
+        str(proposal.get(k) or "") != str(approved.get(k) or "")
+        for k in ("when", "what", "place", "cc")
+    )
+    _learn_alias(session, proposal.get("place"), place_text)
+    meta = dict(record.meta or {})
+    meta["proposal"] = approved
+    record.meta = meta
+    _apply_display(record, approved, placed.dst)
+    if approved["baserow"].get("row_id"):
+        record.baserow_row_id = approved["baserow"]["row_id"]
+    review.outcome = "edited" if edited else "approved"
+    review.final = approved
+    review.operator = operator
+    review.decided_at = datetime.now(UTC)
+    set_status(session, record, "Renamer Done", "renamer-review", f"{review.outcome} by {operator}")
+    return record
+
+
+def _learn_alias(session: Session, old: str | None, new: str | None) -> None:
+    """Count a reviewer's place correction; after ALIAS_ACTIVATION times it becomes a rule."""
+    if not old or not new or norm_key(old) == norm_key(new):
+        return
+    token = norm_key(old)
+    rule = session.scalar(
+        select(m.AliasRule).where(
+            m.AliasRule.field == "where", m.AliasRule.token == token, m.AliasRule.replacement == new
+        )
+    )
+    if rule is None:
+        rule = m.AliasRule(field="where", token=token, replacement=new, occurrences=0)
+        session.add(rule)
+    rule.occurrences += 1
+    rule.active = rule.occurrences >= ALIAS_ACTIVATION
+
+
+def reject_review(session: Session, review: m.Review, operator: str, note: str | None) -> None:
+    """Discard the Renamer result: remove the processed copy and return to Not processed."""
+    record = session.get(m.MediaFile, review.media_file_id)
+    settings = get_settings()
+    copy = Path(record.processed_path) if record.processed_path else None
+    root = settings.media_processed_files_path.resolve()
+    if copy and copy.exists() and root in copy.resolve().parents:
+        copy.unlink()  # a processed copy, never an original
+    record.processed_path = None
+    record.current_name = None
+    record.rec_date = record.title = record.location = record.category = None
+    review.outcome, review.operator, review.note = "rejected", operator, note
+    review.decided_at = datetime.now(UTC)
+    set_status(session, record, "Not processed", "renamer-review", f"rejected by {operator}")
+
+
+def exclude_file(session: Session, review: m.Review, operator: str, note: str | None) -> None:
+    record = session.get(m.MediaFile, review.media_file_id)
+    review.outcome, review.operator, review.note = "excluded", operator, note
+    review.decided_at = datetime.now(UTC)
+    set_status(session, record, "Excluded", "renamer-review", note or f"excluded by {operator}")

@@ -87,3 +87,30 @@ def make_tone(path: Path, *, seconds: float = 10, volume_db: float = -30, codec_
 @pytest.fixture
 def tone(settings):
     return make_tone(settings.media_sample_files_path / "tone.mp3")
+
+
+@pytest.fixture
+def reference(monkeypatch):
+    """Renamer reference data from tests/renamer_fixtures.py instead of Baserow."""
+    import time
+
+    from mam.tools.renamer import knowledge
+    from tests.renamer_fixtures import reference_raw
+
+    ref = knowledge.build_reference(reference_raw())
+    ref.loaded_at = time.time() + 10_000
+    monkeypatch.setattr(knowledge, "_cached", ref)
+    return ref
+
+
+@pytest.fixture
+def no_baserow(monkeypatch):
+    """Record Renamer Baserow writes instead of sending them."""
+    calls = []
+
+    def fake(record, proposal, final_path, settings, dry_run):
+        calls.append({"file": record.id, "values": proposal, "path": str(final_path)})
+        return {"action": "create", "row_id": None, "dry_run": True, "conflicts": {}}
+
+    monkeypatch.setattr("mam.tools.renamer.tool.write_baserow", fake)
+    return calls

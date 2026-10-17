@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "media-manager",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "mam", "serve", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

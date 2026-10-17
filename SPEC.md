@@ -93,7 +93,19 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - the filename is non-descriptive
   - the date format cannot be determined, even with the travel schedule and the media table
   - a new place or country is needed. The review page then offers a one-click add to `travel_schedule` (and to the select option), applied only after confirmation.
+- **The Renamer also flags a file when:**
+  - the filename names another speaker (e.g. `SNS`, `BVS`) and not KKS, since WHO is always KKS
+  - the country code contradicts a known place (`Oslo_fi`) and cannot be corrected safely
+  - a different file already has the final name (it is saved with `-2`)
 - **Missing WHAT:** the file goes to `_unresolved/`, and later tools may fill in the WHAT.
+- **More evidence used:**
+  - sibling files in the same folder decide ambiguous dates (`08-04-10` among April 2008 files is 2008-04-10) and give the place of files recorded the same day
+  - the travel schedule only suggests places in the country the filename names
+  - a new place flag suggests the closest known place (`Fruska-Goranga`: did you mean `Fruska-Gora`?)
+  - seed aliases (place spellings such as `Praha`, `Koln`, `Rdesh`; category words such as `Kirtany`; language words such as `GER`) are in `mam/tools/renamer/aliases.yaml`
+- **Rule-based:** the Renamer does not call the LLM; unusual names are flagged instead.
+- **Every run is copied:** a flagged file is still copied and renamed (into its category folder or `_unresolved/`), so the review edits a real copy. Running the Renamer again on a processed file moves that copy; it never makes a second one.
+- **Dry run:** shows the proposed name in the file list without copying files, changing the status or writing to Baserow.
 
 ### Kirtan-splitter
 - **Video first:** extracts the audio as mp3 in its original quality, with a name that matches the video.
@@ -134,6 +146,11 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Safeguards:**
   - Baserow writes are dry-run by default and are sent only with an explicit `--apply` or the manager's apply action.
   - Every write is logged in the local DB with before and after values, so it can be undone.
+- **When tools write:** the Renamer writes a file's row when its name is final: right away for an unflagged file, and after approval for a flagged one.
+- **Formats:**
+  - `audio_file_location` / `video_file_location`: the path below the processed-files root, e.g. `/Srimad-bhagavatam/2011-08-28_KKS_SB-1-19-30_Oslo-no.wma`
+  - `tag`: verse numbers only, as existing rows have them (`3.6.6`; CC with its lila: `Madhya 20.154`)
+  - an existing row is matched by date plus verse tag, or by date plus category and place; otherwise a new row is created
 - **Overwrite policy:**
   - Tools only fill empty fields and never overwrite values a person entered. Differences are shown as proposals on the review page.
   - `notes` gets a dated entry appended for each tool.

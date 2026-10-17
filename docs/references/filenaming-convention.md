@@ -79,4 +79,9 @@ Source names in the archive are often inconsistent. The tools check each part ag
 - **One valid correction:** it is applied and recorded in the Baserow `notes`, e.g. `oslo-noi` becomes `Oslo-no`.
 - **No valid correction, or several:** the file is flagged for review.
 - **Parts with no meaning:** sequence numbers and recorder names from the source (`-2`, `ZOOM0004`, `R09_0003`) are not kept in the new name. The original name is always kept in the local database and in Baserow.
+- **Glued words are split:** `RadhastamiBhajanas` becomes `Radhastami-Bhajanas`, `RadhaMadhava` becomes `Radha-Madhava`.
+- **Honorifics and recorder words are dropped:** `HH`, `Kadamba Kanana Swami` (that is the WHO), `STEREO`, `clean`. Names of other people keep their honorific (`Suhotra-Maharaja`).
+- **Generic words next to a verse are dropped:** `SB 3.1.20 class` gives `SB-3-1-20`. Without a verse they stay (`Janmastami-evening-lecture`).
+- **Places use their short name:** the Baserow place `ISKCON-Ljubljana` is written `Ljubljana-si`; known spellings are mapped (`Praha` to `Prague`, `Koln` to `Cologne`, `Rdesh` to `Radhadesh`).
+- **Another speaker in the name** (`SNS`, `BVS` instead of `KKS`) is flagged for review, because WHO is always `KKS`.
 - **Repeated corrections:** a correction reviewers make the same way at least 3 times becomes a rule, so it is applied automatically from then on.

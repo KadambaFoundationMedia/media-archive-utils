@@ -1,0 +1,33 @@
+<div {% if active %}hx-get="/jobs/rows?state={{ state }}" hx-trigger="every 2s" hx-target="#job-table" hx-swap="innerHTML"{% endif %}>
+<div class="table-responsive">
+<table class="table table-sm align-middle small">
+  <thead><tr><th>#</th><th>Tool</th><th>File</th><th>State</th><th>Result</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+    <tr>
+      <td>{{ j.id }}</td>
+      <td>{{ tools[j.tool].label if j.tool in tools else j.tool }}
+        {% if j.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}
+        {% if j.pipeline %}<span class="badge text-bg-secondary">pipeline</span>{% endif %}</td>
+      <td class="text-break">
+        {% if j.media_file_id %}<a href="/files/{{ j.media_file_id }}">{{ names.get(j.media_file_id, j.media_file_id) }}</a>
+        {% elif j.params %}{{ j.params.path }}{% endif %}
+      </td>
+      <td><span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'secondary' if j.state == 'cancelled' else 'info' }}">
+        {% if j.state == 'running' %}<i class="fa-solid fa-spinner fa-spin me-1"></i>{% endif %}{{ j.state }}</span></td>
+      <td class="text-break">
+        {% if j.result %}{{ j.result.summary }}{% endif %}
+        {% if j.error %}<details><summary class="text-danger">{{ j.error.split('\n')[0][:160] }}</summary><pre class="small text-wrap">{{ j.error }}</pre></details>{% endif %}
+      </td>
+      <td class="text-nowrap">{{ j.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+      <td>{% if j.state in ('failed', 'done', 'cancelled') %}
+        <form method="post" action="/jobs/{{ j.id }}/retry"><button class="btn btn-sm btn-outline-secondary" type="submit" title="Run again"><i class="fa-solid fa-rotate-right"></i></button></form>
+      {% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="text-center text-body-secondary py-4">No jobs</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>

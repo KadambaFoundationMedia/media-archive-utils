@@ -1,0 +1,5 @@
+<div class="font-monospace fs-6 text-break">{{ r.name }}</div>
+<div class="small text-body-secondary">Folder: {{ r.category or '_unresolved' }}</div>
+{% if r.problems %}
+<ul class="small text-danger mb-0">{% for pr in r.problems %}<li>{{ pr }}</li>{% endfor %}</ul>
+{% else %}<div class="small text-success"><i class="fa-solid fa-check me-1"></i>Follows the naming convention</div>{% endif %}

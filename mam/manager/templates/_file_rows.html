@@ -1,0 +1,57 @@
+<div {% if active %}hx-get="/files/rows?{{ request.url.query }}" hx-trigger="every 3s" hx-target="#file-table" hx-swap="innerHTML"{% endif %}>
+<div class="table-responsive">
+<table class="table table-sm table-hover align-middle file-table">
+  <thead>
+    <tr>
+      <th style="width:2rem"><input class="form-check-input" type="checkbox" id="select-page" aria-label="Select all on this page"></th>
+      <th>Original</th>
+      <th>New name</th>
+      <th>Status</th>
+      <th>Date</th>
+      <th>Title / WHAT</th>
+      <th>Location</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for f in rows %}
+    {% set proposal = (f.meta or {}).get('proposal') %}
+    <tr>
+      <td><input class="form-check-input row-select" type="checkbox" name="ids" value="{{ f.id }}" aria-label="Select"></td>
+      <td class="text-break">
+        <a href="/files/{{ f.id }}" class="fw-medium">{{ f.original_path | basename }}</a>
+        <div class="small text-body-secondary text-break">{{ f.original_path | dirname }}</div>
+      </td>
+      <td class="text-break small">
+        {% if f.current_name %}<span class="font-monospace">{{ f.current_name }}</span>
+        {% elif proposal %}<span class="font-monospace text-body-secondary" title="Proposed by a dry run">{{ proposal.new_name }}</span>
+          <span class="badge text-bg-light border">dry run</span>
+        {% else %}<span class="text-body-secondary">–</span>{% endif %}
+      </td>
+      <td>{% with s=f.status %}{% include "_status.html" %}{% endwith %}</td>
+      <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>
+      <td class="small">{{ f.title or (proposal.what if proposal else '') or '' }}</td>
+      <td class="small">{{ f.location or (proposal.where if proposal else '') or '' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="text-center text-body-secondary py-4">
+      No files yet. <a href="/import">Import a folder</a> to get started.
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% set pages = ((total + page_size - 1) // page_size) %}
+{% if pages > 1 %}
+<nav aria-label="Pages">
+  <ul class="pagination pagination-sm flex-wrap">
+    {% for p in range(1, pages + 1) %}
+      {% if p == 1 or p == pages or (p - flt.page)|abs <= 2 %}
+      <li class="page-item {% if p == flt.page %}active{% endif %}">
+        <a class="page-link" href="/?{{ flt.query_args(page=p) | urlencode }}">{{ p }}</a>
+      </li>
+      {% elif (p - flt.page)|abs == 3 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+</div>
