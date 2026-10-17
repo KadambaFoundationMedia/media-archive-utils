@@ -26,7 +26,7 @@ WHERE: Place and country (ccTLD)
 
 Example 1: 2013-11-14_KKS_SB-9-20-20-27_Vrindavan-in.mp4  
 WHO: KKS  
-WHAT: SB-9-20-20-27  
+WHAT: SB-9-20-20-27 (Srimad Bhagavatam, canto 9, chapter 20, verses 20 to 27)  
 WHERE: Vrindavan-in
 
 Example 2: 2023-01-16_KKS_CC-Raghunatha-das-goswami_Amsterdam-nl.mp3  
@@ -36,6 +36,7 @@ WHERE: Amsterdam-nl
 
 ### WHAT
 - Start with the scripture abbreviation and verse, e.g. `SB-9-20-20`, `BG-2-51`, `CC-Madhya-20-154` (see verse-structure.md).
+- A sequence of verses is written as the first and last verse: `SB-9-20-20-27` is canto 9, chapter 20, verses 20 to 27 (see "Verse ranges" in verse-structure.md).
 - Add the short title from the content-discoverer after the verse, e.g. `SB-9-20-20-Dont-waste-time`.
 - Recordings without a verse (festivals, seminars, kirtans) use a title or the type only, e.g. `Janmastami-evening-lecture` or `Jaya-radha-madhava`.
 - Kirtan files use the mantra type: `Kirtan` (maha-mantra), `Jaya-radha-madhava`, `Jaya-Jaya-Sri-Caitanya`, `Nrsimha-pranama`.
