@@ -39,10 +39,14 @@ dist/
 build/
 
 # Local working folders (media + derived content)
-sample-files/
-processed-files/
-transcriptions/
-trimming-samples/
+sample-files/*
+!sample-files/.gitkeep
+processed-files/*
+!processed-files/.gitkeep
+transcriptions/*
+!transcriptions/.gitkeep
+trimming-samples/*
+!trimming-samples/.gitkeep
 
 # Media files (keep archive content out of the repo)
 *.mp4
