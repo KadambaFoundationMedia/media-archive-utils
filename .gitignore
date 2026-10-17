@@ -42,7 +42,7 @@ build/
 sample-files/
 processed-files/
 transcriptions/
-splitting-samples/
+trimming-samples/
 
 # Media files (keep archive content out of the repo)
 *.mp4
