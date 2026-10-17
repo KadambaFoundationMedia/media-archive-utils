@@ -3,6 +3,7 @@
 ## Table of contents
 - Standard verse structure
 - Example - Srimad Bhagavatam 4.4.1
+- Verse references in filenames
 
 This describes the verse structure that are used in the books by A.C. Bhaktivedanta Swami Prabhupada. They always follow the same structure.
 
@@ -40,3 +41,16 @@ Translation
 
 Purport  
 Satī’s mind was divided about whether to go to her father’s house or obey the orders of Lord Śiva. The struggle between the two decisions was so strong that she was pushed from one side of the room to another, and she began to move just like the pendulum of a clock.
+
+## Verse references in filenames
+The WHAT in a filename (see filenaming-convention.md) starts with the scripture abbreviation and the verse numbers, separated by hyphens. The same reference gives the vedabase.io URL used to confirm the verse.
+
+| Scripture | Filename WHAT | vedabase.io URL |
+|---|---|---|
+| Bhagavad-gita, chapter 2, verse 51 | `BG-2-51` | https://vedabase.io/en/library/bg/2/51/ |
+| Srimad Bhagavatam, canto 4, chapter 4, verse 1 | `SB-4-4-1` | https://vedabase.io/en/library/sb/4/4/1/ |
+| Caitanya-caritamrta, Madhya-lila, chapter 20, verse 154 | `CC-Madhya-20-154` | https://vedabase.io/en/library/cc/madhya/20/154/ |
+
+- The CC lila is written `Adi`, `Madhya` or `Antya`.
+- Source names use many variants of the same abbreviation (`S.B.`, `SB`, `Srimad-bhagavatam`, `B.G.`, `CC`, `Chaitanya Charitamrita`). The accepted variants per category are in the Baserow `category_terms_folder` table.
+- Some verses have no purport (e.g. CC Madhya 20.154); the topics of such a class come from the transcript.

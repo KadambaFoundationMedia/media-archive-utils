@@ -17,6 +17,13 @@ This helper is responsible for improving the audibility of the whole recording a
 ## Improving audibility whole recording
 Improve the audibility of the whole recording by adjusting the gain and using other filters like compressing or normalising the audio. The gain should be set to audio industry standards that match Youtube video standards. If other processing tools will help improving the audibility they can be used as well.
 
+Approved method (see @SPEC.md section 4):
+- Measure integrated loudness, true peak and loudness range with ffmpeg `ebur128`.
+- Target `-18 LUFS +/-1 LU` with a `-1 dBTP` ceiling.
+- If the peaks allow it, apply a pure linear gain.
+- Otherwise apply the gain followed by a peak limiter running at 4x the sample rate, and re-encode once more if limiting cost loudness. Mark the result `dynamic` so it can be flagged for review.
+- The kirtan-splitter runs first, so the whole-recording gain is measured on the class without the kirtan.
+
 ## Improve audibility of audience questions
 Review the complete retained class for questions, answers and other audience speech. Audience questions are often recorded farther away from the microphone and can be substantially quieter than the main speaker. Determine the complete audience-question sections and apply section-specific gain when needed so the questions are clearly intelligible and reasonably match the normal speech level of the class.
 

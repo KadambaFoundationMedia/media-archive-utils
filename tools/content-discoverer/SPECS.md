@@ -22,7 +22,8 @@ The transcription file should be used to maximize performance. The topic(s) (gen
   - Use the matching verse from vedabase.io to discover topics
   - A topic can never be more than 2 words
   - A topic can never be too general or broad
-  - The topics must be aded to the media table on baserow
+  - The topics must be added to the `themes` column of the media table on Baserow, separated by a comma and a space (e.g. `Krishna Prema, Kali Yuga`)
+  - Existing themes are never overwritten; a difference is proposed for review (see @SPEC.md section 6)
 - Generate a summary description for Youtube
    - Always add our Youtube footer to each description
    - the complete description must be added to the media table on Baserow

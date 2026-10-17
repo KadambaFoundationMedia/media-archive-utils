@@ -33,9 +33,13 @@ The goal is to build those tools and the media manager to discover and properly 
 - Class trimmer (tools/class-trimmer/): Class trimmer Tool(docs/):  This will trim the class to our editing standard
 
 ## Repository layout
-- tools/media-manager/  webbased file reviewer
-- tools/<name>/         one folder per tool
-- helpers/<name>/       one folder per helper
+- mam/                  Python package with all code (`mam` CLI, config, logging)
+- mam/helpers/<name>/   helper code (underscored names, e.g. mam/helpers/local_db/)
+- mam/tools/<name>/     tool code (added as tools are built)
+- tests/                pytest suite; tests/fixtures/golden.yaml holds the spec examples
+- tools/media-manager/  webbased file reviewer (specs)
+- tools/<name>/         one folder per tool (SPECS.md, CLAUDE.md)
+- helpers/<name>/       one folder per helper (SPECS.md, CLAUDE.md)
 - docs/                 shared documentation
 - docs/references       shared documentation for specific tools
 - transcriptions/       folder where transcriptions are stored
@@ -55,7 +59,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Run a tool: `mam <tool> --dry-run <path>`
 - Environment check: `mam doctor`
 - Run tests: `uv run pytest` (add `-m slow` for transcription integration tests)
-- Lint/format: [TBD]
+- Lint/format: `uv run ruff check .` and `uv run ruff format .`
 
 ## Rules (always follow)
 - Never overwrite or delete original media files; write new files or use staging.
@@ -65,7 +69,14 @@ The goal is to build those tools and the media manager to discover and properly 
 - If a spec is unclear or marked undecided, ask instead of guessing.
 
 ## Conventions
-- [TBD: code style, naming, error handling, logging]
+- Python 3.12, ruff (line length 100), type hints everywhere.
+- Settings only through `mam.config.get_settings()`; never read `.env` directly.
+- File-changing functions take `dry_run` (default True) and record a `file_event` in the local DB.
+- Never write below an originals folder: call `assert_writable()` before any write.
+- Baserow writes go through `BaserowClient` (validation, merge policy, write log for undo).
+- Expected failures raise subclasses of `mam.errors.MamError`.
+- Logging via `logging.getLogger(__name__)`; console is readable, `~/.mam/logs/mam.log` is JSON lines.
+- Schema changes need an Alembic migration in mam/helpers/local_db/migrations/versions/.
 
 ## Open decisions
 - See "Open decisions" in @SPEC.md

@@ -5,6 +5,9 @@
 - Unedited Recording sections
   - Exceptions 
 - Edited recording sections
+- Kirtan before the class
+- Recordings without a verse structure
+- Audio standard
 
 ## Introduction
 A class (also called lecture) is a discussion of one or more Sanskrit verses from Vaisnava literature like the Bhagavad-gita, Srimad-bhagavatam and other books by A.C. Bhaktivedante Swami Prabhupada (ISKCON, BBT) and other acaryas (guru’s). During live recording in ISKCON temples, the whole class is captured. But edited classes should have certain sections trimmed out. Most unedited recordings follow a certain structure and usually contain a set of sections, but each recording is unique. An edited class should only retain the most important sections.
@@ -42,3 +45,21 @@ After editing these sections should remain in the recording:
 7. Purport
 9. Explanation and discussion of the purport (the actual class)
 10. Questions and answers
+
+## Kirtan before the class
+Temple recordings often start with 5-15 minutes of kirtan (e.g. Jaya Radha-Madhava before an SB or BG class, Jaya Jaya Sri Caitanya before a CC class). The kirtan-splitter separates it into its own file before any editing, so the editing standard and the audio standard are applied to the class alone. A recording that is singing throughout is a kirtan recording and is not split.
+
+## Recordings without a verse structure
+Festival addresses, seminars, workshops and holiday talks (Gaura Purnima, Nrsimha Caturdasi, Janmastami, Radhastami, Govardhana) often do not follow the sections above. For these recordings:
+- trim only the leading and trailing ambience and the introduction mantra, if present;
+- keep everything else, including questions and answers;
+- flag the recording for review when its structure is unclear.
+
+## Audio standard
+After trimming, every class is brought to the same audio standard:
+- **Loudness:** `-18 LUFS +/-1 LU` integrated, with a `-1 dBTP` true-peak ceiling.
+- **Audience questions:** quiet audience questions are raised to roughly the level of the main speaker (normally within 2 LU). A boost above 12 dB, or any uncertainty about who is speaking, is sent for review.
+- **Format:** the source codec, bitrate, sample rate and channel count are kept. Cuts do not re-encode the audio; only the gain changes do.
+- **Not allowed:** no silence or room sound is removed and no fades are added.
+
+Details are in helpers/audio-optimizer/SPECS.md.
