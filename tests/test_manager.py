@@ -448,7 +448,8 @@ def test_baserow_switch_on_the_home_page(client, settings):
     from mam.helpers.local_db.app_settings import baserow_writes_enabled
 
     page = client.get("/").text
-    assert "Baserow writes:" in page and "<strong>off</strong>" in page
+    assert 'id="baserow-switch-nav"' in page and "<strong>off</strong>" in page
+    assert 'id="baserow-switch-nav"' in client.get("/jobs").text  # in the top bar on every page
     response = client.post(
         "/settings/baserow-writes",
         data={"enabled": "on", "back": "/?status=__all"},

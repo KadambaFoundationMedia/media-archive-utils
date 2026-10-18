@@ -59,10 +59,11 @@
   </dl>
 </details>
 
-<div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 rounded border {{ 'border-danger' if baserow_on else '' }}">
-  {% include "_baserow_switch.html" %}
-  <span class="small text-body-secondary">{% if baserow_on %}Runs write to the live Baserow media table.{% else %}Runs only log their Baserow rows. Approving a review always writes.{% endif %}</span>
+{% if baserow_on %}
+<div class="small mb-2 p-2 rounded border border-danger">
+  <i class="fa-solid fa-database me-1 text-danger"></i>Baserow writes are <strong class="text-danger">ON</strong>: runs write to the live Baserow media table. Switch it off in the top bar.
 </div>
+{% endif %}
 <form id="actions" method="post" action="/actions" x-data="{ scope: 'selected' }">
   <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
   {% for k, v in flt.query_args().items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}

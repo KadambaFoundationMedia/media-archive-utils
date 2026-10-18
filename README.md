@@ -16,7 +16,7 @@ uv run mam db migrate     # creates the local database (~/.mam/mam.sqlite)
 ```
 
 Nothing changes files unless you choose **Run** (or pass `--no-dry-run`). Baserow is only
-written when the **Baserow writes** switch in the portal is on, or when you approve a review.
+written when the **Baserow writes** switch in the top bar is on, or when you approve a review.
 
 ## Media manager
 

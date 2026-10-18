@@ -145,7 +145,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 ## 6. Baserow
 - **Live writes:** tools write to the live Baserow database (there is no test database).
 - **Safeguards:**
-  - A **Baserow writes** switch on the portal's home page (also on the Settings page and shown in the navbar) decides whether runs write to Baserow. It is stored in the local DB, takes effect at once, defaults to **off**, asks for confirmation when switched on, and a reset turns it off again. While it is off, runs only log the rows they would write.
+  - A **Baserow writes** switch in the portal's top bar (on every page) decides whether runs write to Baserow. It is stored in the local DB, takes effect at once, defaults to **off**, asks for confirmation when switched on, and a reset turns it off again. While it is off, runs only log the rows they would write.
   - Every write is logged in the local DB with before and after values, so it can be undone.
 - **When tools write:** the Renamer writes a file's row when its name is final: right away for an unflagged file, and after approval for a flagged one.
 - **Live or logged:** runs (**Run** on one or many files, the pipeline) follow the switch. **Approving a review always writes live**, because it is an explicit human decision; the review page says so.
