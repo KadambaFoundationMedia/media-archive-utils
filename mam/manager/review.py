@@ -35,7 +35,6 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
 
     @app.get("/review/{review_id}", response_class=HTMLResponse)
     def review_page(request: Request, review_id: int, error: str | None = None):
-        from mam.tools.renamer.knowledge import get_reference
 
         with session_scope() as session:
             review = session.get(m.Review, review_id)
@@ -52,34 +51,25 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                 .where(m.Review.outcome == "pending", m.Review.id != review_id)
                 .order_by(m.Review.id)
             )
-        ref = get_reference()
+        from mam.manager.edit_routes import form_context
+        from mam.tools.renamer.editing import initial_values
+
         proposal = review.proposal
-        candidates = ref.media_by_date.get(proposal.get("when", ""), [])
-        place_names = sorted({p.name for p in ref.places.values()})
+        with session_scope() as session:
+            edit_context = form_context(record, initial_values(session.get(m.MediaFile, record.id)))
         return render(
             request,
             "review.html",
+            mode="review",
+            review_id=review_id,
+            **edit_context,
             review=review,
             f=record,
             p=proposal,
             evidence=evidence,
-            candidates=candidates,
-            places=place_names,
-            countries=sorted(ref.country_options.items()),
             next_id=next_id,
             error=error,
         )
-
-    @app.post("/review/{review_id}/preview", response_class=HTMLResponse)
-    async def review_preview(request: Request, review_id: int):
-        from mam.tools.renamer.tool import preview
-
-        form = await request.form()
-        with session_scope() as session:
-            review = session.get(m.Review, review_id)
-            ext = review.proposal["ext"]
-        result = preview(dict(form), ext)
-        return render(request, "_name_preview.html", r=result)
 
     @app.post("/review/{review_id}/decide")
     async def review_decide(request: Request, review_id: int):
@@ -100,8 +90,12 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                 if review is None or review.outcome != "pending":
                     raise HTTPException(409, "This review is already decided")
                 if action == "approve":
-                    record = renamer.approve_review(session, review, dict(form), operator)
-                    baserow = (record.meta or {}).get("proposal", {}).get("baserow", {})
+                    from mam.manager.edit_routes import form_values
+                    from mam.tools.renamer.editing import save
+
+                    record = session.get(m.MediaFile, review.media_file_id)
+                    data = save(session, record, form_values(form), operator, review=review)
+                    baserow = data.get("baserow", {})
                     if baserow.get("dry_run"):
                         result_msg = (
                             "Approved. Baserow is in dry-run mode, so the "

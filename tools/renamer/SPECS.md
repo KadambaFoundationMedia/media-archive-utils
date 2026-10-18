@@ -52,6 +52,23 @@ The folder/filename could be "KKS DUBEN 2008 MP3/Lekce/06 KKS SB 3.1.25.mp3". In
 ## Filename convention (docs/filenaming-convention.md)
 All files must follow this strict naming convention. Files that cannot be renamed, due to missing information, should be flagged for further processing. If consecutive tooling provides more metadata the filename should be corrected.
 
+## Confirmed values and enrichment by other tools
+What a person saves on the file page or approves in a review is *confirmed*. Later runs of the Renamer keep confirmed values and only fill fields that are still empty (or complete a date that has placeholders).
+
+Other tools call the Renamer with what they discovered, as job parameters:
+
+```python
+enqueue(
+    session,
+    "renamer",
+    [file_id],
+    dry_run=False,
+    params={"evidence": {"what": "BG-2-51", "source": "class-discoverer"}},
+)
+```
+
+Evidence fields: `when`, `what`, `place`, `place_name`, `cc`, `category`, `verse_tag`, `title`. Evidence takes precedence over the Renamer's own guesses. If it contradicts a confirmed value, the file is flagged for review instead of overwritten.
+
 ## Multiple languages
 The speaker, Kadamba Kanana Swami, speaks multiple languages; English, Dutch, German, Spanish, Hindi. French. And some recordings have live translations in languages; Czech, Slovak, French, German, Spanish and others). Some filenames also are in different languages, like Czech and others. 
 

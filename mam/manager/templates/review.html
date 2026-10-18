@@ -23,65 +23,7 @@
       </ul>
     </div>
 
-    <form method="post" action="/review/{{ review.id }}/decide" class="card mb-3" id="review-form">
-      <div class="card-header">Filename</div>
-      <div class="card-body">
-        <div class="row g-2" hx-post="/review/{{ review.id }}/preview" hx-trigger="input delay:300ms from:#review-form, load" hx-target="#preview" hx-include="#review-form">
-          <div class="col-12 col-md-3">
-            <label class="form-label small" for="when">WHEN</label>
-            <input class="form-control form-control-sm font-monospace" id="when" name="when" value="{{ p.when }}" placeholder="YYYY-MM-DD">
-          </div>
-          <div class="col-12 col-md-4">
-            <label class="form-label small" for="what">WHAT</label>
-            <input class="form-control form-control-sm" id="what" name="what" value="{{ p.what or '' }}" placeholder="SB-1-19-31-title">
-          </div>
-          <div class="col-8 col-md-3">
-            <label class="form-label small" for="place">Place</label>
-            <input class="form-control form-control-sm" id="place" name="place" list="place-list" value="{{ p.place or '' }}">
-            <datalist id="place-list">{% for pl in places %}<option value="{{ pl }}">{% endfor %}</datalist>
-          </div>
-          <div class="col-4 col-md-2">
-            <label class="form-label small" for="cc">Country</label>
-            <input class="form-control form-control-sm" id="cc" name="cc" list="cc-list" value="{{ p.cc or '' }}" maxlength="2">
-            <datalist id="cc-list">{% for code, name in countries %}<option value="{{ code }}">{{ name }}</option>{% endfor %}</datalist>
-          </div>
-          <div class="col-12">
-            <label class="form-label small" for="title">Baserow title</label>
-            <input class="form-control form-control-sm" id="title" name="title" value="{{ p.title }}">
-          </div>
-          <input type="hidden" name="category" value="{{ p.category or '' }}">
-        </div>
-        <div class="mt-3 p-2 rounded bg-body-tertiary" id="preview">{{ p.final_name or p.new_name }}</div>
-
-        <div class="mt-3">
-          <div class="small fw-semibold mb-1">Baserow media row</div>
-          <div class="form-check small">
-            <input class="form-check-input" type="radio" name="baserow_row_id" id="row-new" value="" {% if not p.baserow_row_id %}checked{% endif %}>
-            <label class="form-check-label" for="row-new">Create a new row</label>
-          </div>
-          {% for c in candidates %}
-          <div class="form-check small">
-            <input class="form-check-input" type="radio" name="baserow_row_id" id="row-{{ c.id }}" value="{{ c.id }}" {% if p.baserow_row_id == c.id %}checked{% endif %}>
-            <label class="form-check-label" for="row-{{ c.id }}">Row {{ c.id }}: {{ c.title }} <span class="text-body-secondary">({{ c.category or '-' }}, {{ c.place or '-' }}{% if c.tag %}, {{ c.tag }}{% endif %})</span></label>
-          </div>
-          {% endfor %}
-        </div>
-
-        <div class="mt-3">
-          <label class="form-label small" for="note">Note (for reject or exclude)</label>
-          <input class="form-control form-control-sm" id="note" name="note">
-        </div>
-        {% if next_id %}<input type="hidden" name="next" value="/review/{{ next_id }}">{% endif %}
-      </div>
-      {% if review.outcome == 'pending' %}
-      <div class="small text-body-secondary px-3 pb-2"><i class="fa-solid fa-database me-1 text-danger"></i>Approving writes to the live Baserow media table, also when the Baserow writes switch is off. Every write can be undone from the log on the file page.</div>
-      <div class="card-footer d-flex flex-wrap gap-2">
-        <button class="btn btn-success btn-sm" name="action" value="approve" type="submit"><i class="fa-solid fa-check me-1"></i>Approve</button>
-        <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>
-        <button class="btn btn-outline-secondary btn-sm" name="action" value="exclude" type="submit" title="Stop processing this file"><i class="fa-solid fa-ban me-1"></i>Exclude file</button>
-      </div>
-      {% endif %}
-    </form>
+    {% if review.outcome == 'pending' %}{% include "_edit_form.html" %}{% endif %}
 
     {% if p.new_place %}
     <form method="post" action="/review/{{ review.id }}/add-place" class="card mb-3">

@@ -38,6 +38,8 @@
         <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
       </div>
 </form>
+{% if request.query_params.get('error') %}<div class="alert alert-danger">{{ request.query_params.get('error') }}</div>{% endif %}
+{% include "_edit_form.html" %}
 <div class="row g-3">
   <div class="col-12 col-lg-6">
     <div class="card mb-3">

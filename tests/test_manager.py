@@ -18,6 +18,26 @@ def client(settings):
         yield c
 
 
+def approve_form(filename, **extra):
+    """The review/edit form as a browser would send it for `filename`."""
+    from mam.tools.renamer.editing import parse_filename
+    from mam.tools.renamer.knowledge import get_reference
+
+    values = parse_filename(filename, get_reference())
+    return {
+        "action": "approve",
+        "filename": filename,
+        "when": values["when"],
+        "category": values["category"],
+        "tag": values["tag"],
+        "place": values["place"],
+        "cc": values["cc"],
+        "title": values["title"] or filename,
+        "languages": ["English"],
+        **extra,
+    }
+
+
 def run_queue():
     """Run every queued job synchronously."""
     queue = JobQueue()
@@ -122,29 +142,34 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
 
     page = client.get(f"/review/{review.id}").text
     assert "Non-descriptive filename" in page
-    preview = client.post(
-        f"/review/{review.id}/preview",
-        data={"when": "2012-07-12", "what": "Kirtan", "place": "", "cc": "rs"},
-    )
-    assert (
-        "2012-07-12_KKS_Kirtan_rs.mp3" in preview.text
-        and "Follows the naming convention" in preview.text
-    )
+    flag_id = by_name["R09_0004.MP3"]
+    # editing the filename fills the table fields
+    synced = client.post(
+        f"/files/{flag_id}/edit/sync",
+        data={"filename": "2012-07-12_KKS_Kirtan_rs.mp3", "changed": "filename"},
+    ).text
+    assert 'name="when" value="2012-07-12"' in synced
+    assert '<option value="Kirtan" selected>' in synced and 'value="rs" selected' in synced
+    # changing the date rewrites the filename
+    synced = client.post(
+        f"/files/{flag_id}/edit/sync",
+        data={
+            "filename": "2012-07-12_KKS_Kirtan_rs.mp3",
+            "when": "2012-07-13",
+            "cc": "rs",
+            "changed": "when",
+        },
+    ).text
+    assert 'value="2012-07-13_KKS_Kirtan_rs.mp3"' in synced
     bad = client.post(
-        f"/review/{review.id}/preview", data={"when": "12-07-2012", "what": "", "cc": ""}
-    )
-    assert "date must be YYYY-MM-DD" in bad.text
+        f"/files/{flag_id}/edit/sync",
+        data={"filename": "12-07-2012_KKS.mp3", "when": "12-07-2012", "changed": "when"},
+    ).text
+    assert "date must be YYYY-MM-DD" in bad
 
     response = client.post(
         f"/review/{review.id}/decide",
-        data={
-            "action": "approve",
-            "when": "2012-07-12",
-            "what": "Kirtan",
-            "place": "",
-            "cc": "rs",
-            "title": "Kirtan",
-        },
+        data={**approve_form("2012-07-12_KKS_Kirtan_rs.mp3"), "title": "Kirtan"},
         follow_redirects=False,
     )
     assert response.status_code == 303
@@ -316,9 +341,7 @@ def test_dry_run_explains_that_no_review_is_opened(client, archive, reference, n
         assert not s.scalars(select(m.Review)).all()
 
 
-def test_renamer_never_overwrites_an_approved_review(
-    client, archive, reference, no_baserow, settings
-):
+def test_rerun_keeps_confirmed_values(client, archive, reference, no_baserow, settings):
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
     with session_scope() as s:
@@ -329,7 +352,7 @@ def test_renamer_never_overwrites_an_approved_review(
         review_id = s.scalars(select(m.Review.id)).one()
     client.post(
         f"/review/{review_id}/decide",
-        data={"action": "approve", "when": "2012-07-11", "what": "Kirtan", "cc": "rs"},
+        data=approve_form("2012-07-11_KKS_Kirtan_rs.mp3"),
     )
     approved = settings.media_processed_files_path / "Kirtan" / "2012-07-11_KKS_Kirtan_rs.mp3"
     assert approved.exists()
@@ -344,7 +367,7 @@ def test_renamer_never_overwrites_an_approved_review(
         assert rec.current_name == approved.name and rec.status == "Renamer Done"
         assert rec.meta["proposal"]["final_name"] == approved.name
         assert (
-            "Kept 2012-07-11_KKS_Kirtan_rs.mp3, approved by tester"
+            "Kept 2012-07-11_KKS_Kirtan_rs.mp3 (confirmed by tester)"
             in s.scalars(
                 select(m.Job.result).where(m.Job.media_file_id == file_id).order_by(m.Job.id.desc())
             ).first()["summary"]
@@ -405,14 +428,14 @@ def test_approve_writes_baserow_live_even_in_dry_run_mode(
         # the run itself did not write (the Baserow writes switch is off)
         assert not s.scalars(select(m.BaserowWriteLog)).all()
     assert (
-        "Approving writes to the live Baserow media table"
+        "Approving renames the copy in processed-files and writes the media row live"
         in client.get(f"/review/{review_id}").text
     )
     with respx.mock(base_url="https://baserow.test/api/database") as api:
         create = api.post("/rows/table/1/").mock(return_value=httpx.Response(200, json={"id": 999}))
         response = client.post(
             f"/review/{review_id}/decide",
-            data={"action": "approve", "when": "2012-07-11", "what": "Kirtan", "cc": "rs"},
+            data=approve_form("2012-07-11_KKS_Kirtan_rs.mp3"),
             follow_redirects=False,
         )
     from urllib.parse import unquote
@@ -516,8 +539,7 @@ def test_what_is_shown_in_its_category_color(client, archive, reference, no_base
     # Srimad-bhagavatam is 'light-red' in category_terms_folder
     assert (
         'style="background-color:#edaba8;color:#1f2328;border-color:#edaba8" '
-        'title="Srimad-bhagavatam">SB-1-19-30'
-        in page
+        'title="Srimad-bhagavatam">SB-1-19-30' in page
     )
 
 
