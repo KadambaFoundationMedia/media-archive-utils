@@ -65,7 +65,7 @@ if (editForm) {
       const el = editForm.elements.namedItem(name);
       if (!el || el instanceof RadioNodeList) continue;
       if (el.tagName === "SELECT" && value && ![...el.options].some((o) => o.value === value)) {
-        el.add(new Option(`${value} (not a Baserow option)`, value));
+        el.add(new Option(`${value} (not in Baserow)`, value), 1);
       }
       if (el.value !== (value ?? "")) el.value = value ?? "";
     }
@@ -85,6 +85,12 @@ if (editForm) {
     fill(out.values);
     show("edit-problems", out.problems);
     show("edit-hints", out.hints);
+    const warning = document.getElementById("place-warning");
+    if (warning) {
+      warning.textContent = out.place_warning || "";
+      warning.hidden = !out.place_warning;
+      document.getElementById("place")?.classList.toggle("is-invalid", Boolean(out.place_warning));
+    }
     editForm.querySelectorAll(".edit-save").forEach((b) => { b.disabled = out.problems.length > 0; });
   }
 

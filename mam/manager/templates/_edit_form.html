@@ -36,8 +36,12 @@
       </div>
       <div class="col-6 col-md-6">
         <label class="form-label small mb-0" for="place">Place</label>
-        <input class="form-control form-control-sm" id="place" name="place" list="place-list" value="{{ ev.place }}">
-        <datalist id="place-list">{% for p in place_names %}<option value="{{ p }}">{% endfor %}</datalist>
+        <select class="form-select form-select-sm {% if place_warning %}is-invalid{% endif %}" id="place" name="place">
+          <option value="">–</option>
+          {% if ev.place and ev.place not in place_names %}<option value="{{ ev.place }}" selected>{{ ev.place }} (not in Baserow)</option>{% endif %}
+          {% for p in place_names %}<option value="{{ p }}" {% if ev.place == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+        </select>
+        <div id="place-warning" class="small text-danger mt-1" {% if not place_warning %}hidden{% endif %}>{{ place_warning }}</div>
       </div>
       <div class="col-6 col-md-6">
         <label class="form-label small mb-0" for="cc">Country</label>

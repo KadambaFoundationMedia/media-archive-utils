@@ -276,7 +276,8 @@ def test_a_typed_place_is_taken_literally(client, imported):
     ).json()
     assert out["values"]["place"] == "Praha"
     assert out["values"]["filename"] == "2012-07-12_KKS_Kirtan_Praha-cz.mp3"
-    assert any("'Praha' is a new place" in h and "did you mean Prague" in h for h in out["hints"])
+    assert "'Praha' is not a place in Baserow" in out["place_warning"]
+    assert "Did you mean Prague?" in out["place_warning"]
     # an existing option is recognised exactly, and brings its country
     out = client.post(
         f"/files/{file_id}/edit/sync",
@@ -287,7 +288,8 @@ def test_a_typed_place_is_taken_literally(client, imported):
             "changed": "place",
         },
     ).json()
-    assert out["values"]["filename"] == "2012-07-12_KKS_Kirtan_Prague-cz.mp3" and not out["hints"]
+    assert out["values"]["filename"] == "2012-07-12_KKS_Kirtan_Prague-cz.mp3"
+    assert not out["place_warning"]
     # editing the filename keeps the chosen place when the filename shows its short name
     out = client.post(
         f"/files/{file_id}/edit/sync",
@@ -387,3 +389,22 @@ def test_save_picks_up_a_place_just_added_in_baserow(client, imported, no_basero
     )
     sent = no_baserow[-1]["values"]
     assert sent["place_name"] == "Amsterdam"
+
+
+def test_place_is_a_list_of_baserow_places(client, imported, reference):
+    file_id = imported["R09_0004.MP3"]
+    page = client.get(f"/files/{file_id}").text
+    form = page.split('id="place"')[1].split("</select>")[0]
+    for name in reference.place_options:
+        assert f'<option value="{name}"' in form
+    # a place from an old filename that Baserow does not know is shown and flagged
+    client.post(
+        f"/files/{file_id}/edit",
+        data=save_form("2012-07-12_KKS_Kirtan_Serbia-Summercamp-rs.mp3", place="Serbia-Summercamp"),
+    )
+    page = client.get(f"/files/{file_id}").text
+    assert (
+        '<option value="Serbia-Summercamp" selected>Serbia-Summercamp (not in Baserow)</option>'
+        in page
+    )
+    assert "is not a place in Baserow" in page and "is-invalid" in page
