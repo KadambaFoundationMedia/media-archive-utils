@@ -108,8 +108,8 @@ def no_baserow(monkeypatch):
     """Record Renamer Baserow writes instead of sending them."""
     calls = []
 
-    def fake(record, proposal, final_path, settings, dry_run):
-        calls.append({"file": record.id, "values": proposal, "path": str(final_path)})
+    def fake(record, proposal, final_path, settings, dry_run, live=False):
+        calls.append({"file": record.id, "values": proposal, "path": str(final_path), "live": live})
         return {"action": "create", "row_id": None, "dry_run": True, "conflicts": {}}
 
     monkeypatch.setattr("mam.tools.renamer.tool.write_baserow", fake)

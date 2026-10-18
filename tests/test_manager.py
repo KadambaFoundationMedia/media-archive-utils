@@ -155,6 +155,7 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
         assert rec.status == "Renamer Done" and rec.current_name == moved.name
         assert s.get(m.Review, review.id).outcome == "edited"
     assert len(no_baserow) == 2  # written once approved
+    assert no_baserow[0]["live"] is False and no_baserow[1]["live"] is True  # approval is live
 
 
 def test_reject_removes_copy_and_exclude_stops(client, archive, reference, no_baserow, settings):
@@ -377,14 +378,20 @@ def test_preview_button_is_a_dry_run(client, archive, reference, no_baserow, set
         assert all(j.dry_run for j in s.scalars(select(m.Job).where(m.Job.tool == "renamer")))
 
 
-def test_approve_says_baserow_is_in_dry_run(client, archive, reference, settings, monkeypatch):
+def test_approve_writes_baserow_live_even_in_dry_run_mode(
+    client, archive, reference, settings, monkeypatch
+):
+    import httpx
+    import respx
+
     from mam.helpers.baserow.client import BaserowClient, Field
 
-    class AnyColumn(dict):  # every column exists and is plain text: no Baserow needed
+    class AnyColumn(dict):  # every column exists and is plain text
         def get(self, name, default=None):
             return Field(name, "text", {})
 
     monkeypatch.setattr(BaserowClient, "fields", lambda self, table_id, refresh=False: AnyColumn())
+    assert settings.baserow_apply is False
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
     with session_scope() as s:
@@ -393,17 +400,24 @@ def test_approve_says_baserow_is_in_dry_run(client, archive, reference, settings
     run_queue()
     with session_scope() as s:
         review_id = s.scalars(select(m.Review.id)).one()
-    assert "Baserow is in dry-run mode" in client.get(f"/review/{review_id}").text
-    response = client.post(
-        f"/review/{review_id}/decide",
-        data={"action": "approve", "when": "2012-07-11", "what": "Kirtan", "cc": "rs"},
-        follow_redirects=False,
+        # the bulk-style real run itself did not write (BASEROW_APPLY=false)
+        assert not s.scalars(select(m.BaserowWriteLog)).all()
+    assert (
+        "Approving writes to the live Baserow media table"
+        in client.get(f"/review/{review_id}").text
     )
+    with respx.mock(base_url="https://baserow.test/api/database") as api:
+        create = api.post("/rows/table/1/").mock(return_value=httpx.Response(200, json={"id": 999}))
+        response = client.post(
+            f"/review/{review_id}/decide",
+            data={"action": "approve", "when": "2012-07-11", "what": "Kirtan", "cc": "rs"},
+            follow_redirects=False,
+        )
     from urllib.parse import unquote
 
-    assert "logged on the file page but not written" in unquote(response.headers["location"])
+    assert create.called
+    assert "written to Baserow (row 999)" in unquote(response.headers["location"])
     with session_scope() as s:
-        log = s.scalars(
-            select(m.BaserowWriteLog).where(m.BaserowWriteLog.media_file_id == file_id)
-        ).one()
-        assert log.dry_run and log.action == "create" and log.payload["date"] == "2012-07-11"
+        log = s.scalars(select(m.BaserowWriteLog)).one()
+        assert not log.dry_run and log.row_id == 999 and log.payload["date"] == "2012-07-11"
+        assert s.get(m.MediaFile, file_id).baserow_row_id == 999

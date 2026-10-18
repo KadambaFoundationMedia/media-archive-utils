@@ -41,6 +41,8 @@ The .env provides the database name and relevant tables. The important tables in
 # READ (search)
 Search for existing items by matching the date, category place_location, title or other columns.
 
+Matching rule for an existing recording (see SPEC.md section 6): the same date is required but never enough on its own. The row must also agree on the verse `tag` and/or the `title`; `place_location`, `country` and `category` add evidence, and a different verse, place or country counts against it. Several fitting rows: flag for review.
+
 # UPDATE
 Update an existing media item with newly discovered metadata. 
 

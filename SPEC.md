@@ -148,10 +148,11 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Baserow writes are dry-run by default and are sent only with an explicit `--apply` or the manager's apply action.
   - Every write is logged in the local DB with before and after values, so it can be undone.
 - **When tools write:** the Renamer writes a file's row when its name is final: right away for an unflagged file, and after approval for a flagged one.
+- **Live or dry-run:** bulk runs (Run for real, the pipeline) follow `BASEROW_APPLY`. **Approving a review always writes live**, because it is an explicit human decision; the review page says so.
+- **Matching an existing row:** the date alone never decides. Among the rows on the same date, a row matches only when it also agrees on the verse `tag` and/or the `title` (shared title words, ignoring stop words, places and countries), with `place_location`/`country` and category as further evidence. A different verse, place or country counts against the row; an online place (`Zoom-livestream`) is neutral, because a livestream happens somewhere. When several rows fit, the file is flagged so the reviewer picks the row; otherwise a new row is created.
 - **Formats:**
   - `audio_file_location` / `video_file_location`: the path below the processed-files root, e.g. `/Srimad-bhagavatam/2011-08-28_KKS_SB-1-19-30_Oslo-no.wma`
   - `tag`: verse numbers only, as existing rows have them (`3.6.6`; CC with its lila: `Madhya 20.154`)
-  - an existing row is matched by date plus verse tag, or by date plus category and place; otherwise a new row is created
 - **Overwrite policy:**
   - Tools only fill empty fields and never overwrite values a person entered. Differences are shown as proposals on the review page.
   - `notes` gets a dated entry appended for each tool.
