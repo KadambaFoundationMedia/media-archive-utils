@@ -59,6 +59,10 @@
   </dl>
 </details>
 
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2 p-2 rounded border {{ 'border-danger' if baserow_on else '' }}">
+  {% include "_baserow_switch.html" %}
+  <span class="small text-body-secondary">{% if baserow_on %}Runs write to the live Baserow media table.{% else %}Runs only log their Baserow rows. Approving a review always writes.{% endif %}</span>
+</div>
 <form id="actions" method="post" action="/actions" x-data="{ scope: 'selected' }">
   <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
   {% for k, v in flt.query_args().items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
@@ -73,7 +77,7 @@
       <option value="all">All {{ total }} matching files</option>
     </select>
     <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
-    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written only when BASEROW_APPLY=true or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
+    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
     <span class="small text-body-secondary ms-auto">{{ total }} files</span>
   </div>
   <div id="file-table">

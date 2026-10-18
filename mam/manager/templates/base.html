@@ -38,11 +38,10 @@
         <li class="nav-item"><a class="nav-link" href="/import"><i class="fa-solid fa-folder-plus me-1"></i>Import</a></li>
         <li class="nav-item"><a class="nav-link" href="/settings"><i class="fa-solid fa-gear me-1"></i>Settings</a></li>
       </ul>
-      <span class="navbar-text small me-3" title="Baserow writes">
-        <i class="fa-solid fa-database me-1"></i>Baserow:
-        {% if settings.baserow_apply %}<span class="text-danger fw-semibold">live writes</span>
-        {% else %}<span>dry-run</span>{% endif %}
-      </span>
+      <a class="navbar-text small me-3 text-decoration-none" href="/" title="Change it with the switch on the Files page">
+        <i class="fa-solid fa-database me-1"></i>Baserow writes:
+        {% if baserow_on %}<span class="text-danger fw-semibold">ON</span>{% else %}<span>off</span>{% endif %}
+      </a>
       <button class="btn btn-sm btn-outline-secondary" type="button" id="theme-toggle" aria-label="Toggle dark mode">
         <i class="fa-solid fa-circle-half-stroke"></i>
       </button>

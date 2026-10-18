@@ -256,6 +256,19 @@ class Calibration(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class AppSetting(Base):
+    """A setting changed in the media manager (e.g. the Baserow writes switch)."""
+
+    __tablename__ = "app_setting"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict[str, Any]]  # {"value": ...}
+    updated_by: Mapped[str | None] = mapped_column(String(64))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class AliasRule(Base):
     """A learned filename correction, e.g. token 'noi' -> 'no' for WHERE."""
 

@@ -159,6 +159,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     def render(request: Request, name: str, **context) -> HTMLResponse:
+        from mam.helpers.local_db.app_settings import baserow_writes_enabled
+
+        context["baserow_on"] = baserow_writes_enabled()
         with session_scope() as session:
             context.setdefault("counts", queries.counts(session))
         if "rows" in context and "active" not in context:
@@ -438,6 +441,22 @@ def create_app(start_queue: bool = True) -> FastAPI:
         from mam.manager.maintenance import summary
 
         return render(request, "settings.html", info=summary(settings))
+
+    @app.post("/settings/baserow-writes")
+    async def toggle_baserow_writes(request: Request):
+        from mam.helpers.local_db.app_settings import set_baserow_writes
+
+        form = await request.form()
+        enabled = form.get("enabled") == "on"
+        set_baserow_writes(enabled)
+        back = re.sub(r"[?&]msg=[^&]*", "", form.get("back") or "/")
+        sep = "&" if "?" in back else "?"
+        msg = (
+            "Baserow writes are ON: runs now write to the live media table"
+            if enabled
+            else "Baserow writes are off: runs only log their Baserow rows"
+        )
+        return RedirectResponse(f"{back}{sep}msg={msg}", status_code=303)
 
     @app.post("/settings/reset")
     async def settings_reset(request: Request):

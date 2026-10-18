@@ -88,15 +88,41 @@ def run_checks(settings: Settings) -> list[Check]:
     )
     if not missing:
         checks.extend(_baserow_checks(settings))
-    checks.append(
-        Check(
-            "Baserow writes",
-            True,
-            "APPLY (live writes enabled)" if settings.baserow_apply else "dry-run (default)",
-            required=False,
+    checks.append(_baserow_switch_check())
+    if "BASEROW_APPLY" in _env_text():
+        checks.append(
+            Check(
+                "BASEROW_APPLY in .env",
+                False,
+                "no longer used: use the Baserow writes switch in the portal; remove the line",
+                required=False,
+            )
         )
-    )
     return checks
+
+
+def _env_text() -> str:
+    from mam.config import REPO_ROOT
+
+    env = REPO_ROOT / ".env"
+    return env.read_text(encoding="utf-8") if env.exists() else ""
+
+
+def _baserow_switch_check() -> Check:
+    try:
+        from mam.helpers.local_db import migrate
+        from mam.helpers.local_db.app_settings import baserow_writes_enabled
+
+        migrate()
+        on = baserow_writes_enabled()
+    except Exception as exc:  # report, don't crash the doctor
+        return Check("Baserow writes switch", False, str(exc)[:200], required=False)
+    return Check(
+        "Baserow writes switch",
+        True,
+        "ON: runs write to the live table" if on else "off: runs only log rows (approvals write)",
+        required=False,
+    )
 
 
 def _baserow_checks(settings: Settings) -> list[Check]:

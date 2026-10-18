@@ -34,7 +34,6 @@ def settings(tmp_path, monkeypatch):
         "BASEROW_MEDIA_TABLE_ID": "1",
         "BASEROW_TRAVEL_SCHEDULE_TABLE_ID": "2",
         "BASEROW_CATEGORY_TERMS_TABLE_ID": "3",
-        "BASEROW_APPLY": "false",
         "OPERATOR_NAME": "tester",
     }
     for key, value in env.items():
