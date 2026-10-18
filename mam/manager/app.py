@@ -140,6 +140,15 @@ def filesize(n: int) -> str:
 templates.env.filters["filesize"] = filesize
 
 
+def asset_version() -> str:
+    """Changes whenever a static file changes, so browsers never use an outdated copy."""
+    static = HERE / "static"
+    return str(int(max((p.stat().st_mtime for p in static.iterdir()), default=0)))
+
+
+templates.env.globals["asset_version"] = asset_version
+
+
 def create_app(start_queue: bool = True) -> FastAPI:
     settings = get_settings()
 
