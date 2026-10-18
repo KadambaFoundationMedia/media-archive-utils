@@ -129,6 +129,17 @@ def localtime(value, fmt: str = "%Y-%m-%d %H:%M") -> str:
 templates.env.filters["localtime"] = localtime
 
 
+def filesize(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.1f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024
+    return f"{n:.1f} TB"
+
+
+templates.env.filters["filesize"] = filesize
+
+
 def create_app(start_queue: bool = True) -> FastAPI:
     settings = get_settings()
 
@@ -420,6 +431,37 @@ def create_app(start_queue: bool = True) -> FastAPI:
             enqueue(session, "scan", dry_run=False, params={"path": str(inbox)})
         notify(request)
         return RedirectResponse(f"/jobs?msg={saved} file(s) uploaded to the inbox", status_code=303)
+
+    # -------------------------------------------------------------- settings
+    @app.get("/settings", response_class=HTMLResponse)
+    def settings_page(request: Request):
+        from mam.manager.maintenance import summary
+
+        return render(request, "settings.html", info=summary(settings))
+
+    @app.post("/settings/reset")
+    async def settings_reset(request: Request):
+        from mam.errors import MamError
+        from mam.manager.maintenance import ResetOptions, reset
+
+        form = await request.form()
+        if (form.get("confirm") or "").strip() != "RESET":
+            return RedirectResponse("/settings?error=Type RESET to confirm", status_code=303)
+        options = ResetOptions(
+            processed_files=form.get("processed_files") == "on",
+            learned=form.get("learned") == "on",
+            caches=form.get("caches") == "on",
+        )
+        try:
+            result = reset(options, settings)
+        except MamError as exc:
+            return RedirectResponse(f"/settings?error={exc}", status_code=303)
+        files = sum(v for k, v in result.rows_deleted.items() if k == "media_file")
+        msg = (
+            f"Reset done: {files} file record(s) and {result.files_deleted} processed file(s) "
+            f"removed. Backup: {result.backup}"
+        )
+        return RedirectResponse(f"/settings?msg={msg}", status_code=303)
 
     @app.get("/health")
     def health() -> Response:

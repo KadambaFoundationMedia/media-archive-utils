@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Settings · Media Archive{% endblock %}
+{% block content %}
+<h1 class="h5 mb-3">Settings</h1>
+{% if request.query_params.get('error') %}<div class="alert alert-danger">{{ request.query_params.get('error') }}</div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header">Current settings <span class="small text-body-secondary">(from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
+      <div class="card-body">
+        <dl class="row small mb-0">
+          <dt class="col-5">Baserow writes</dt>
+          <dd class="col-7">{% if settings.baserow_apply %}<span class="text-danger fw-semibold">live</span>{% else %}dry-run for bulk runs; approvals write live{% endif %} <code>BASEROW_APPLY</code></dd>
+          <dt class="col-5">Operator</dt><dd class="col-7">{{ settings.operator_name }}</dd>
+          <dt class="col-5">Processed files</dt><dd class="col-7 text-break">{{ settings.media_processed_files_path }}</dd>
+          {% for label, path in settings.import_roots %}
+          <dt class="col-5">{{ label }} (originals)</dt><dd class="col-7 text-break">{{ path }}</dd>
+          {% endfor %}
+          <dt class="col-5">Local database</dt><dd class="col-7 text-break">{{ settings.local_db_path }}</dd>
+          <dt class="col-5">Worker pools</dt><dd class="col-7">ML {{ settings.workers_ml }}, CPU {{ settings.workers_cpu }}, I/O {{ settings.workers_io }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <form method="post" action="/settings/reset" class="card border-danger mb-3"
+          onsubmit="return confirm('Reset the media manager? A backup of the database is made first.');">
+      <div class="card-header text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Reset the media manager</div>
+      <div class="card-body small">
+        <p>Start from scratch to compare results. This clears:</p>
+        <ul>
+          <li><strong>{{ info.files }}</strong> file records, <strong>{{ info.jobs }}</strong> jobs and <strong>{{ info.reviews }}</strong> reviews, with all evidence and history</li>
+          <li>the Baserow write log ({{ info.baserow_log }} entries)</li>
+        </ul>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="processed_files" name="processed_files" checked>
+          <label class="form-check-label" for="processed_files">Delete the processed copies: <strong>{{ info.processed_files }}</strong> file(s), {{ info.processed_bytes | filesize }} in processed-files</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="learned" name="learned">
+          <label class="form-check-label" for="learned">Also forget what was learned from reviews ({{ info.learned }} alias rules, calibrations and voice profiles)</label>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="caches" name="caches">
+          <label class="form-check-label" for="caches">Also clear caches ({{ info.cached }} entries: transcripts, vedabase, LLM, Baserow reference data)</label>
+        </div>
+        <ul class="text-body-secondary">
+          <li>Originals (sample files, trimming samples, inbox, NAS) are never touched.</li>
+          <li>Baserow is not changed.{% if info.baserow_live %} <strong class="text-danger">{{ info.baserow_live }} live Baserow write(s)</strong> stay in Baserow; undo them first if needed, because their undo log is only kept in the backup.{% endif %}</li>
+          <li>A full backup of the database is saved in <code>{{ settings.local_db_path.parent }}/backups</code> first. Restore it with <code>uv run mam db import &lt;backup folder&gt;</code>.</li>
+        </ul>
+        {% if info.active_jobs %}<div class="alert alert-warning py-2">{{ info.active_jobs }} job(s) are queued or running. Wait or <a href="/jobs">cancel them</a> before resetting.</div>{% endif %}
+        <label class="form-label" for="confirm">Type <code>RESET</code> to confirm</label>
+        <div class="d-flex gap-2">
+          <input class="form-control form-control-sm w-auto" id="confirm" name="confirm" autocomplete="off" required>
+          <button class="btn btn-sm btn-danger" type="submit" {% if info.active_jobs %}disabled{% endif %}><i class="fa-solid fa-rotate-left me-1"></i>Reset</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

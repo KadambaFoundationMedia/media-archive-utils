@@ -193,6 +193,10 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Link the file to an existing Baserow row (dedupe) or create a new row, and edit its Baserow fields.
   - When Baserow is in dry-run mode the page says so, and after approving the message says the Baserow row was logged but not written.
   - Buttons: Edit/Save, Approve, **Reject result** (discards the output, reverts through the history and re-queues with a note), **Exclude file** (stops all processing).
+- **Settings page:**
+  - Shows the current settings from `.env` (read-only).
+  - **Reset the media manager** for a clean start: clears all file records, jobs, reviews, evidence, history and the Baserow write log, and (optionally, on by default) deletes the copies in processed-files. Learned corrections and caches are kept unless chosen.
+  - A full database backup is made first (`~/.mam/backups`, restore with `mam db import`). Originals and Baserow are never changed. It refuses while jobs run and needs `RESET` typed to confirm. The same reset is available as `uv run mam reset`.
 - **Waveform editor** (for splitter and trimmer reviews):
   - Colored, labeled, draggable regions, each with a KEEP/TRIM toggle. Colors come from Baserow `category_terms_folder.color`.
   - Approve each boundary separately, then "Approve all".
