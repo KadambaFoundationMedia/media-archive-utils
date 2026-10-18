@@ -36,6 +36,9 @@ The tools/media-manager/ coordinates and executes these tools:
 - Kirtan-only outputs are `Skipped` for class-discoverer, content-discoverer and class-trimmer.
 - File statuses and the full rules are in @SPEC.md (sections 4 and 7).
 
+## Enriching the filename and Baserow
+When a tool discovers new metadata (date, WHAT, place, ...), it does not rename files itself: it queues the Renamer with that evidence (`params={"evidence": {...}, "source": ...}`, see tools/renamer/SPECS.md). The Renamer keeps values a person confirmed, fills the gaps, and flags conflicts for review.
+
 ## Tool dependencies
 
 - tools/media-manager/

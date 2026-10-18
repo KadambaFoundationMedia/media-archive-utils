@@ -1,0 +1,102 @@
+{# The filename and the media table fields share their values; see mam/tools/renamer/editing.py #}
+<form id="edit-form" class="card mb-3" method="post"
+      action="{% if mode == 'review' %}/review/{{ review_id }}/decide{% else %}/files/{{ f.id }}/edit{% endif %}"
+      hx-post="/files/{{ f.id }}/edit/sync" hx-trigger="change" hx-target="this" hx-swap="outerHTML"
+      hx-vals='js:{changed: event.target.name}'>
+  <input type="hidden" name="mode" value="{{ mode }}">
+  {% if review_id %}<input type="hidden" name="review_id" value="{{ review_id }}">{% endif %}
+  <input type="hidden" name="auto_title" value="{{ ev.auto_title }}">
+  <div class="card-header d-flex align-items-center">
+    <span class="me-auto">{% if mode == 'review' %}Decide{% else %}Name and media table{% endif %}</span>
+    <span class="small text-body-secondary">The filename and the table fields stay in step.</span>
+  </div>
+  <div class="card-body">
+    <label class="form-label small mb-0" for="filename">Filename</label>
+    <input class="form-control form-control-sm font-monospace mb-1" id="filename" name="filename" value="{{ ev.filename }}" spellcheck="false">
+    <div class="small text-body-secondary mb-3">YYYY-MM-DD_KKS_WHAT_Place-cc.{{ ext }} — editing it fills the fields below; changing Date, Place or Country updates it.</div>
+
+    <div class="row g-2">
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-0" for="when">Date</label>
+        <input class="form-control form-control-sm font-monospace" id="when" name="when" value="{{ ev.when }}" placeholder="YYYY-MM-DD">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-0" for="tag">Tag (verse)</label>
+        <input class="form-control form-control-sm" id="tag" name="tag" value="{{ ev.tag }}" placeholder="2.54">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label small mb-0" for="category">Category</label>
+        <select class="form-select form-select-sm" id="category" name="category">
+          <option value="">–</option>
+          {% for c in category_options %}<option value="{{ c }}" {% if ev.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label small mb-0" for="title">Title</label>
+        <input class="form-control form-control-sm" id="title" name="title" value="{{ ev.title }}">
+      </div>
+      <div class="col-6 col-md-6">
+        <label class="form-label small mb-0" for="place">Place</label>
+        <input class="form-control form-control-sm" id="place" name="place" list="place-list" value="{{ ev.place }}">
+        <datalist id="place-list">{% for p in place_names %}<option value="{{ p }}">{% endfor %}</datalist>
+      </div>
+      <div class="col-6 col-md-6">
+        <label class="form-label small mb-0" for="cc">Country</label>
+        <select class="form-select form-select-sm" id="cc" name="cc">
+          <option value="">–</option>
+          {% set known = country_options | map(attribute=0) | list %}
+          {% if ev.cc and ev.cc not in known %}<option value="{{ ev.cc }}" selected>{{ ev.cc }} (not a Baserow option)</option>{% endif %}
+          {% for code, name in country_options %}<option value="{{ code }}" {% if ev.cc == code %}selected{% endif %}>{{ name }} ({{ code }})</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-12">
+        <div class="form-label small mb-0">Language</div>
+        {% for lang in language_options %}
+        <div class="form-check form-check-inline small">
+          <input class="form-check-input" type="checkbox" name="languages" value="{{ lang }}" id="lang-{{ lang }}" {% if lang in ev.languages %}checked{% endif %}>
+          <label class="form-check-label" for="lang-{{ lang }}">{{ lang }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <div class="small fw-semibold mb-1">Baserow media row</div>
+      {% if f.baserow_row_id %}
+      <div class="form-check small">
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-current" value="{{ f.baserow_row_id }}" {% if ev.baserow_row_id|string == f.baserow_row_id|string %}checked{% endif %}>
+        <label class="form-check-label" for="row-current">Row {{ f.baserow_row_id }} (linked now)</label>
+      </div>
+      {% endif %}
+      <div class="form-check small">
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-new" value="" {% if not ev.baserow_row_id %}checked{% endif %}>
+        <label class="form-check-label" for="row-new">Create a new row</label>
+      </div>
+      {% for c in candidates if c.id != f.baserow_row_id %}
+      <div class="form-check small">
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-{{ c.id }}" value="{{ c.id }}" {% if ev.baserow_row_id|string == c.id|string %}checked{% endif %}>
+        <label class="form-check-label" for="row-{{ c.id }}">Row {{ c.id }}: {{ c.title }} <span class="text-body-secondary">({{ c.category or '-' }}, {{ c.place or '-' }}{% if c.tag %}, {{ c.tag }}{% endif %})</span></label>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if edit_problems %}<ul class="small text-danger mt-3 mb-0">{% for pr in edit_problems %}<li>{{ pr }}</li>{% endfor %}</ul>{% endif %}
+    {% if edit_notes %}<ul class="small text-body-secondary mt-2 mb-0">{% for n in edit_notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+    {% if mode == 'review' %}
+    <div class="mt-3">
+      <label class="form-label small" for="note">Note (for reject or exclude)</label>
+      <input class="form-control form-control-sm" id="note" name="note">
+    </div>
+    {% endif %}
+  </div>
+  <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+    {% if mode == 'review' %}
+      <button class="btn btn-success btn-sm" name="action" value="approve" type="submit" {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-check me-1"></i>Approve</button>
+      <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>
+      <button class="btn btn-outline-secondary btn-sm" name="action" value="exclude" type="submit" title="Stop processing this file"><i class="fa-solid fa-ban me-1"></i>Exclude file</button>
+    {% else %}
+      <button class="btn btn-success btn-sm" type="submit" {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-floppy-disk me-1"></i>Save</button>
+    {% endif %}
+    <span class="small text-body-secondary"><i class="fa-solid fa-database me-1 text-danger"></i>{% if mode == 'review' %}Approving{% else %}Saving{% endif %} renames the copy in processed-files and writes the media row live. Originals are never changed.</span>
+  </div>
+</form>

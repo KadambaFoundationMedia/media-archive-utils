@@ -303,7 +303,21 @@ def create_app(start_queue: bool = True) -> FastAPI:
                     .order_by(m.BaserowWriteLog.id.desc())
                 ).all(),
             }
-        return render(request, "file.html", menu=menu_tools(), **context)
+        from mam.manager.edit_routes import form_context
+        from mam.tools.renamer.editing import initial_values
+
+        with session_scope() as session:
+            record = session.get(m.MediaFile, file_id)
+            edit_context = form_context(record, initial_values(record))
+        return render(
+            request,
+            "file.html",
+            menu=menu_tools(),
+            mode="file",
+            review_id=None,
+            **context,
+            **edit_context,
+        )
 
     @app.get("/files/{file_id}/activity", response_class=HTMLResponse)
     def file_activity(request: Request, file_id: int):
@@ -513,9 +527,11 @@ def create_app(start_queue: bool = True) -> FastAPI:
     def health() -> Response:
         return Response("ok")
 
+    from mam.manager.edit_routes import register_edit_routes
     from mam.manager.review import register_review_routes
 
     register_review_routes(app, render, notify)
+    register_edit_routes(app, render, notify)
     return app
 
 

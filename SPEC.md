@@ -105,6 +105,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - a new place flag suggests the closest known place (`Fruska-Goranga`: did you mean `Fruska-Gora`?)
   - seed aliases (place spellings such as `Praha`, `Koln`, `Rdesh`; category words such as `Kirtany`; language words such as `GER`) are in `mam/tools/renamer/aliases.yaml`
 - **Rule-based:** the Renamer does not call the LLM; unusual names are flagged instead.
+- **Confirmed values:** what a person saves on the file page or approves in a review is stored as *confirmed*. A later Renamer run keeps confirmed values and only fills what is still empty (or completes a date with placeholders). Other tools pass what they discover as evidence (e.g. the class-discoverer's verse); when it contradicts a confirmed value the file is flagged for review instead of being overwritten.
 - **Every run is copied:** a flagged file is still copied and renamed (into its category folder or `_unresolved/`), so the review edits a real copy. Running the Renamer again on a processed file moves that copy; it never makes a second one.
 - **Dry run:** shows the proposed name in the file list without copying files, changing the status or writing to Baserow. It never opens a review; the file page says so and offers to run the Renamer for real.
 
@@ -186,6 +187,8 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
   - The list refreshes itself while any job is queued or running.
 - **File page:**
+  - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, and which Baserow row to link). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
+  - **Save** renames the copy in processed-files, writes the media row live, confirms the values and closes any open review. The review page uses the same form, with Approve / Reject result / Exclude file.
   - The run buttons are at the top, with a "Last run" line showing the latest job's result and an "Open the review" button when a review is waiting.
   - While a job for the file is queued or running, the page shows it and reloads itself when the job finishes.
   - Times are shown in the computer's own time zone.

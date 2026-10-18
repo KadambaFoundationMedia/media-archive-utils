@@ -22,7 +22,7 @@ from mam.helpers.local_db.repo import set_status
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.renamer.dates import DateValue
 from mam.tools.renamer.knowledge import Reference, get_reference, norm_key
-from mam.tools.renamer.naming import build_name, format_where, problems
+from mam.tools.renamer.naming import build_name, format_where
 from mam.tools.renamer.resolve import Proposal, Resolver
 
 log = logging.getLogger(__name__)
@@ -203,23 +203,116 @@ def baserow_summary(baserow: dict | None, flagged: bool = False) -> str:
     return f"Baserow: {what} written (row {row})" if row else f"Baserow: {what} written"
 
 
+# ------------------------------------------------------- confirmed values
+MERGED_FIELDS = ("when", "what", "place", "place_name", "cc", "category", "verse_tag", "title")
+
+
+def _empty(field: str, value: Any) -> bool:
+    if value in (None, "", []):
+        return True
+    return field == "when" and value == "YYYY-MM-DD"
+
+
+def apply_tool_evidence(proposal: Proposal, evidence: dict[str, Any], ref: Reference) -> None:
+    """Values another tool discovered take precedence over the Renamer's own guesses."""
+    from mam.tools.renamer.parse import find_verse
+
+    for field_name, value in evidence.items():
+        if field_name == "source" or value in (None, ""):
+            continue
+        setattr(proposal, field_name, value)
+        if field_name == "what":
+            match = ref.matcher.match(value)
+            if match:
+                proposal.category = match.category.name
+            verse = find_verse(value)
+            if verse and verse.numbers:
+                proposal.verse_tag = verse.tag
+    if evidence:
+        source = evidence.get("source", "another tool")
+        proposal.notes.append(
+            f"New evidence from {source}: "
+            + ", ".join(f"{k} {v}" for k, v in evidence.items() if k != "source")
+        )
+    _rebuild_name(proposal)
+
+
+def merge_confirmed(
+    proposal: Proposal, confirmed: dict[str, Any], evidence: dict[str, Any]
+) -> list[str]:
+    """Keep what a person confirmed; fill only what is still missing.
+
+    A confirmed value is never replaced by the Renamer's own guess. New evidence from another
+    tool fills empty fields (and completes a date with placeholders); when it contradicts a
+    confirmed value the file is flagged for review instead. Returns the enriched fields.
+    """
+    who = confirmed.get("by", "a reviewer")
+    enriched: list[str] = []
+    conflicts: list[str] = []
+    for field_name in MERGED_FIELDS:
+        kept, found = confirmed.get(field_name), getattr(proposal, field_name)
+        if _empty(field_name, kept):
+            if not _empty(field_name, found):
+                enriched.append(field_name)
+            continue
+        if field_name == "when" and _completes(kept, found):
+            enriched.append(field_name)
+            continue
+        if field_name in evidence and str(found) != str(kept):
+            conflicts.append(
+                f"{evidence.get('source', 'Another tool')} found {field_name} '{found}', but "
+                f"{who} set it to '{kept}'. Check which is right."
+            )
+        setattr(proposal, field_name, kept)
+    proposal.flags = conflicts  # the person's decision settles the Renamer's own questions
+    proposal.baserow_row_id = confirmed.get("baserow_row_id") or proposal.baserow_row_id
+    proposal.notes.insert(0, f"Values confirmed by {who} are kept.")
+    if enriched:
+        proposal.notes.append("Filled in from new evidence: " + ", ".join(enriched) + ".")
+    _rebuild_name(proposal)
+    return enriched
+
+
+def _completes(kept: str, found: str) -> bool:
+    """A date with placeholders that the found date agrees with and makes more complete."""
+    k, f = DateValue(*_date_parts(kept)), DateValue(*_date_parts(found or "YYYY-MM-DD"))
+    known = lambda d: sum(x is not None for x in (d.year, d.month, d.day))  # noqa: E731
+    return k.agrees_with(f) and known(f) > known(k)
+
+
+def _rebuild_name(proposal: Proposal) -> None:
+    proposal.where = format_where(proposal.place, proposal.cc)
+    proposal.new_name = build_name(proposal.when, proposal.what, proposal.where, proposal.ext)
+
+
 # ------------------------------------------------------------------- the job
 def run_renamer(ctx: JobContext) -> ToolOutcome:
     record = ctx.media_file
     if record is None or not record.original_path:
         raise MamError("The Renamer needs an original file")
     settings = ctx.settings
-    approved = latest_approval(ctx.session, record.id)
-    if approved is not None and not ctx.params.get("override_review"):
-        # A reviewer's decision is never overwritten by a new automatic run.
-        return ToolOutcome(
-            "info",
-            f"Kept {approved.final.get('final_name')}, approved by {approved.operator} "
-            f"on {approved.decided_at:%Y-%m-%d}",
-            {"kept": approved.final.get("final_name")},
-        )
+    confirmed = (record.meta or {}).get("confirmed")
+    if confirmed is None:  # approvals made before confirmed values were stored
+        approved = latest_approval(ctx.session, record.id)
+        if approved is not None:
+            confirmed = {**approved.final, "by": approved.operator}
     res = resolver(settings)
     proposal = res.propose(Path(record.original_path))
+    # Other tools pass what they discovered, e.g. {"what": "BG-2-51", "source": "class-discoverer"}.
+    evidence = dict(ctx.params.get("evidence") or {})
+    apply_tool_evidence(proposal, evidence, res.ref)
+    enriched: list[str] = []
+    if confirmed:
+        enriched = merge_confirmed(proposal, confirmed, evidence)
+        if not enriched and not proposal.flags:
+            unchanged = confirmed.get("final_name")
+            if unchanged and record.current_name == unchanged:
+                return ToolOutcome(
+                    "info",
+                    f"Kept {unchanged} (confirmed by {confirmed.get('by', 'a reviewer')}); "
+                    "no new information",
+                    {"kept": unchanged},
+                )
 
     # Release the session before helpers write through their own sessions (SQLite locking).
     ctx.session.commit()
@@ -361,92 +454,6 @@ def valid_when(text: str) -> bool:
         except ValueError:
             return False
     return True
-
-
-def preview(values: dict[str, str], ext: str) -> dict[str, Any]:
-    """Filename for edited review values, with convention problems and the target folder."""
-    when = (values.get("when") or "YYYY-MM-DD").strip() or "YYYY-MM-DD"
-    what = (values.get("what") or "").strip() or None
-    ref = get_reference()
-    place_text = (values.get("place") or "").strip() or None
-    cc = (values.get("cc") or "").strip().lower() or None
-    place = ref.find_place(place_text) if place_text else None
-    if place:
-        place_text = place.display  # 'ISKCON-Ljubljana' or 'ljubljana' -> 'Ljubljana'
-        cc = cc or place.cc  # a known place brings its country
-    where = format_where(place_text, cc)
-    name = build_name(when, what, where, ext)
-    issues = problems(name)
-    if not valid_when(when):
-        issues.insert(0, "date must be YYYY-MM-DD (YYYY, MM and DD may be placeholders)")
-    match = ref.matcher.match(what)
-    category = match.category.name if match else values.get("category") or None
-    return {"name": name, "problems": issues, "category": category, "where": where, "cc": cc}
-
-
-def approve_review(
-    session: Session, review: m.Review, values: dict[str, str], operator: str
-) -> m.MediaFile:
-    record = session.get(m.MediaFile, review.media_file_id)
-    proposal = dict(review.proposal)
-    result = preview(values, proposal["ext"])
-    if result["problems"]:
-        raise MamError("; ".join(result["problems"]))
-    settings = get_settings()
-    ref = get_reference()
-    session.commit()  # release before helpers write
-    organizer = FileOrganizer(ref.matcher, settings)
-    folder, _ = organizer.target_folder(values.get("what") or None, result["category"])
-    name, _ = reserve_name(record.id, folder, result["name"])
-    placed = organizer.organize(
-        source_path(record),
-        name,
-        values.get("what") or None,
-        tool="renamer-review",
-        dry_run=False,
-        media_file_id=record.id,
-        category=result["category"],
-    )
-    place_text = (values.get("place") or "").strip() or None
-    place = ref.find_place(place_text) if place_text else None
-    approved = {
-        **proposal,
-        "when": values.get("when") or "YYYY-MM-DD",
-        "what": values.get("what") or None,
-        "place": place_text,
-        "place_name": place.name if place else None,
-        "cc": result["cc"],
-        "where": result["where"],
-        "category": result["category"],
-        "title": values.get("title") or proposal["title"],
-        "baserow_row_id": int(values["baserow_row_id"]) if values.get("baserow_row_id") else None,
-        "final_name": placed.dst.name,
-        "target": str(placed.dst),
-        "dry_run": False,
-    }
-    # Approving is an explicit decision: it writes to Baserow even when the switch is off.
-    approved["baserow"] = write_baserow(
-        record, approved, placed.dst, settings, dry_run=False, live=True
-    )
-
-    edited = any(
-        str(proposal.get(k) or "") != str(approved.get(k) or "")
-        for k in ("when", "what", "place", "cc")
-    )
-    _learn_alias(session, proposal.get("place"), place_text)
-    meta = dict(record.meta or {})
-    meta["proposal"] = approved
-    meta["reserved"] = str(placed.dst)
-    record.meta = meta
-    _apply_display(record, approved, placed.dst)
-    if approved["baserow"].get("row_id"):
-        record.baserow_row_id = approved["baserow"]["row_id"]
-    review.outcome = "edited" if edited else "approved"
-    review.final = approved
-    review.operator = operator
-    review.decided_at = datetime.now(UTC)
-    set_status(session, record, "Renamer Done", "renamer-review", f"{review.outcome} by {operator}")
-    return record
 
 
 def _learn_alias(session: Session, old: str | None, new: str | None) -> None:
