@@ -20,3 +20,9 @@
 .status-guide summary { cursor: pointer; }
 /* Evidence: keep values readable in narrow cards. */
 .evidence-table td:nth-child(2) { min-width: 7rem; }
+
+/* Calmer file list: names in text color, categories in their Baserow color. */
+.file-table a.file-link { color: var(--bs-body-color); text-decoration: none; }
+.file-table a.file-link:hover { text-decoration: underline; color: var(--bs-link-hover-color); }
+.cat-pill { font-weight: 500; font-size: .8rem; white-space: normal; text-align: left; border: 1px solid transparent; }
+.clear-filter:disabled { opacity: .35; }

@@ -30,7 +30,7 @@
     <tr class="file-row{% if flt.sort == 'path' and ns.stripe is even %} stripe{% endif %}">
       <td><input class="form-check-input row-select" type="checkbox" name="ids" value="{{ f.id }}" aria-label="Select"></td>
       <td class="text-break">
-        <a href="/files/{{ f.id }}" class="fw-medium">{{ f.original_path | basename }}</a>
+        <a href="/files/{{ f.id }}" class="fw-medium file-link">{{ f.original_path | basename }}</a>
         {% if flt.sort != 'path' %}<div class="small text-body-secondary text-break">{{ f.original_path | rel_folder }}</div>{% endif %}
       </td>
       <td class="text-break small">
@@ -41,7 +41,12 @@
       </td>
       <td>{% with s=f.status %}{% include "_status.html" %}{% endwith %}</td>
       <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>
-      <td class="small">{{ f.title or (proposal.what if proposal else '') or '' }}</td>
+      {% set what = f.title or (proposal.what if proposal else '') %}
+      {% set category = f.category or (proposal.category if proposal else '') %}
+      <td class="small">
+        {% if what %}<span class="badge cat-pill {% if not category %}text-bg-light border{% endif %}" style="{{ category_style(category) }}" title="{{ category or 'No category yet' }}">{{ what }}</span>{% endif %}
+        {% if category %}<div class="text-body-secondary mt-1">{{ category }}</div>{% endif %}
+      </td>
       <td class="small">{{ f.location or (proposal.where if proposal else '') or '' }}</td>
     </tr>
   {% else %}
