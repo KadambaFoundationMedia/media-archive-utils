@@ -220,3 +220,52 @@ def test_queue_survives_restart(settings):
         job = s.scalars(select(m.Job)).one()
         assert job.state in ("queued", "running", "done", "failed")
         assert job.state != "running" or job.started_at is not None
+
+
+@pytest.mark.parametrize("dry_run", [True, False])
+def test_recordings_never_share_a_proposed_name(
+    client, settings, tone, reference, no_baserow, dry_run
+):
+    """STE-000/001/002 all resolve to 2008-MM-DD_KKS.mp3; each must get its own name."""
+    folder = settings.media_sample_files_path / "2008"
+    folder.mkdir()
+    for i in range(3):
+        path = folder / f"STE-00{i}.mp3"
+        shutil.copy2(tone, path)
+        with path.open("ab") as fh:
+            fh.write(bytes([i]))  # different content: three different recordings
+    tone.unlink()
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    data = {"tool": "renamer", "scope": "all"}
+    if dry_run:
+        data["dry_run"] = "on"
+    client.post("/actions", data=data)
+
+    # Run the jobs on several threads at once, like the real worker pool.
+    queue = JobQueue()
+    queue.settings.workers_io = 4
+    queue.start()
+    import time
+
+    for _ in range(100):
+        with session_scope() as s:
+            if not s.scalar(select(m.Job.id).where(m.Job.state.in_(("queued", "running")))):
+                break
+        time.sleep(0.1)
+    queue.stop()
+
+    with session_scope() as s:
+        names = sorted(f.meta["proposal"]["final_name"] for f in s.scalars(select(m.MediaFile)))
+        flags = [f.meta["proposal"]["flags"] for f in s.scalars(select(m.MediaFile))]
+    assert names == ["2008-MM-DD_KKS-2.mp3", "2008-MM-DD_KKS-3.mp3", "2008-MM-DD_KKS.mp3"]
+    assert sum(any("Same name as another recording" in f for f in fl) for fl in flags) == 2
+    copies = sorted(p.name for p in settings.media_processed_files_path.rglob("*.mp3"))
+    assert copies == ([] if dry_run else names)
+
+    # Running again keeps each file's own name (no shifting to -4, -5, ...).
+    client.post("/actions", data=data)
+    run_queue()
+    with session_scope() as s:
+        again = sorted(f.meta["proposal"]["final_name"] for f in s.scalars(select(m.MediaFile)))
+    assert again == names

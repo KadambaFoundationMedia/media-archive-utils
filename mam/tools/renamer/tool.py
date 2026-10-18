@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from mam.config import Settings, get_settings
@@ -126,6 +127,53 @@ def write_baserow(
     }
 
 
+# ------------------------------------------------------------- unique names
+_names_lock = threading.Lock()
+
+
+def _with_suffix(name: str, suffix: str) -> str:
+    stem, dot, ext = name.rpartition(".")
+    return f"{stem}{suffix}.{ext}" if dot else f"{name}{suffix}"
+
+
+def reserve_name(record_id: int, folder: Path, name: str) -> tuple[str, str | None]:
+    """Give `name` to this recording, or the next free `-2`, `-3`, ... in `folder`.
+
+    Names are taken by other recordings' processed copies and by their (dry-run) proposals,
+    so two different recordings never get the same proposed name. The reservation is saved
+    at once, so parallel jobs see it. Returns (name, original path of the recording that
+    already had the name, if any).
+    """
+    with _names_lock, session_scope() as s:
+        prefix = f"{folder}/"
+        target = func.json_extract(m.MediaFile.meta, "$.reserved")
+        rows = s.execute(
+            select(m.MediaFile.original_path, m.MediaFile.processed_path, target).where(
+                m.MediaFile.id != record_id,
+                or_(m.MediaFile.processed_path.like(f"{prefix}%"), target.like(f"{prefix}%")),
+            )
+        ).all()
+        taken: dict[str, str] = {}
+        for original, processed, reserved in rows:
+            for path in (processed, reserved):
+                if path and Path(path).parent == folder:
+                    taken.setdefault(Path(path).name.lower(), original)
+        chosen, n = name, 2
+        while chosen.lower() in taken:
+            chosen = _with_suffix(name, f"-{n}")
+            n += 1
+        s.execute(
+            update(m.MediaFile)
+            .where(m.MediaFile.id == record_id)
+            .values(
+                meta=func.json_set(
+                    func.coalesce(m.MediaFile.meta, "{}"), "$.reserved", str(folder / chosen)
+                )
+            )
+        )
+    return chosen, taken.get(name.lower()) if chosen != name else None
+
+
 # ------------------------------------------------------------------- the job
 def run_renamer(ctx: JobContext) -> ToolOutcome:
     record = ctx.media_file
@@ -138,6 +186,14 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
     # Release the session before helpers write through their own sessions (SQLite locking).
     ctx.session.commit()
     organizer = FileOrganizer(res.ref.matcher, settings)
+    folder, _ = organizer.target_folder(proposal.what, proposal.category)
+    unique, other = reserve_name(record.id, folder, proposal.new_name)
+    if other:
+        proposal.flags.append(
+            f"Same name as another recording ({Path(other).name}); named {unique} instead. "
+            "Add a title or date that tells them apart."
+        )
+        proposal.new_name = unique
     placed = organizer.organize(
         source_path(record),
         proposal.new_name,
@@ -175,6 +231,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
 
     meta = dict(record.meta or {})
     meta["proposal"] = data
+    meta["reserved"] = str(placed.dst)
     record.meta = meta
     summary = f"{'Would rename' if ctx.dry_run else 'Renamed'} to {placed.dst.name}"
     if proposal.flags:
@@ -295,9 +352,11 @@ def approve_review(
     ref = get_reference()
     session.commit()  # release before helpers write
     organizer = FileOrganizer(ref.matcher, settings)
+    folder, _ = organizer.target_folder(values.get("what") or None, result["category"])
+    name, _ = reserve_name(record.id, folder, result["name"])
     placed = organizer.organize(
         source_path(record),
-        result["name"],
+        name,
         values.get("what") or None,
         tool="renamer-review",
         dry_run=False,
@@ -318,6 +377,7 @@ def approve_review(
         "title": values.get("title") or proposal["title"],
         "baserow_row_id": int(values["baserow_row_id"]) if values.get("baserow_row_id") else None,
         "final_name": placed.dst.name,
+        "target": str(placed.dst),
         "dry_run": False,
     }
     approved["baserow"] = write_baserow(record, approved, placed.dst, settings, dry_run=False)
@@ -329,6 +389,7 @@ def approve_review(
     _learn_alias(session, proposal.get("place"), place_text)
     meta = dict(record.meta or {})
     meta["proposal"] = approved
+    meta["reserved"] = str(placed.dst)
     record.meta = meta
     _apply_display(record, approved, placed.dst)
     if approved["baserow"].get("row_id"):
@@ -368,6 +429,7 @@ def reject_review(session: Session, review: m.Review, operator: str, note: str |
         copy.unlink()  # a processed copy, never an original
     record.processed_path = None
     record.current_name = None
+    record.meta = {k: v for k, v in (record.meta or {}).items() if k != "reserved"}
     record.rec_date = record.title = record.location = record.category = None
     review.outcome, review.operator, review.note = "rejected", operator, note
     review.decided_at = datetime.now(UTC)
