@@ -208,7 +208,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
     async def run_action(request: Request):
         form = await request.form()
         tool = form.get("tool", "")
-        # Two buttons: "Preview (dry run)" sends mode=preview, "Run for real" sends mode=run.
+        # Two buttons: "Preview (dry run)" sends mode=preview, "Run" sends mode=run.
         dry_run = form.get("dry_run") == "on" or form.get("mode") == "preview"
         pipeline = tool == "__pipeline"
         if pipeline:
