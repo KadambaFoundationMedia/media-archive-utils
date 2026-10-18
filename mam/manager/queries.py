@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from mam.helpers.local_db import models as m
 
 PAGE_SIZE = 50
+DEFAULT_STATUS = "__attention"  # the file list opens on the files that need a person
+ATTENTION_LIKE = ("% Review", "% Failed")
 SORTS = {
     "path": m.MediaFile.original_path,
     "name": m.MediaFile.current_name,
@@ -24,7 +26,7 @@ SORTS = {
 @dataclass
 class FileFilter:
     q: str = ""
-    status: str = ""
+    status: str = "__attention"
     kind: str = ""
     category: str = ""
     folder: str = ""
@@ -34,7 +36,7 @@ class FileFilter:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_params(cls, params: Any) -> FileFilter:
+    def from_params(cls, params: Any, default_status: str = DEFAULT_STATUS) -> FileFilter:
         def get(name: str, default: str = "") -> str:
             return (params.get(name) or default).strip()
 
@@ -45,7 +47,7 @@ class FileFilter:
         sort = get("sort", "path")
         return cls(
             q=get("q"),
-            status=get("status"),
+            status=get("status", default_status),
             kind=get("kind"),
             category=get("category"),
             folder=get("folder"),
@@ -79,7 +81,16 @@ class FileFilter:
                     m.MediaFile.location.ilike(like),
                 )
             )
-        if self.status == "__review":
+        if self.status == "__attention":
+            stmt = stmt.where(
+                or_(
+                    *(m.MediaFile.status.like(p) for p in ATTENTION_LIKE),
+                    m.MediaFile.status == "Corrupted",
+                )
+            )
+        elif self.status == "__all":
+            pass
+        elif self.status == "__review":
             stmt = stmt.where(m.MediaFile.status.like("% Review"))
         elif self.status == "__failed":
             stmt = stmt.where(m.MediaFile.status.like("% Failed"))
@@ -110,15 +121,31 @@ def matching_ids(session: Session, flt: FileFilter) -> list[int]:
     return list(session.scalars(stmt))
 
 
-def facet_values(session: Session) -> dict[str, list[str]]:
-    statuses = session.scalars(select(m.MediaFile.status).distinct().order_by(m.MediaFile.status))
+def facet_values(session: Session) -> dict[str, Any]:
+    statuses = session.execute(
+        select(m.MediaFile.status, func.count(m.MediaFile.id))
+        .where(m.MediaFile.parent_id.is_(None))
+        .group_by(m.MediaFile.status)
+        .order_by(m.MediaFile.status)
+    ).all()
     categories = session.scalars(
         select(m.MediaFile.category)
         .where(m.MediaFile.category.is_not(None))
         .distinct()
         .order_by(m.MediaFile.category)
     )
-    return {"statuses": list(statuses), "categories": list(categories)}
+    counts = dict(statuses)
+    attention = sum(
+        n for s, n in counts.items() if s.endswith((" Review", " Failed")) or s == "Corrupted"
+    )
+    return {
+        "statuses": list(statuses),
+        "categories": list(categories),
+        "attention": attention,
+        "review": sum(n for s, n in counts.items() if s.endswith(" Review")),
+        "failed": sum(n for s, n in counts.items() if s.endswith(" Failed")),
+        "all": sum(counts.values()),
+    }
 
 
 def counts(session: Session) -> dict[str, int]:

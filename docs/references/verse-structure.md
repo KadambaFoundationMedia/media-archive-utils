@@ -71,5 +71,6 @@ How many numbers a single verse has depends on the scripture, so any extra numbe
 - Each verse in the range can be checked on vedabase.io.
 
 - The CC lila is written `Adi`, `Madhya` or `Antya`.
+- **Separators:** filenames use hyphens (`BG-2-54`, `SB-9-20-20-27`, `CC-Madhya-20-154`); titles, such as the Baserow `title`, use dots between the numbers (`BG 2.54`, `SB 9.20.20-27`, `CC Madhya 20.154`). The Baserow `tag` holds only the numbers (`2.54`, `Madhya 20.154`).
 - Source names use many variants of the same abbreviation (`S.B.`, `SB`, `Srimad-bhagavatam`, `B.G.`, `CC`, `Chaitanya Charitamrita`). The accepted variants per category are in the Baserow `category_terms_folder` table.
 - Some verses have no purport (e.g. CC Madhya 20.154); the topics of such a class come from the transcript.

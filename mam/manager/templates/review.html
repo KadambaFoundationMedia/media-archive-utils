@@ -105,15 +105,7 @@
         {% else %}<video controls preload="none" class="w-100" src="/files/{{ f.id }}/audio"></video>{% endif %}
       </div>
     </div>
-    <div class="card mb-3">
-      <div class="card-header">Evidence</div>
-      <div class="table-responsive"><table class="table table-sm mb-0 small">
-        <thead><tr><th>Field</th><th>Value</th><th>Source</th><th>Score</th></tr></thead>
-        <tbody>{% for e in evidence %}
-          <tr class="{% if e.selected %}fw-semibold{% endif %}"><td>{{ e.field }}</td><td class="text-break">{{ e.value }}</td><td>{{ e.source }}</td><td>{{ '%.2f' % e.score }}</td></tr>
-        {% endfor %}</tbody>
-      </table></div>
-    </div>
+    {% include "_evidence.html" %}
     <div class="card mb-3"><div class="card-header">Current copy</div>
       <div class="card-body small text-break">{{ f.processed_path or 'not copied' }}</div></div>
   </div>

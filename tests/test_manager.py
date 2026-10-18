@@ -65,7 +65,7 @@ def test_import_scan_and_list(client, archive, settings):
         files = s.scalars(select(m.MediaFile)).all()
         assert len(files) == 2  # the .txt file is ignored
         assert {f.status for f in files} == {"Not processed"}
-    page = client.get("/", params={"q": "R09"}).text
+    page = client.get("/", params={"q": "R09", "status": "__all"}).text
     assert "R09_0004.MP3" in page and "S.B. 1.19.30" not in page
 
 
@@ -90,7 +90,7 @@ def test_renamer_dry_run_changes_nothing(client, archive, reference, no_baserow,
         for f in s.scalars(select(m.MediaFile)):
             assert f.status == "Not processed" and f.processed_path is None
             assert f.meta["proposal"]["dry_run"] is True
-    assert "2011-08-28_KKS_SB-1-19-30_Oslo-no.mp3" in client.get("/").text
+    assert "2011-08-28_KKS_SB-1-19-30_Oslo-no.mp3" in client.get("/?status=__all").text
 
 
 def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_baserow, settings):
@@ -269,3 +269,33 @@ def test_recordings_never_share_a_proposed_name(
     with session_scope() as s:
         again = sorted(f.meta["proposal"]["final_name"] for f in s.scalars(select(m.MediaFile)))
     assert again == names
+
+
+def test_file_list_opens_on_files_needing_attention(
+    client, archive, reference, no_baserow, settings
+):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    assert "Nothing needs your attention" in client.get("/").text
+    client.post("/actions", data={"tool": "renamer", "scope": "all"})
+    run_queue()
+    page = client.get("/").text
+    assert "R09_0004.MP3" in page  # flagged for review
+    assert "S.B. 1.19.30" not in page  # renamed cleanly; nothing to do
+    assert "Needs attention (1)" in page and "All files (2)" in page
+    # grouped by folder, relative to the import root
+    assert "Sample files / Serbia-summercamp-6-13-jul-2012" in page
+    everything = client.get("/?status=__all").text
+    assert "S.B. 1.19.30" in everything and "What do the statuses mean?" in everything
+
+
+def test_evidence_shows_where_it_came_from(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    client.post("/actions", data={"tool": "renamer", "scope": "all"})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    page = client.get(f"/files/{file_id}").text
+    assert "Folder name" in page
+    assert "&#34;6-13-jul-2012&#34; in folder &#34;Serbia-summercamp-6-13-jul-2012&#34;" in page
