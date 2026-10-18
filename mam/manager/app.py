@@ -48,7 +48,7 @@ def status_color(status: str) -> str:
     if status.startswith(("Processing ", "Queued ")):
         return "info"
     if status.endswith(" Done"):
-        return "primary"
+        return "success"
     return "secondary"
 
 
@@ -147,6 +147,24 @@ def asset_version() -> str:
 
 
 templates.env.globals["asset_version"] = asset_version
+
+
+def category_style(name: str | None) -> str:
+    """Inline style for a category pill, in the color from Baserow category_terms_folder."""
+    if not name:
+        return ""
+    from mam.manager.colors import badge_style
+
+    try:
+        from mam.tools.renamer.knowledge import get_reference
+
+        category = get_reference().matcher.by_name(name)
+    except Exception:  # Baserow unreachable and no cache yet: plain pill
+        return ""
+    return badge_style(category.color) if category else ""
+
+
+templates.env.globals["category_style"] = category_style
 
 
 def create_app(start_queue: bool = True) -> FastAPI:

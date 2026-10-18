@@ -34,7 +34,7 @@ function syncClearButtons() {
     if (btn.dataset.target === "sort") {
       isDefault = isDefault && !document.getElementById("desc")?.checked;
     }
-    btn.classList.toggle("d-none", isDefault);
+    btn.disabled = isDefault;  // always visible; dimmed when there is nothing to clear
   });
 }
 document.addEventListener("click", (event) => {

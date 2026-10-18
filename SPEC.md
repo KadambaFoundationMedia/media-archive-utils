@@ -179,6 +179,8 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Opens on **Needs attention** (files waiting for a review, failed or corrupted); *All files*, *Needs review*, *Failed* and each single status (with counts) are one choice away. A short guide on the page explains every status.
   - Sorted by path, files are grouped under a header row per folder (shown relative to its import root, e.g. `Sample files / 2012 / Radhadesh Jan 2012`) with alternating row colors.
   - An action without a status filter applies to all files.
+  - Every filter has an always-visible × that clears only that filter (dimmed when there is nothing to clear). Clearing Status shows all files; **Reset all** returns every filter to its default (Needs attention, sorted by path).
+  - The WHAT of each file is shown as a pill in its category's color from the Baserow `category_terms_folder.color` column (e.g. Bhagavad-gita blue, Srimad-bhagavatam light-red), with the category name below it. File names use the normal text color; finished tool steps are green.
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all at once.
   - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).

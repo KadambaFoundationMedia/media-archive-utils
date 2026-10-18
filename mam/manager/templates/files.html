@@ -3,14 +3,14 @@
 <form id="filters" class="row g-2 align-items-end mb-3" method="get" action="/"
       hx-get="/" hx-select="#file-table" hx-target="#file-table" hx-swap="outerHTML"
       hx-select-oob="#file-count,#scope-all" hx-trigger="change, keyup changed delay:400ms from:#q" hx-push-url="true">
-  <div class="col-12 col-md-4">
+  <div class="col-12 col-lg-3">
     <label class="form-label small mb-0" for="q">Search</label>
     <div class="input-group input-group-sm">
       <input class="form-control" id="q" name="q" value="{{ flt.q }}" placeholder="name, path, title, place">
-      <button type="button" class="btn btn-outline-secondary clear-filter{% if not flt.q %} d-none{% endif %}" data-target="q" data-default="" title="Clear search" aria-label="Clear search"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="btn btn-outline-secondary clear-filter" {% if not flt.q %}disabled{% endif %} data-target="q" data-default="" title="Clear search" aria-label="Clear search"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
-  <div class="col-6 col-md-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <label class="form-label small mb-0" for="status">Status</label>
     <div class="input-group input-group-sm">
     <select class="form-select" id="status" name="status">
@@ -21,20 +21,20 @@
         {% for s, n in facets.statuses %}<option value="{{ s }}" {% if flt.status == s %}selected{% endif %}>{{ s }} ({{ n }})</option>{% endfor %}
       </optgroup>
     </select>
-    <button type="button" class="btn btn-outline-secondary clear-filter{% if flt.status == '__attention' %} d-none{% endif %}" data-target="status" data-default="__attention" title="Clear status (back to Needs attention)" aria-label="Clear status (back to Needs attention)"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" class="btn btn-outline-secondary clear-filter" {% if flt.status == '__all' %}disabled{% endif %} data-target="status" data-default="__all" title="Clear status (show all files)" aria-label="Clear status (show all files)"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
-  <div class="col-6 col-md-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <label class="form-label small mb-0" for="category">Category</label>
     <div class="input-group input-group-sm">
     <select class="form-select" id="category" name="category">
       <option value="">All</option>
       {% for c in facets.categories %}<option {% if flt.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
-    <button type="button" class="btn btn-outline-secondary clear-filter{% if not flt.category %} d-none{% endif %}" data-target="category" data-default="" title="Clear category" aria-label="Clear category"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" class="btn btn-outline-secondary clear-filter" {% if not flt.category %}disabled{% endif %} data-target="category" data-default="" title="Clear category" aria-label="Clear category"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
-  <div class="col-6 col-md-1">
+  <div class="col-6 col-md-4 col-lg-2">
     <label class="form-label small mb-0" for="kind">Type</label>
     <div class="input-group input-group-sm">
     <select class="form-select" id="kind" name="kind">
@@ -42,10 +42,10 @@
       <option value="audio" {% if flt.kind == 'audio' %}selected{% endif %}>Audio</option>
       <option value="video" {% if flt.kind == 'video' %}selected{% endif %}>Video</option>
     </select>
-    <button type="button" class="btn btn-outline-secondary clear-filter{% if not flt.kind %} d-none{% endif %}" data-target="kind" data-default="" title="Clear type" aria-label="Clear type"><i class="fa-solid fa-xmark"></i></button>
+    <button type="button" class="btn btn-outline-secondary clear-filter" {% if not flt.kind %}disabled{% endif %} data-target="kind" data-default="" title="Clear type" aria-label="Clear type"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
-  <div class="col-6 col-md-2">
+  <div class="col-6 col-md-6 col-lg-2">
     <label class="form-label small mb-0" for="sort">Sort</label>
     <div class="input-group input-group-sm">
       <select class="form-select" id="sort" name="sort">
@@ -55,11 +55,11 @@
       </select>
       <input type="checkbox" class="btn-check" id="desc" name="desc" value="1" {% if flt.desc %}checked{% endif %}>
       <label class="btn btn-outline-secondary" for="desc" title="Descending"><i class="fa-solid fa-arrow-down-wide-short"></i></label>
-      <button type="button" class="btn btn-outline-secondary clear-filter{% if flt.sort == 'path' and not flt.desc %} d-none{% endif %}" data-target="sort" data-default="path" title="Clear sort (back to Path)" aria-label="Clear sort (back to Path)"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="btn btn-outline-secondary clear-filter" {% if flt.sort == 'path' and not flt.desc %}disabled{% endif %} data-target="sort" data-default="path" title="Clear sort (back to Path)" aria-label="Clear sort (back to Path)"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
   {% if flt.folder %}<input type="hidden" name="folder" value="{{ flt.folder }}">{% endif %}
-  <div class="col-12 col-md-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/" title="Clear all filters">Reset all</a></div>
+  <div class="col-6 col-md-6 col-lg-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/" title="Clear all filters">Reset all</a></div>
   {% if flt.folder %}
   <div class="col-12">
     <span class="badge rounded-pill text-bg-secondary fs-6 fw-normal">

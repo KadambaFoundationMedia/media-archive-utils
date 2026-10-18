@@ -47,7 +47,7 @@
           <dt class="col-4">Date</dt><dd class="col-8">{{ f.rec_date or '–' }}</dd>
           <dt class="col-4">WHAT / title</dt><dd class="col-8">{{ f.title or '–' }}</dd>
           <dt class="col-4">Location</dt><dd class="col-8">{{ f.location or '–' }}</dd>
-          <dt class="col-4">Category</dt><dd class="col-8">{{ f.category or '–' }}</dd>
+          <dt class="col-4">Category</dt><dd class="col-8">{% if f.category %}<span class="badge cat-pill" style="{{ category_style(f.category) }}">{{ f.category }}</span>{% else %}–{% endif %}</dd>
           <dt class="col-4">Processed copy</dt><dd class="col-8 text-break">{{ f.processed_path or '–' }}</dd>
           <dt class="col-4">Type / size</dt><dd class="col-8">{{ f.kind }}, {{ (f.size / 1048576) | round(1) }} MB</dd>
           <dt class="col-4">Baserow row</dt><dd class="col-8">{{ f.baserow_row_id or '–' }}</dd>

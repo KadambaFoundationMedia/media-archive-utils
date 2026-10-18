@@ -494,18 +494,31 @@ def test_run_writes_baserow_live_when_the_switch_is_on(
         assert s.get(m.MediaFile, file_id).baserow_row_id == 77
 
 
-
 def test_filters_have_clear_buttons(client):
     page = client.get("/").text
     for target in ("q", "status", "category", "kind", "sort"):
-        assert f'data-target="{target}"' in page
-    # hidden while a filter has its default value, shown when it is set
-    assert 'clear-filter d-none" data-target="status"' in page
+        assert f'data-target="{target}"' in page  # always visible
+    # dimmed (disabled) while there is nothing to clear; status clears to All files
+    assert 'clear-filter" disabled data-target="q"' in page
+    assert 'clear-filter"  data-target="status" data-default="__all"' in page  # Needs attention
     page = client.get("/", params={"status": "__all", "q": "SB", "folder": "/x/sample/2008"}).text
-    assert 'clear-filter" data-target="status"' in page
-    assert 'clear-filter" data-target="q"' in page
+    assert 'clear-filter" disabled data-target="status"' in page
+    assert 'clear-filter"  data-target="q"' in page
     assert "Clear folder" in page
 
+
+def test_what_is_shown_in_its_category_color(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    client.post("/actions", data={"tool": "renamer", "scope": "all", "mode": "run"})
+    run_queue()
+    page = client.get("/?status=__all").text
+    # Srimad-bhagavatam is 'light-red' in category_terms_folder
+    assert (
+        'style="background-color:#edaba8;color:#1f2328;border-color:#edaba8" '
+        'title="Srimad-bhagavatam">SB-1-19-30'
+        in page
+    )
 
 
 def test_filter_reload_keeps_a_real_page_url(client):
