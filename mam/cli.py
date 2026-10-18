@@ -268,3 +268,30 @@ def rename(
             console.print(f"[{'red' if job.state == 'failed' else 'green'}]{job.state}[/] {line}")
             for flag in (job.result or {}).get("flags", []):
                 console.print(f"   [yellow]⚑ {flag}[/yellow]")
+
+
+@app.command()
+def reset(
+    processed_files: Annotated[bool, typer.Option(help="Delete the processed copies.")] = True,
+    learned: Annotated[bool, typer.Option(help="Also forget learned corrections.")] = False,
+    caches: Annotated[bool, typer.Option(help="Also clear caches.")] = False,
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation.")] = False,
+) -> None:
+    """Reset the media manager: clear the local database and processed copies (backup first).
+
+    Originals and Baserow are never changed.
+    """
+    from mam.manager.maintenance import ResetOptions, summary
+    from mam.manager.maintenance import reset as do_reset
+
+    _ready_db()
+    info = summary()
+    console.print(
+        f"This clears {info['files']} file records, {info['jobs']} jobs, {info['reviews']} reviews"
+        + (f" and deletes {info['processed_files']} processed file(s)" if processed_files else "")
+        + ". Originals and Baserow are not changed; a database backup is made first."
+    )
+    if not yes:
+        typer.confirm("Reset the media manager?", abort=True)
+    result = do_reset(ResetOptions(processed_files, learned, caches))
+    console.print(f"Reset done. Backup: {result.backup}")
