@@ -1,14 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 <form id="filters" class="row g-2 align-items-end mb-3" method="get" action="/"
-      hx-get="/files/rows" hx-target="#file-table" hx-trigger="change, keyup changed delay:400ms from:#q" hx-push-url="true">
+      hx-get="/" hx-select="#file-table" hx-target="#file-table" hx-swap="outerHTML"
+      hx-select-oob="#file-count,#scope-all" hx-trigger="change, keyup changed delay:400ms from:#q" hx-push-url="true">
   <div class="col-12 col-md-4">
     <label class="form-label small mb-0" for="q">Search</label>
-    <input class="form-control form-control-sm" id="q" name="q" value="{{ flt.q }}" placeholder="name, path, title, place">
+    <div class="input-group input-group-sm">
+      <input class="form-control" id="q" name="q" value="{{ flt.q }}" placeholder="name, path, title, place">
+      <button type="button" class="btn btn-outline-secondary clear-filter{% if not flt.q %} d-none{% endif %}" data-target="q" data-default="" title="Clear search" aria-label="Clear search"><i class="fa-solid fa-xmark"></i></button>
+    </div>
   </div>
   <div class="col-6 col-md-2">
     <label class="form-label small mb-0" for="status">Status</label>
-    <select class="form-select form-select-sm" id="status" name="status">
+    <div class="input-group input-group-sm">
+    <select class="form-select" id="status" name="status">
       {% for value, label, n in [('__attention', 'Needs attention', facets.attention), ('__all', 'All files', facets.all), ('__review', 'Needs review', facets.review), ('__failed', 'Failed', facets.failed)] %}
       <option value="{{ value }}" {% if flt.status == value %}selected{% endif %}>{{ label }} ({{ n }})</option>
       {% endfor %}
@@ -16,21 +21,29 @@
         {% for s, n in facets.statuses %}<option value="{{ s }}" {% if flt.status == s %}selected{% endif %}>{{ s }} ({{ n }})</option>{% endfor %}
       </optgroup>
     </select>
+    <button type="button" class="btn btn-outline-secondary clear-filter{% if flt.status == '__attention' %} d-none{% endif %}" data-target="status" data-default="__attention" title="Clear status (back to Needs attention)" aria-label="Clear status (back to Needs attention)"><i class="fa-solid fa-xmark"></i></button>
+    </div>
   </div>
   <div class="col-6 col-md-2">
     <label class="form-label small mb-0" for="category">Category</label>
-    <select class="form-select form-select-sm" id="category" name="category">
+    <div class="input-group input-group-sm">
+    <select class="form-select" id="category" name="category">
       <option value="">All</option>
       {% for c in facets.categories %}<option {% if flt.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
+    <button type="button" class="btn btn-outline-secondary clear-filter{% if not flt.category %} d-none{% endif %}" data-target="category" data-default="" title="Clear category" aria-label="Clear category"><i class="fa-solid fa-xmark"></i></button>
+    </div>
   </div>
   <div class="col-6 col-md-1">
     <label class="form-label small mb-0" for="kind">Type</label>
-    <select class="form-select form-select-sm" id="kind" name="kind">
+    <div class="input-group input-group-sm">
+    <select class="form-select" id="kind" name="kind">
       <option value="">All</option>
       <option value="audio" {% if flt.kind == 'audio' %}selected{% endif %}>Audio</option>
       <option value="video" {% if flt.kind == 'video' %}selected{% endif %}>Video</option>
     </select>
+    <button type="button" class="btn btn-outline-secondary clear-filter{% if not flt.kind %} d-none{% endif %}" data-target="kind" data-default="" title="Clear type" aria-label="Clear type"><i class="fa-solid fa-xmark"></i></button>
+    </div>
   </div>
   <div class="col-6 col-md-2">
     <label class="form-label small mb-0" for="sort">Sort</label>
@@ -42,10 +55,19 @@
       </select>
       <input type="checkbox" class="btn-check" id="desc" name="desc" value="1" {% if flt.desc %}checked{% endif %}>
       <label class="btn btn-outline-secondary" for="desc" title="Descending"><i class="fa-solid fa-arrow-down-wide-short"></i></label>
+      <button type="button" class="btn btn-outline-secondary clear-filter{% if flt.sort == 'path' and not flt.desc %} d-none{% endif %}" data-target="sort" data-default="path" title="Clear sort (back to Path)" aria-label="Clear sort (back to Path)"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
   {% if flt.folder %}<input type="hidden" name="folder" value="{{ flt.folder }}">{% endif %}
-  <div class="col-12 col-md-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/">Reset</a></div>
+  <div class="col-12 col-md-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/" title="Clear all filters">Reset all</a></div>
+  {% if flt.folder %}
+  <div class="col-12">
+    <span class="badge rounded-pill text-bg-secondary fs-6 fw-normal">
+      <i class="fa-regular fa-folder-open me-1"></i>Folder: {{ (flt.folder ~ '/x') | rel_folder }}
+      <a class="text-reset ms-1" href="/?{{ flt.query_args(folder='', page=1) | urlencode }}" title="Clear folder" aria-label="Clear folder"><i class="fa-solid fa-xmark"></i></a>
+    </span>
+  </div>
+  {% endif %}
 </form>
 <details class="small mb-3 status-guide">
   <summary class="text-body-secondary">What do the statuses mean?</summary>
@@ -59,11 +81,6 @@
   </dl>
 </details>
 
-{% if baserow_on %}
-<div class="small mb-2 p-2 rounded border border-danger">
-  <i class="fa-solid fa-database me-1 text-danger"></i>Baserow writes are <strong class="text-danger">ON</strong>: runs write to the live Baserow media table. Switch it off in the top bar.
-</div>
-{% endif %}
 <form id="actions" method="post" action="/actions" x-data="{ scope: 'selected' }">
   <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
   {% for k, v in flt.query_args().items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
@@ -75,11 +92,11 @@
     </select>
     <select class="form-select form-select-sm w-auto" name="scope" x-model="scope" aria-label="Which files">
       <option value="selected">Selected files</option>
-      <option value="all">All {{ total }} matching files</option>
+      <option value="all" id="scope-all">All {{ total }} matching files</option>
     </select>
     <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
     <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
-    <span class="small text-body-secondary ms-auto">{{ total }} files</span>
+    <span class="small text-body-secondary ms-auto" id="file-count">{{ total }} files</span>
   </div>
   <div id="file-table">
     {% include "_file_rows.html" %}

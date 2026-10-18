@@ -492,3 +492,23 @@ def test_run_writes_baserow_live_when_the_switch_is_on(
         ).one()
         assert job.result["summary"].endswith("Baserow: new row written (row 77)")
         assert s.get(m.MediaFile, file_id).baserow_row_id == 77
+
+
+
+def test_filters_have_clear_buttons(client):
+    page = client.get("/").text
+    for target in ("q", "status", "category", "kind", "sort"):
+        assert f'data-target="{target}"' in page
+    # hidden while a filter has its default value, shown when it is set
+    assert 'clear-filter d-none" data-target="status"' in page
+    page = client.get("/", params={"status": "__all", "q": "SB", "folder": "/x/sample/2008"}).text
+    assert 'clear-filter" data-target="status"' in page
+    assert 'clear-filter" data-target="q"' in page
+    assert "Clear folder" in page
+
+
+
+def test_filter_reload_keeps_a_real_page_url(client):
+    page = client.get("/").text
+    assert 'hx-get="/" hx-select="#file-table"' in page  # the address bar stays on /?...
+    assert 'id="file-count"' in page and 'id="scope-all"' in page  # counts update too
