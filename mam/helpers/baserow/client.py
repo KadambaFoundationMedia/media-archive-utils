@@ -88,8 +88,12 @@ class BaserowClient:
         self.settings = settings or get_settings()
         if not self.settings.baserow_api_token:
             raise BaserowError("BASEROW_API_TOKEN is not set in .env")
-        # Writes are only sent when explicitly enabled (SPEC.md section 6).
-        self.apply = self.settings.baserow_apply if apply is None else apply
+        # Writes are only sent when the "Baserow writes" switch is on (SPEC.md section 6).
+        if apply is None:
+            from mam.helpers.local_db.app_settings import baserow_writes_enabled
+
+            apply = baserow_writes_enabled()
+        self.apply = apply
         self._http = httpx.Client(
             base_url=self.settings.baserow_api_url.rstrip("/"),
             headers={"Authorization": f"Token {self.settings.baserow_api_token}"},

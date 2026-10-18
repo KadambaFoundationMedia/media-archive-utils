@@ -15,8 +15,8 @@ uv run mam doctor         # checks binaries, .env, local DB and Baserow (read-on
 uv run mam db migrate     # creates the local database (~/.mam/mam.sqlite)
 ```
 
-Everything that changes files or Baserow is a dry run unless you pass `--no-dry-run`
-(files) or set `BASEROW_APPLY=true` (Baserow).
+Nothing changes files unless you choose **Run** (or pass `--no-dry-run`). Baserow is only
+written when the **Baserow writes** switch in the portal is on, or when you approve a review.
 
 ## Media manager
 

@@ -25,8 +25,6 @@ class Settings(BaseSettings):
     baserow_media_table_id: int | None = None
     baserow_travel_schedule_table_id: int | None = None
     baserow_category_terms_table_id: int | None = None
-    # Baserow writes are dry-run unless this is true or a command passes --apply.
-    baserow_apply: bool = False
 
     # Folders
     media_sample_files_path: Path = REPO_ROOT / "sample-files"

@@ -7,11 +7,12 @@
 <div class="row g-3">
   <div class="col-12 col-lg-6">
     <div class="card mb-3">
-      <div class="card-header">Current settings <span class="small text-body-secondary">(from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
+      <div class="card-header">Current settings <span class="small text-body-secondary">(folders and pools come from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
       <div class="card-body">
         <dl class="row small mb-0">
           <dt class="col-5">Baserow writes</dt>
-          <dd class="col-7">{% if settings.baserow_apply %}<span class="text-danger fw-semibold">live</span>{% else %}dry-run for bulk runs; approvals write live{% endif %} <code>BASEROW_APPLY</code></dd>
+          <dd class="col-7">{% with switch_id='settings' %}{% include "_baserow_switch.html" %}{% endwith %}
+            <div class="text-body-secondary">Approving a review always writes.</div></dd>
           <dt class="col-5">Operator</dt><dd class="col-7">{{ settings.operator_name }}</dd>
           <dt class="col-5">Processed files</dt><dd class="col-7 text-break">{{ settings.media_processed_files_path }}</dd>
           {% for label, path in settings.import_roots %}

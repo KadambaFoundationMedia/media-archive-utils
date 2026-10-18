@@ -391,7 +391,9 @@ def test_approve_writes_baserow_live_even_in_dry_run_mode(
             return Field(name, "text", {})
 
     monkeypatch.setattr(BaserowClient, "fields", lambda self, table_id, refresh=False: AnyColumn())
-    assert settings.baserow_apply is False
+    from mam.helpers.local_db.app_settings import baserow_writes_enabled
+
+    assert baserow_writes_enabled() is False
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
     with session_scope() as s:
@@ -400,7 +402,7 @@ def test_approve_writes_baserow_live_even_in_dry_run_mode(
     run_queue()
     with session_scope() as s:
         review_id = s.scalars(select(m.Review.id)).one()
-        # the bulk-style real run itself did not write (BASEROW_APPLY=false)
+        # the run itself did not write (the Baserow writes switch is off)
         assert not s.scalars(select(m.BaserowWriteLog)).all()
     assert (
         "Approving writes to the live Baserow media table"
@@ -436,7 +438,56 @@ def test_run_result_says_what_happened_in_baserow(client, archive, reference, no
         }
     clean = summaries[by_name["KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"]]
     flagged = summaries[by_name["R09_0004.MP3"]]
-    assert clean.endswith("Baserow: new row logged only (BASEROW_APPLY=false)")
+    assert clean.endswith("Baserow: new row logged only (Baserow writes are off)")
     assert flagged.endswith("Baserow: written when you approve the review")
     page = client.get("/").text
     assert ">Run</button>" in page and "Run for real" not in page
+
+
+def test_baserow_switch_on_the_home_page(client, settings):
+    from mam.helpers.local_db.app_settings import baserow_writes_enabled
+
+    page = client.get("/").text
+    assert "Baserow writes:" in page and "<strong>off</strong>" in page
+    response = client.post(
+        "/settings/baserow-writes",
+        data={"enabled": "on", "back": "/?status=__all"},
+        follow_redirects=False,
+    )
+    assert response.headers["location"].startswith("/?status=__all&msg=")
+    assert baserow_writes_enabled() is True
+    assert 'text-danger">ON' in client.get("/").text
+    client.post("/settings/baserow-writes", data={"back": "/"})  # unchecked switch -> off
+    assert baserow_writes_enabled() is False
+
+
+def test_run_writes_baserow_live_when_the_switch_is_on(
+    client, archive, reference, settings, monkeypatch
+):
+    import httpx
+    import respx
+
+    from mam.helpers.baserow.client import BaserowClient, Field
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    class AnyColumn(dict):
+        def get(self, name, default=None):
+            return Field(name, "text", {})
+
+    monkeypatch.setattr(BaserowClient, "fields", lambda self, table_id, refresh=False: AnyColumn())
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"]
+    set_baserow_writes(True)
+    with respx.mock(base_url="https://baserow.test/api/database") as api:
+        create = api.post("/rows/table/1/").mock(return_value=httpx.Response(200, json={"id": 77}))
+        client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
+        run_queue()
+    assert create.called
+    with session_scope() as s:
+        job = s.scalars(
+            select(m.Job).where(m.Job.media_file_id == file_id, m.Job.tool == "renamer")
+        ).one()
+        assert job.result["summary"].endswith("Baserow: new row written (row 77)")
+        assert s.get(m.MediaFile, file_id).baserow_row_id == 77

@@ -143,12 +143,12 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Database:** full segment- and word-level data, plus the binding metadata, lives in the local DB for the tools and the waveform editor.
 
 ## 6. Baserow
-- **Live writes:** tools write to Baserow as they go, against the live database (there is no test database).
+- **Live writes:** tools write to the live Baserow database (there is no test database).
 - **Safeguards:**
-  - Baserow writes are dry-run by default and are sent only with an explicit `--apply` or the manager's apply action.
+  - A **Baserow writes** switch on the portal's home page (also on the Settings page and shown in the navbar) decides whether runs write to Baserow. It is stored in the local DB, takes effect at once, defaults to **off**, asks for confirmation when switched on, and a reset turns it off again. While it is off, runs only log the rows they would write.
   - Every write is logged in the local DB with before and after values, so it can be undone.
 - **When tools write:** the Renamer writes a file's row when its name is final: right away for an unflagged file, and after approval for a flagged one.
-- **Live or dry-run:** runs (**Run**, the pipeline) follow `BASEROW_APPLY`. **Approving a review always writes live**, because it is an explicit human decision; the review page says so.
+- **Live or logged:** runs (**Run** on one or many files, the pipeline) follow the switch. **Approving a review always writes live**, because it is an explicit human decision; the review page says so.
 - **Matching an existing row:** the date alone never decides. Among the rows on the same date, a row matches only when it also agrees on the verse `tag` and/or the `title` (shared title words, ignoring stop words, places and countries), with `place_location`/`country` and category as further evidence. A different verse, place or country counts against the row; an online place (`Zoom-livestream`) is neutral, because a livestream happens somewhere. When several rows fit, the file is flagged so the reviewer picks the row; otherwise a new row is created.
 - **Formats:**
   - `audio_file_location` / `video_file_location`: the path below the processed-files root, e.g. `/Srimad-bhagavatam/2011-08-28_KKS_SB-1-19-30_Oslo-no.wma`

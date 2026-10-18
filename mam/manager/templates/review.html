@@ -74,7 +74,7 @@
         {% if next_id %}<input type="hidden" name="next" value="/review/{{ next_id }}">{% endif %}
       </div>
       {% if review.outcome == 'pending' %}
-      <div class="small text-body-secondary px-3 pb-2"><i class="fa-solid fa-database me-1 text-danger"></i>Approving writes to the live Baserow media table{% if not settings.baserow_apply %} (bulk runs stay in dry-run while <code>BASEROW_APPLY=false</code>){% endif %}. Every write can be undone from the log on the file page.</div>
+      <div class="small text-body-secondary px-3 pb-2"><i class="fa-solid fa-database me-1 text-danger"></i>Approving writes to the live Baserow media table, also when the Baserow writes switch is off. Every write can be undone from the log on the file page.</div>
       <div class="card-footer d-flex flex-wrap gap-2">
         <button class="btn btn-success btn-sm" name="action" value="approve" type="submit"><i class="fa-solid fa-check me-1"></i>Approve</button>
         <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>
@@ -93,7 +93,7 @@
           <input class="form-control form-control-sm" id="nc" name="country" value="{{ p.new_place.country }}"></div>
         <input type="hidden" name="when" value="{{ p.when }}">
         <div class="col-12 col-md-4"><button class="btn btn-sm btn-outline-primary w-100" type="submit">Add to travel schedule</button></div>
-        <div class="small text-body-secondary">Adds a travel schedule row for {{ p.when }}{% if not settings.baserow_apply %} (dry-run: logged, not sent){% endif %}. A new place option for the media table must be added in Baserow itself.</div>
+        <div class="small text-body-secondary">Adds a travel schedule row for {{ p.when }}{% if not baserow_on %} (Baserow writes are off: logged, not sent){% endif %}. A new place option for the media table must be added in Baserow itself.</div>
       </div>
     </form>
     {% endif %}

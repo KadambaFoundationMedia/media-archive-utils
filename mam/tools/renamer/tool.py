@@ -16,6 +16,7 @@ from mam.config import Settings, get_settings
 from mam.errors import MamError
 from mam.helpers.file_organizer import FileOrganizer
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import baserow_writes_enabled
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.manager.tools import JobContext, ToolOutcome
@@ -90,14 +91,14 @@ def write_baserow(
     dry_run: bool,
     live: bool = False,
 ) -> dict[str, Any]:
-    """Create or update the media row. Bulk runs follow BASEROW_APPLY; `live` (a reviewer's
-    approval) always writes for real."""
+    """Create or update the media row. Runs follow the "Baserow writes" switch; `live` (a
+    reviewer's approval) always writes for real."""
     from mam.helpers.baserow import BaserowClient
 
     ref = get_reference()
     values = baserow_values(proposal, final_path, record.kind, ref, settings)
     with BaserowClient(settings) as client:
-        apply = (settings.baserow_apply or live) and not dry_run
+        apply = (baserow_writes_enabled() or live) and not dry_run
         row_id = proposal.get("baserow_row_id") or record.baserow_row_id
         if row_id:
             result = client.update_row(
@@ -197,7 +198,7 @@ def baserow_summary(baserow: dict | None, flagged: bool = False) -> str:
         return "Baserow: written when you approve the review"
     what = "new row" if baserow.get("action") == "create" else "row update"
     if baserow.get("dry_run"):
-        return f"Baserow: {what} logged only (BASEROW_APPLY=false)"
+        return f"Baserow: {what} logged only (Baserow writes are off)"
     row = baserow.get("row_id")
     return f"Baserow: {what} written (row {row})" if row else f"Baserow: {what} written"
 
@@ -423,7 +424,7 @@ def approve_review(
         "target": str(placed.dst),
         "dry_run": False,
     }
-    # Approving is an explicit decision: it writes to Baserow even when BASEROW_APPLY is false.
+    # Approving is an explicit decision: it writes to Baserow even when the switch is off.
     approved["baserow"] = write_baserow(
         record, approved, placed.dst, settings, dry_run=False, live=True
     )
