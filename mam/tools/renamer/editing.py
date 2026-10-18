@@ -11,6 +11,7 @@ records the values as *confirmed*, so later Renamer runs keep them and only fill
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -56,7 +57,10 @@ def exact_place(text: str | None, ref: Reference) -> Place | None:
     key = norm_key(text)
     for name in ref.place_options:
         if norm_key(name) == key:
-            return ref.places.get(key) or Place(name, None, None)
+            known = ref.places.get(key)
+            if known and norm_key(known.name) == key:
+                return known
+            return Place(name, None, None)  # an option without travel-schedule country yet
     return None
 
 
@@ -220,6 +224,9 @@ def save(
     )
 
     ref = get_reference()
+    if _clean(values.get("place")) and not exact_place(_clean(values.get("place")), ref):
+        with contextlib.suppress(Exception):  # an option just added in Baserow counts at once
+            ref = get_reference(refresh=True)
     ext = Path(record.original_path).suffix.lower().lstrip(".")
     result = check(values, ext, ref)
     if result["problems"]:

@@ -54,8 +54,15 @@ def archive_path(path: Path, settings: Settings) -> str:
 
 # ------------------------------------------------------------------ Baserow
 def baserow_values(
-    proposal: dict[str, Any], final_path: Path, kind: str, ref: Reference, settings: Settings
+    proposal: dict[str, Any],
+    final_path: Path,
+    kind: str,
+    ref: Reference,
+    settings: Settings,
+    clear_unknown_place: bool = False,
 ) -> dict[str, Any]:
+    """Media row values. With `clear_unknown_place` (a person's save) a place that is not a
+    place_location option clears the old place_location instead of leaving it as it was."""
     values: dict[str, Any] = {
         "title": proposal["title"],
         "tag": proposal.get("verse_tag"),
@@ -79,7 +86,10 @@ def baserow_values(
     country = ref.country_option(proposal.get("cc"))
     if country:
         values["country"] = country
-    return {k: v for k, v in values.items() if v not in (None, "", [])}
+    values = {k: v for k, v in values.items() if v not in (None, "", [])}
+    if clear_unknown_place and proposal.get("place") and "place_location" not in values:
+        values["place_location"] = None  # e.g. was ISKCON-Amsterdam, now the new place Amsterdam
+    return values
 
 
 def _date_parts(text: str) -> tuple[int | None, int | None, int | None]:
@@ -104,7 +114,9 @@ def write_baserow(
     from mam.helpers.baserow import BaserowClient
 
     ref = get_reference()
-    values = baserow_values(proposal, final_path, record.kind, ref, settings)
+    values = baserow_values(
+        proposal, final_path, record.kind, ref, settings, clear_unknown_place=live
+    )
     with BaserowClient(settings) as client:
         apply = (baserow_writes_enabled() or live) and not dry_run
         row_id = proposal.get("baserow_row_id") or record.baserow_row_id
@@ -130,6 +142,7 @@ def write_baserow(
                     "imported_on": date.today().isoformat(),
                 }
             )
+            values = {k: v for k, v in values.items() if v is not None}  # nothing to clear
             result = client.create_row(
                 client.media_table, values, tool=TOOL, media_file_id=record.id, dry_run=not apply
             )

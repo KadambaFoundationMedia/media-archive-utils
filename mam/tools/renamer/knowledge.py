@@ -82,7 +82,7 @@ class MediaRow:
 @dataclass
 class Reference:
     matcher: CategoryMatcher
-    places: dict[str, Place]  # norm key -> place
+    places: dict[str, Place]  # norm key -> place (names, short names and aliases)
     stays: list[Stay]
     media_by_date: dict[str, list[MediaRow]]
     place_options: set[str]
@@ -213,7 +213,10 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
         built.append(place)
     for place in built:  # ... then the name without the ISKCON- prefix
         places.setdefault(norm_key(re.sub(r"^ISKCON-", "", place.name, flags=re.I)), place)
+    exact = {norm_key(p.name): p for p in built}
     for key, target in aliases["places"].items():
+        if key in exact:
+            continue  # a real Baserow place ('Amsterdam') always beats an alias for it
         target_place = places.get(norm_key(target))
         if target_place:
             places[key] = target_place

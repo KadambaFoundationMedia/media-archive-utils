@@ -317,3 +317,73 @@ def test_refresh_baserow_data_button(client, settings, monkeypatch):
     monkeypatch.setattr(knowledge, "fetch_raw", reference_raw)
     response = client.post("/settings/refresh-baserow", follow_redirects=False)
     assert "Baserow data refreshed" in response.headers["location"].replace("%20", " ")
+
+
+def test_a_real_place_option_beats_the_alias(reference):
+    """Baserow has 'ISKCON-Amsterdam' and the new 'Amsterdam': typing Amsterdam is Amsterdam."""
+    from mam.tools.renamer.editing import exact_place
+    from mam.tools.renamer.knowledge import build_reference
+    from tests.renamer_fixtures import reference_raw
+
+    raw = reference_raw()
+    raw["options"]["place_location"] += ["ISKCON-Amsterdam", "Amsterdam"]
+    ref = build_reference(raw)
+    assert exact_place("Amsterdam", ref).name == "Amsterdam"
+    assert exact_place("ISKCON-Amsterdam", ref).name == "ISKCON-Amsterdam"
+    assert ref.find_place("amsterdam").name == "Amsterdam"  # the Renamer too
+
+
+def test_saving_a_new_place_clears_the_old_place_location(reference, settings):
+    from pathlib import Path
+
+    from mam.tools.renamer.tool import baserow_values
+
+    proposal = {
+        "original_path": "/x/STE-001.mp3",
+        "title": "Home program",
+        "languages": ["English"],
+        "when": "2008-MM-DD",
+        "place": "Amsterdam",
+        "place_name": None,
+        "cc": "nl",
+    }
+    path = Path("/p/Home-program/2008-MM-DD_KKS_Home-program_Amsterdam-nl.mp3")
+    person = baserow_values(proposal, path, "audio", reference, settings, clear_unknown_place=True)
+    tool = baserow_values(proposal, path, "audio", reference, settings)
+    assert person["place_location"] is None  # was ISKCON-Amsterdam: cleared, not kept
+    assert "place_location" not in tool  # tools never clear anything
+
+
+def test_merge_clears_a_field_a_person_emptied():
+    from mam.helpers.baserow import merge_update
+
+    current = {"place_location": {"id": 1, "value": "ISKCON-Amsterdam"}}
+    result = merge_update(
+        current,
+        {"place_location": None},
+        multi_select_fields=set(),
+        tool="t",
+        overwrite={"place_location"},
+    )
+    assert result.payload == {"place_location": None}
+
+
+def test_save_picks_up_a_place_just_added_in_baserow(client, imported, no_baserow, monkeypatch):
+    """The cache does not know 'Amsterdam' yet; saving refreshes once and finds it."""
+    from mam.tools.renamer import knowledge
+    from tests.renamer_fixtures import reference_raw
+
+    def baserow_now():
+        raw = reference_raw()
+        raw["options"]["place_location"] += ["Amsterdam"]
+        raw["options"]["country"] += ["Netherlands"]
+        return raw
+
+    monkeypatch.setattr(knowledge, "fetch_raw", baserow_now)
+    file_id = imported["R09_0004.MP3"]
+    client.post(
+        f"/files/{file_id}/edit",
+        data=save_form("2008-MM-DD_KKS_Home-program_Amsterdam-nl.mp3", place="Amsterdam", cc="nl"),
+    )
+    sent = no_baserow[-1]["values"]
+    assert sent["place_name"] == "Amsterdam"

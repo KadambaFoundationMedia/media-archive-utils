@@ -18,6 +18,9 @@ from tests.renamer_fixtures import reference_raw
 
 RAW = reference_raw()
 OPTIONS = RAW["options"]
+# Like the live table: the temple and the new city place both exist.
+OPTIONS["place_location"] += ["ISKCON-Amsterdam", "Amsterdam"]
+OPTIONS["country"] += ["Netherlands"]
 MEDIA_FIELDS = [
     {"name": "title", "type": "text"},
     {"name": "date", "type": "date"},
