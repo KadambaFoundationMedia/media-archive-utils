@@ -27,7 +27,17 @@ from mam.tools.renamer.knowledge import Reference, get_reference
 from mam.tools.renamer.naming import build_name, format_where, problems
 from mam.tools.renamer.parse import NameParser
 
-FIELDS = ("filename", "when", "title", "category", "tag", "place", "cc", "baserow_row_id")
+FIELDS = (
+    "filename",
+    "when",
+    "title",
+    "category",
+    "tag",
+    "place",
+    "cc",
+    "baserow_row_id",
+    "notes",
+)
 
 
 def _clean(value: Any) -> str:
@@ -142,6 +152,7 @@ def initial_values(record: m.MediaFile) -> dict[str, Any]:
         "cc": source.get("cc") or derived["cc"] or "",
         "languages": source.get("languages") or ["English"],
         "baserow_row_id": source.get("baserow_row_id") or record.baserow_row_id or "",
+        "notes": source.get("notes_text") or "",
     }
 
 
@@ -202,6 +213,8 @@ def save(
         "verse_tag": _clean(values.get("tag")) or None,
         "title": _clean(values.get("title")) or parsed["title"] or Path(name).stem,
         "languages": list(values.get("languages") or ["English"]),
+        "notes_text": _clean(values.get("notes")) or None,
+        "notes_by": operator,
         "baserow_row_id": int(row_id) if row_id.isdigit() else None,
         "new_name": name,
         "final_name": placed.dst.name,

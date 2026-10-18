@@ -22,7 +22,7 @@
       </div>
       <div class="col-6 col-md-3">
         <label class="form-label small mb-0" for="tag">Tag (verse)</label>
-        <input class="form-control form-control-sm" id="tag" name="tag" value="{{ ev.tag }}" placeholder="2.54">
+        <input class="form-control form-control-sm" id="tag" name="tag" value="{{ ev.tag }}" placeholder="e.g. 2.54">
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label small mb-0" for="category">Category</label>
@@ -58,6 +58,13 @@
         </div>
         {% endfor %}
       </div>
+    </div>
+
+    <div class="mt-3">
+      <label class="form-label small mb-0" for="notes">Notes</label>
+      <textarea class="form-control form-control-sm" id="notes" name="notes" rows="2"
+                placeholder="e.g. Edirol recorder; recorded in our house in Amsterdam">{{ ev.notes }}</textarea>
+      <div class="small text-body-secondary">Kept with the file and added to the Baserow <code>notes</code> column with your name.</div>
     </div>
 
     <div class="mt-3">

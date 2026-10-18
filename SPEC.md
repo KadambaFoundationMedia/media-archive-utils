@@ -187,7 +187,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
   - The list refreshes itself while any job is queued or running.
 - **File page:**
-  - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, and which Baserow row to link). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
+  - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, Notes, and which Baserow row to link; the note is kept with the file and added to the Baserow `notes` column with the person's name). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
   - **Save** renames the copy in processed-files, writes the media row live, confirms the values and closes any open review. The review page uses the same form, with Approve / Reject result / Exclude file.
   - The run buttons are at the top, with a "Last run" line showing the latest job's result and an "Open the review" button when a review is waiting.
   - While a job for the file is queued or running, the page shows it and reloads itself when the job finishes.

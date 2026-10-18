@@ -65,6 +65,10 @@ def baserow_values(
         ),
         "notes": f"Renamer: {Path(proposal['original_path']).name} -> {final_path.name}",
     }
+    note = (proposal.get("notes_text") or "").strip()
+    if note:  # the person's own note, e.g. where and on what it was recorded
+        by = proposal.get("notes_by")
+        values["notes"] += f"\nNote{f' ({by})' if by else ''}: {note}"
     when = DateValue(*_date_parts(proposal["when"]))
     if when.is_full:
         values["date"] = when.text()

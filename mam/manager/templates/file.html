@@ -52,6 +52,10 @@
           <dt class="col-4">Category</dt><dd class="col-8">{% if f.category %}<span class="badge cat-pill" style="{{ category_style(f.category) }}">{{ f.category }}</span>{% else %}–{% endif %}</dd>
           <dt class="col-4">Processed copy</dt><dd class="col-8 text-break">{{ f.processed_path or '–' }}</dd>
           <dt class="col-4">Type / size</dt><dd class="col-8">{{ f.kind }}, {{ (f.size / 1048576) | round(1) }} MB</dd>
+          {% set confirmed = (f.meta or {}).get('confirmed') %}
+          {% if confirmed and confirmed.notes_text %}
+          <dt class="col-4">Notes</dt><dd class="col-8" style="white-space: pre-line">{{ confirmed.notes_text }}</dd>
+          {% endif %}
           <dt class="col-4">Baserow row</dt><dd class="col-8">{{ f.baserow_row_id or '–' }}</dd>
           <dt class="col-4">Fingerprint</dt><dd class="col-8 font-monospace text-break">{{ f.fingerprint }}</dd>
           {% if f.meta and f.meta.loudness %}
