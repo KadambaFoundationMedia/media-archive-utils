@@ -87,6 +87,10 @@ def _date_parts(text: str) -> tuple[int | None, int | None, int | None]:
     return tuple(int(p) if p.isdigit() else None for p in parts)  # type: ignore[return-value]
 
 
+LOCATION_FIELDS = frozenset({"audio_file_location", "video_file_location"})
+PERSON_FIELDS = frozenset({"title", "date", "category", "tag", "place_location", "country"})
+
+
 def write_baserow(
     record: m.MediaFile,
     proposal: dict[str, Any],
@@ -112,6 +116,9 @@ def write_baserow(
                 tool=TOOL,
                 media_file_id=record.id,
                 dry_run=not apply,
+                # The file location always follows the file; a person's own save (live) also
+                # replaces the other values they set. Tools only fill empty fields.
+                overwrite=LOCATION_FIELDS | (PERSON_FIELDS if live else frozenset()),
             )
             action = "update"
         else:

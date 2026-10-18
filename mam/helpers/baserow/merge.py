@@ -41,7 +41,10 @@ def merge_update(
     multi_select_fields: set[str],
     tool: str,
     today: date | None = None,
+    overwrite: set[str] | frozenset = frozenset(),
 ) -> MergeResult:
+    """`overwrite`: fields whose new value replaces the old one, e.g. the file location (it
+    follows the file) or everything a person saved themselves."""
     result = MergeResult()
     stamp = (today or date.today()).isoformat()
     for name, new in proposed.items():
@@ -49,16 +52,22 @@ def merge_update(
             continue
         old = _plain(current.get(name))
         if name in APPEND_FIELDS:
-            entry = f"[{stamp} {tool}] {new}"
-            if old and str(new) in str(old):
+            # Only lines that are not there yet, so saving again never repeats a note.
+            lines = [
+                ln
+                for ln in str(new).splitlines()
+                if ln.strip() and ln.strip() not in str(old or "")
+            ]
+            if not lines:
                 continue
+            entry = f"[{stamp} {tool}] " + "\n".join(lines)
             result.payload[name] = f"{old}\n{entry}" if old else entry
         elif name in multi_select_fields:
             old_list = list(old or [])
             merged = old_list + [v for v in new if v not in old_list]
             if merged != old_list:
                 result.payload[name] = merged
-        elif is_empty(old):
+        elif is_empty(old) or str(old) != str(new) and name in overwrite:
             result.payload[name] = new
         elif str(old) != str(new):
             result.conflicts[name] = (old, new)

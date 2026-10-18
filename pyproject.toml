@@ -53,3 +53,7 @@ extend-exclude = ["mam/helpers/local_db/migrations/versions"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
 ignore = ["SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+# pytest fixtures are imported into test modules and then used as parameters
+"tests/*" = ["F811"]

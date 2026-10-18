@@ -51,3 +51,58 @@ document.addEventListener("click", (event) => {
 });
 document.getElementById("filters")?.addEventListener("input", syncClearButtons);
 document.getElementById("filters")?.addEventListener("change", syncClearButtons);
+
+// Edit form (file and review pages): keep the filename and the table fields in step.
+// Only values come back from the server and are filled into the existing fields, so the
+// form and its buttons are never replaced while you click. Save waits for a running sync.
+const editForm = document.getElementById("edit-form");
+if (editForm) {
+  let pending = null;
+
+  function fill(values) {
+    for (const [name, value] of Object.entries(values)) {
+      if (name === "languages" || name === "baserow_row_id" || name === "notes") continue;
+      const el = editForm.elements.namedItem(name);
+      if (!el || el instanceof RadioNodeList) continue;
+      if (el.tagName === "SELECT" && value && ![...el.options].some((o) => o.value === value)) {
+        el.add(new Option(`${value} (not a Baserow option)`, value));
+      }
+      if (el.value !== (value ?? "")) el.value = value ?? "";
+    }
+  }
+
+  function show(id, items) {
+    const list = document.getElementById(id);
+    list.replaceChildren(...items.map((text) => Object.assign(document.createElement("li"), { textContent: text })));
+  }
+
+  async function sync(changed) {
+    const data = new FormData(editForm);
+    data.set("changed", changed);
+    const response = await fetch(editForm.dataset.sync, { method: "POST", body: data });
+    if (!response.ok) return;
+    const out = await response.json();
+    fill(out.values);
+    show("edit-problems", out.problems);
+    show("edit-hints", out.hints);
+    editForm.querySelectorAll(".edit-save").forEach((b) => { b.disabled = out.problems.length > 0; });
+  }
+
+  editForm.addEventListener("change", (event) => {
+    const name = event.target.name;
+    if (!["filename", "when", "place", "cc", "title", "category", "tag"].includes(name)) return;
+    pending = sync(name).finally(() => { pending = null; });
+  });
+
+  editForm.addEventListener("submit", (event) => {
+    if (!pending) return; // nothing to wait for: submit right away
+    // A field change fired as you clicked Save: wait for its sync, then submit with the
+    // updated filename. (Re-submitting must happen after this event, or browsers ignore it.)
+    event.preventDefault();
+    const submitter = event.submitter;
+    pending.then(() => {
+      if (submitter && submitter.disabled) return; // the sync found a problem
+      editForm.requestSubmit(submitter);
+    });
+  });
+}

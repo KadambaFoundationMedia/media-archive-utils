@@ -105,11 +105,14 @@ def sync(values: dict[str, Any], changed: str, ext: str) -> dict[str, Any]:
 
 
 def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dict[str, Any]:
-    """Problems that block saving, and notes about what will be written."""
+    """Problems that block saving, and hints about what will be written.
+
+    The keys are `problems` and `hints` (not `notes`: that is a form field).
+    """
     from mam.tools.renamer.tool import valid_when
 
     ref = ref or get_reference()
-    issues, notes = [], []
+    issues, hints = [], []
     name = _clean(values.get("filename"))
     if not name:
         issues.append("filename is empty")
@@ -121,18 +124,23 @@ def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dic
         issues.append("date must be YYYY-MM-DD (YYYY, MM and DD may be placeholders)")
     place = _clean(values.get("place"))
     if place and place not in ref.place_options and not ref.find_place(place):
-        notes.append(f"'{place}' is not a Baserow place option: place_location stays empty.")
+        hints.append(f"'{place}' is not a Baserow place option: place_location stays empty.")
     category = _clean(values.get("category"))
     if category and category not in ref.category_options:
         issues.append(f"'{category}' is not a Baserow category")
-    return {"problems": issues, "notes": notes}
+    return {"problems": issues, "hints": hints}
 
 
 def initial_values(record: m.MediaFile) -> dict[str, Any]:
     """Form values: the confirmed values, else the last Renamer proposal, else the filename."""
     meta = record.meta or {}
-    source = meta.get("confirmed") or meta.get("proposal") or {}
+    source = meta.get("confirmed") or meta.get("proposal")
     ref = get_reference()
+    if not source and record.original_path:
+        from mam.tools.renamer.tool import resolver
+
+        source = resolver().propose(Path(record.original_path)).to_dict()  # read-only
+    source = source or {}
     filename = (
         source.get("final_name")
         or source.get("new_name")
@@ -141,11 +149,13 @@ def initial_values(record: m.MediaFile) -> dict[str, Any]:
     )
     derived = parse_filename(filename, ref)
     title = source.get("title") or derived["title"]
+    # A title the Renamer suggested may follow the filename; a title someone saved may not.
+    auto_title = derived["title"] if meta.get("confirmed") else title
     return {
         "filename": filename,
         "when": source.get("when") or derived["when"],
         "title": title,
-        "auto_title": derived["title"],
+        "auto_title": auto_title,
         "category": source.get("category") or derived["category"] or "",
         "tag": source.get("verse_tag") or derived["tag"] or "",
         "place": source.get("place_name") or source.get("place") or derived["place"] or "",

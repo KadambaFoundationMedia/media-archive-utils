@@ -201,7 +201,7 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
     places: dict[str, Place] = {}
     names = set(options.get("place_location", [])) | set(place_country)
     built: list[Place] = []
-    for name in sorted(names):
+    for name in sorted(n for n in names if isinstance(n, str)):
         key = norm_key(name)
         if key in not_places:
             continue

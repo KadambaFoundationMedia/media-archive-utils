@@ -135,3 +135,29 @@ def test_client_errors_are_not_retried(api):
     with pytest.raises(BaserowError, match="404"):
         BaserowClient().get_row(1, 8)
     assert route.call_count == 1
+
+
+def test_merge_overwrites_only_the_named_fields():
+    current = {**ROW, "audio_file_location": "/Home-program/old.mp3", "title": "Old title"}
+    result = merge_update(
+        current,
+        {"audio_file_location": "/Home-program/new.mp3", "title": "New title"},
+        multi_select_fields={"language"},
+        tool="renamer",
+        overwrite={"audio_file_location"},
+    )
+    assert result.payload == {"audio_file_location": "/Home-program/new.mp3"}  # follows the file
+    assert result.conflicts == {"title": ("Old title", "New title")}  # a tool never overwrites
+
+
+def test_merge_appends_only_new_note_lines():
+    current = {**ROW, "notes": "Renamer: a.mp3 -> x.mp3\nNote (maced): Home program at Uddhava"}
+    result = merge_update(
+        current,
+        {"notes": "Renamer: a.mp3 -> y.mp3\nNote (maced): Home program at Uddhava"},
+        multi_select_fields=set(),
+        tool="renamer",
+        today=date(2026, 10, 18),
+    )
+    assert result.payload["notes"].endswith("\n[2026-10-18 renamer] Renamer: a.mp3 -> y.mp3")
+    assert result.payload["notes"].count("Home program at Uddhava") == 1

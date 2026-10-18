@@ -185,6 +185,7 @@ class BaserowClient:
                         ids.append(field.options[item])
                     else:
                         raise UnknownOption(name, item)
+                ids = list(dict.fromkeys(ids))  # never send an option twice
                 payload[name] = ids if field.type == "multiple_select" else ids[0]
             else:
                 payload[name] = value
@@ -307,14 +308,18 @@ class BaserowClient:
         media_file_id: int | None = None,
         dry_run: bool | None = None,
         merge: bool = True,
+        overwrite: set[str] | frozenset = frozenset(),
     ) -> WriteResult:
-        """Update a row. With `merge` (default) the fill-empty/append/union policy applies."""
+        """Update a row. With `merge` (default) the fill-empty/append/union policy applies;
+        fields in `overwrite` replace their old value."""
         dry = (not self.apply) if dry_run is None else dry_run
         before = self.get_row(table_id, row_id)
         conflicts = None
         if merge:
             multi = {f.name for f in self.fields(table_id).values() if f.type == "multiple_select"}
-            merged: MergeResult = merge_update(before, values, multi_select_fields=multi, tool=tool)
+            merged: MergeResult = merge_update(
+                before, values, multi_select_fields=multi, tool=tool, overwrite=overwrite
+            )
             values, conflicts = merged.payload, merged.conflicts
         if not values:
             return WriteResult(0, dry, row_id, {}, before, conflicts)

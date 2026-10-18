@@ -74,3 +74,6 @@ output/
 cache/
 
 
+
+# Manual-testing sandbox (media-manager-sandbox in .claude/launch.json)
+.sandbox/
