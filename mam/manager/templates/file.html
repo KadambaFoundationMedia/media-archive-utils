@@ -45,7 +45,19 @@
       <div class="card-body small">
         <div class="font-monospace mb-2 text-break">{{ proposal.new_name }}</div>
         {% if proposal.flags %}
-        <ul class="mb-0 text-warning-emphasis">{% for fl in proposal.flags %}<li>{{ fl }}</li>{% endfor %}</ul>
+        <ul class="mb-2 text-warning-emphasis">{% for fl in proposal.flags %}<li>{{ fl }}</li>{% endfor %}</ul>
+        {% if proposal.dry_run %}
+        <div class="alert alert-info small py-2 mb-2">
+          This was a dry run, so nothing was copied and no review was opened.
+          Run the Renamer without dry run to copy the file and open the review for these points.
+          <form method="post" action="/actions" class="mt-2">
+            <input type="hidden" name="ids" value="{{ f.id }}">
+            <input type="hidden" name="tool" value="renamer">
+            <input type="hidden" name="back" value="/files/{{ f.id }}">
+            <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run Renamer (not a dry run)</button>
+          </form>
+        </div>
+        {% endif %}
         {% endif %}
         {% if proposal.notes %}
         <ul class="mb-0 text-body-secondary">{% for n in proposal.notes %}<li>{{ n }}</li>{% endfor %}</ul>

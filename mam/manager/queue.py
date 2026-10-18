@@ -250,6 +250,21 @@ class JobQueue:
             set_status(
                 session, record, status_for(spec.label, outcome.state), job.tool, outcome.summary
             )
+        elif spec.sets_status and record.status.startswith(("Queued ", "Processing ")):
+            # The tool changed nothing (e.g. kept an approved name): restore the earlier status.
+            set_status(session, record, stable_status(session, record), job.tool, outcome.summary)
+
+
+def stable_status(session: Session, record: m.MediaFile) -> str:
+    """The last status that was not 'Queued ...' or 'Processing ...'."""
+    for status in session.scalars(
+        select(m.StatusHistory.new_status)
+        .where(m.StatusHistory.media_file_id == record.id)
+        .order_by(m.StatusHistory.id.desc())
+    ):
+        if not status.startswith(("Queued ", "Processing ")):
+            return status
+    return "Not processed"
 
 
 def resume_after_review(session: Session, record: m.MediaFile, tool: str) -> None:
