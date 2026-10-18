@@ -23,7 +23,7 @@ from mam.errors import MamError
 from mam.helpers.file_organizer import FileOrganizer
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.repo import set_status
-from mam.tools.renamer.knowledge import Reference, get_reference
+from mam.tools.renamer.knowledge import Place, Reference, get_reference, norm_key
 from mam.tools.renamer.naming import build_name, format_where, problems
 from mam.tools.renamer.parse import NameParser
 
@@ -44,6 +44,33 @@ def _clean(value: Any) -> str:
     return str(value or "").strip()
 
 
+def exact_place(text: str | None, ref: Reference) -> Place | None:
+    """The Baserow place option with exactly this name (case and separators aside).
+
+    In the edit form the typed place is taken literally: no spelling aliases and no
+    'ISKCON-' shortcuts, so a new place such as 'Amsterdam' is never swapped for
+    'ISKCON-Amsterdam'. (The automatic Renamer does use aliases.)
+    """
+    if not text:
+        return None
+    key = norm_key(text)
+    for name in ref.place_options:
+        if norm_key(name) == key:
+            return ref.places.get(key) or Place(name, None, None)
+    return None
+
+
+def place_suggestion(text: str, ref: Reference) -> str | None:
+    """A known place the typed text may mean (alias, short name or close spelling)."""
+    import difflib
+
+    known = ref.find_place(text)
+    if known and norm_key(known.name) != norm_key(text):
+        return known.name
+    close = difflib.get_close_matches(norm_key(text), list(ref.places), n=1, cutoff=0.8)
+    return ref.places[close[0]].name if close else None
+
+
 def parse_filename(name: str, ref: Reference) -> dict[str, Any]:
     """Values a filename stands for: date, WHAT, place, country, tag, category, title."""
     stem = Path(name).stem
@@ -53,7 +80,8 @@ def parse_filename(name: str, ref: Reference) -> dict[str, Any]:
         when = parsed.dates[0].readings[0].value.text()
     what_parts = ([parsed.verse.code] if parsed.verse else []) + parsed.what_words
     what = "-".join(what_parts) or None
-    place = parsed.places[0] if parsed.places else None
+    raw_place = parsed.where_raw or (parsed.places[0].display if parsed.places else "")
+    place = exact_place(raw_place, ref)
     match = ref.matcher.match(what)
     title_words = " ".join(parsed.what_words)
     if parsed.verse:
@@ -63,7 +91,7 @@ def parse_filename(name: str, ref: Reference) -> dict[str, Any]:
     return {
         "when": when,
         "what": what,
-        "place": place.name if place else (parsed.unknown_place or ""),
+        "place": place.name if place else raw_place,
         "cc": parsed.ccs[0][0] if parsed.ccs else (place.cc if place else ""),
         "tag": parsed.verse.tag if parsed.verse and parsed.verse.numbers else "",
         "category": match.category.name if match else "",
@@ -75,7 +103,7 @@ def compose_filename(values: dict[str, Any], ext: str, ref: Reference) -> str:
     """Filename from Date, the WHAT in the current filename, Place and Country."""
     current = parse_filename(_clean(values.get("filename")) or f"x.{ext}", ref)
     place_text = _clean(values.get("place"))
-    place = ref.find_place(place_text) if place_text else None
+    place = exact_place(place_text, ref)
     where = format_where(
         place.display if place else (place_text or None), _clean(values.get("cc")) or None
     )
@@ -90,6 +118,9 @@ def sync(values: dict[str, Any], changed: str, ext: str) -> dict[str, Any]:
     out["auto_title"] = _clean(values.get("auto_title"))
     if changed == "filename":
         derived = parse_filename(out["filename"], ref)
+        current = exact_place(out["place"], ref)
+        if current and norm_key(current.display) == norm_key(derived["place"] or ""):
+            derived["place"] = current.name  # 'Ljubljana' in the filename is the chosen place
         for key in ("when", "place", "cc", "tag", "category"):
             out[key] = derived[key] or ("" if key != "category" else out["category"])
         if not out["title"] or out["title"] == out["auto_title"]:
@@ -97,7 +128,7 @@ def sync(values: dict[str, Any], changed: str, ext: str) -> dict[str, Any]:
         out["auto_title"] = derived["title"]
     elif changed in ("when", "place", "cc"):
         if changed == "place":
-            place = ref.find_place(out["place"]) if out["place"] else None
+            place = exact_place(out["place"], ref)
             if place and place.cc:
                 out["cc"] = place.cc  # a known place brings its country
         out["filename"] = compose_filename(out, ext, ref)
@@ -123,8 +154,14 @@ def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dic
     if not valid_when(_clean(values.get("when")) or "YYYY-MM-DD"):
         issues.append("date must be YYYY-MM-DD (YYYY, MM and DD may be placeholders)")
     place = _clean(values.get("place"))
-    if place and place not in ref.place_options and not ref.find_place(place):
-        hints.append(f"'{place}' is not a Baserow place option: place_location stays empty.")
+    if place and not exact_place(place, ref):
+        suggestion = place_suggestion(place, ref)
+        hints.append(
+            f"'{place}' is a new place: it is not a place_location option in Baserow yet, so "
+            "place_location stays empty. Add the option in Baserow (media table, place_location "
+            "field), then use 'Refresh Baserow data' on the Settings page and save again."
+            + (f" Or did you mean {suggestion}?" if suggestion else "")
+        )
     category = _clean(values.get("category"))
     if category and category not in ref.category_options:
         issues.append(f"'{category}' is not a Baserow category")
@@ -191,7 +228,7 @@ def save(
     parsed = parse_filename(_clean(values["filename"]), ref)
     category = _clean(values.get("category")) or parsed["category"] or None
     place_text = _clean(values.get("place")) or None
-    place = ref.find_place(place_text) if place_text else None
+    place = exact_place(place_text, ref)
     cc = _clean(values.get("cc")).lower() or None
     old = dict((record.meta or {}).get("proposal") or {})
 

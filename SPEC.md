@@ -189,6 +189,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - The list refreshes itself while any job is queued or running.
 - **File page:**
   - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, Notes, and which Baserow row to link; the note is kept with the file and added to the Baserow `notes` column with the person's name). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
+  - **Places are taken literally:** only an exact Baserow `place_location` option counts as known. A new place (e.g. `Amsterdam`, next to the existing `ISKCON-Amsterdam`) stays as typed: it is used in the filename, `place_location` stays empty, and the page explains how to add the option in Baserow and suggests the known place it may mean. After adding the option in Baserow, **Refresh Baserow data** (Settings page) and save again.
   - **Save** renames the copy in processed-files, writes the media row live, confirms the values and closes any open review. The review page uses the same form, with Approve / Reject result / Exclude file.
   - The run buttons are at the top, with a "Last run" line showing the latest job's result and an "Open the review" button when a review is waiting.
   - While a job for the file is queued or running, the page shows it and reloads itself when the job finishes.
