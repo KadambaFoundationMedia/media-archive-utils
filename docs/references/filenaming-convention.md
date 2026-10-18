@@ -88,6 +88,6 @@ Source names in the archive are often inconsistent. The tools check each part ag
 - **Honorifics and recorder words are dropped:** `HH`, `Kadamba Kanana Swami` (that is the WHO), `STEREO`, `clean`. Names of other people keep their honorific (`Suhotra-Maharaja`).
 - **Generic words next to a verse are dropped:** `SB 3.1.20 class` gives `SB-3-1-20`. Without a verse they stay (`Janmastami-evening-lecture`).
 - **Places use their short name:** the Baserow place `ISKCON-Ljubljana` is written `Ljubljana-si`; when the Renamer reads source names, known spellings are mapped (`Praha` to `Prague`, `Koln` to `Cologne`, `Rdesh` to `Radhadesh`).
-- **A place typed by a person is taken literally:** on the file page `Amsterdam` stays `Amsterdam` (a new place) and is never swapped for `ISKCON-Amsterdam`; the page suggests the known place it may mean.
+- **On the file page a place is chosen from the Baserow places:** `Amsterdam` and `ISKCON-Amsterdam` are separate options; a place Baserow does not know is marked "(not in Baserow)" with a suggestion for the place it may mean.
 - **Another speaker in the name** (`SNS`, `BVS` instead of `KKS`) is flagged for review, because WHO is always `KKS`.
 - **Repeated corrections:** a correction reviewers make the same way at least 3 times becomes a rule, so it is applied automatically from then on.

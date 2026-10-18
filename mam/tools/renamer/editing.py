@@ -142,12 +142,13 @@ def sync(values: dict[str, Any], changed: str, ext: str) -> dict[str, Any]:
 def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dict[str, Any]:
     """Problems that block saving, and hints about what will be written.
 
-    The keys are `problems` and `hints` (not `notes`: that is a form field).
+    The keys are `problems`, `hints` and `place_warning` (not `notes`: that is a form field).
     """
     from mam.tools.renamer.tool import valid_when
 
     ref = ref or get_reference()
     issues, hints = [], []
+    place_warning = ""
     name = _clean(values.get("filename"))
     if not name:
         issues.append("filename is empty")
@@ -160,16 +161,15 @@ def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dic
     place = _clean(values.get("place"))
     if place and not exact_place(place, ref):
         suggestion = place_suggestion(place, ref)
-        hints.append(
-            f"'{place}' is a new place: it is not a place_location option in Baserow yet, so "
-            "place_location stays empty. Add the option in Baserow (media table, place_location "
-            "field), then use 'Refresh Baserow data' on the Settings page and save again."
-            + (f" Or did you mean {suggestion}?" if suggestion else "")
+        place_warning = (
+            f"'{place}' is not a place in Baserow, so place_location stays empty. Choose a place "
+            "from the list, or add it as an option in Baserow (media table, place_location) and "
+            "save again." + (f" Did you mean {suggestion}?" if suggestion else "")
         )
     category = _clean(values.get("category"))
     if category and category not in ref.category_options:
         issues.append(f"'{category}' is not a Baserow category")
-    return {"problems": issues, "hints": hints}
+    return {"problems": issues, "hints": hints, "place_warning": place_warning}
 
 
 def initial_values(record: m.MediaFile) -> dict[str, Any]:

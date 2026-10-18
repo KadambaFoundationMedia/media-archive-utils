@@ -33,7 +33,8 @@ def form_context(record: m.MediaFile, values: dict, checked: dict | None = None)
         "edit_problems": checked["problems"],
         "edit_hints": checked["hints"],
         "candidates": candidates,
-        "place_names": sorted({p.name for p in ref.places.values()}),
+        "place_names": sorted(ref.place_options, key=str.casefold),
+        "place_warning": checked.get("place_warning", ""),
         "category_options": sorted(ref.category_options),
         "country_options": sorted(ref.country_options.items(), key=lambda kv: kv[1]),
         "language_options": sorted(ref.language_options),
@@ -56,7 +57,10 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
             ext = Path(record.original_path).suffix.lower().lstrip(".")
         values = sync(form_values(form), form.get("changed", ""), ext)
         problems, hints = values.pop("problems"), values.pop("hints")
-        return JSONResponse({"values": values, "problems": problems, "hints": hints})
+        warning = values.pop("place_warning", "")
+        return JSONResponse(
+            {"values": values, "problems": problems, "hints": hints, "place_warning": warning}
+        )
 
     @app.post("/files/{file_id}/edit")
     async def edit_save(request: Request, file_id: int):
