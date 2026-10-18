@@ -144,6 +144,7 @@ class ParsedName:
     what_words: list[str] = field(default_factory=list)
     places: list[Place] = field(default_factory=list)
     unknown_place: str | None = None  # text in the WHERE position that is not a known place
+    where_raw: str | None = None  # the place text exactly as written in the WHERE position
     ccs: list[tuple[str, str]] = field(default_factory=list)  # (cc, raw text)
     has_kks: bool = False
     speakers: list[str] = field(default_factory=list)
@@ -324,6 +325,7 @@ class NameParser:
             code = cc.lower() if len(cc) == 2 else cc_for_name(cc)
             result.ccs.append((code or cc.lower(), cc))
         if where_text:
+            result.where_raw = where_text
             place = self.ref.find_place(where_text)
             if place:
                 result.places.append(place)

@@ -499,6 +499,23 @@ def create_app(start_queue: bool = True) -> FastAPI:
         )
         return RedirectResponse(f"{back}{sep}msg={msg}", status_code=303)
 
+    @app.post("/settings/refresh-baserow")
+    def refresh_baserow():
+        """Reload categories, places, travel schedule and media index from Baserow now."""
+        from mam.tools.renamer.knowledge import get_reference
+
+        try:
+            ref = get_reference(refresh=True)
+        except Exception as exc:
+            return RedirectResponse(
+                f"/settings?error=Baserow refresh failed: {exc}", status_code=303
+            )
+        msg = (
+            f"Baserow data refreshed: {len(ref.place_options)} places, "
+            f"{len(ref.category_options)} categories, {len(ref.stays)} travel stays"
+        )
+        return RedirectResponse(f"/settings?msg={msg}", status_code=303)
+
     @app.post("/settings/reset")
     async def settings_reset(request: Request):
         from mam.errors import MamError

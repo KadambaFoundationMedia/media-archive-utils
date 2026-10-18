@@ -259,3 +259,61 @@ def test_resaving_updates_the_linked_row_with_the_persons_values(
     assert action == "update"
     assert values["audio_file_location"] == "/Kirtan/2012-07-12_KKS_Kirtan_Prague-cz.mp3"
     assert {"audio_file_location", "title", "place_location", "country"} <= set(kw["overwrite"])
+
+
+def test_a_typed_place_is_taken_literally(client, imported):
+    """'Praha' is not swapped for 'Prague': a new place stays as typed, with a suggestion."""
+    file_id = imported["R09_0004.MP3"]
+    out = client.post(
+        f"/files/{file_id}/edit/sync",
+        data={
+            "filename": "2012-07-12_KKS_Kirtan_rs.mp3",
+            "when": "2012-07-12",
+            "place": "Praha",
+            "cc": "cz",
+            "changed": "place",
+        },
+    ).json()
+    assert out["values"]["place"] == "Praha"
+    assert out["values"]["filename"] == "2012-07-12_KKS_Kirtan_Praha-cz.mp3"
+    assert any("'Praha' is a new place" in h and "did you mean Prague" in h for h in out["hints"])
+    # an existing option is recognised exactly, and brings its country
+    out = client.post(
+        f"/files/{file_id}/edit/sync",
+        data={
+            "filename": "2012-07-12_KKS_Kirtan.mp3",
+            "when": "2012-07-12",
+            "place": "Prague",
+            "changed": "place",
+        },
+    ).json()
+    assert out["values"]["filename"] == "2012-07-12_KKS_Kirtan_Prague-cz.mp3" and not out["hints"]
+    # editing the filename keeps the chosen place when the filename shows its short name
+    out = client.post(
+        f"/files/{file_id}/edit/sync",
+        data={
+            "filename": "2015-09-05_KKS_Kirtan_Ljubljana-si.mp3",
+            "place": "ISKCON-Ljubljana",
+            "changed": "filename",
+        },
+    ).json()
+    assert out["values"]["place"] == "ISKCON-Ljubljana"
+
+
+def test_saving_a_new_place_keeps_it_out_of_place_location(client, imported, no_baserow):
+    file_id = imported["R09_0004.MP3"]
+    client.post(
+        f"/files/{file_id}/edit",
+        data=save_form("2012-07-12_KKS_Kirtan_Praha-cz.mp3", place="Praha", cc="cz"),
+    )
+    sent = no_baserow[-1]["values"]
+    assert sent["place"] == "Praha" and sent["place_name"] is None  # not a Baserow option yet
+
+
+def test_refresh_baserow_data_button(client, settings, monkeypatch):
+    from mam.tools.renamer import knowledge
+    from tests.renamer_fixtures import reference_raw
+
+    monkeypatch.setattr(knowledge, "fetch_raw", reference_raw)
+    response = client.post("/settings/refresh-baserow", follow_redirects=False)
+    assert "Baserow data refreshed" in response.headers["location"].replace("%20", " ")

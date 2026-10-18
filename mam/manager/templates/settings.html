@@ -13,6 +13,13 @@
           <dt class="col-5">Baserow writes</dt>
           <dd class="col-7">{% if baserow_on %}<strong class="text-danger">ON</strong>: runs write to the live media table{% else %}off: runs only log their rows{% endif %}
             <div class="text-body-secondary">Use the switch in the top bar. Approving a review always writes.</div></dd>
+          <dt class="col-5">Baserow data</dt>
+          <dd class="col-7">
+            <form method="post" action="/settings/refresh-baserow" class="d-inline">
+              <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fa-solid fa-rotate me-1"></i>Refresh Baserow data</button>
+            </form>
+            <div class="text-body-secondary">Places, categories, travel schedule and media rows are cached and refreshed every 10 minutes. Refresh now after adding a place or category in Baserow.</div>
+          </dd>
           <dt class="col-5">Operator</dt><dd class="col-7">{{ settings.operator_name }}</dd>
           <dt class="col-5">Processed files</dt><dd class="col-7 text-break">{{ settings.media_processed_files_path }}</dd>
           {% for label, path in settings.import_roots %}
