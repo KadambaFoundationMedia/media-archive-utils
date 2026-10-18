@@ -134,3 +134,23 @@ def test_conflicting_tool_evidence_is_flagged_not_overwritten(client, imported):
         "class-discoverer found what 'BG-2-51', but tester set it to 'Kirtan'" in f
         for f in job.result["flags"]
     )
+
+
+def test_notes_are_kept_and_sent_to_baserow(client, imported, no_baserow, reference, settings):
+    from pathlib import Path
+
+    from mam.tools.renamer.tool import baserow_values
+
+    file_id = imported["R09_0004.MP3"]
+    note = "Edirol recorder; recorded in our house in Amsterdam"
+    client.post(
+        f"/files/{file_id}/edit",
+        data={**save_form("2012-07-12_KKS_Kirtan_rs.mp3"), "notes": note},
+    )
+    sent = no_baserow[-1]["values"]
+    assert sent["notes_text"] == note and sent["notes_by"] == "tester"
+    values = baserow_values(sent, Path(sent["target"]), "audio", reference, settings)
+    assert values["notes"].endswith(f"Note (tester): {note}")
+    page = client.get(f"/files/{file_id}").text
+    assert note in page  # shown on the file page and kept in the form
+    assert f">{note}</textarea>" in page
