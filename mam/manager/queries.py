@@ -121,6 +121,24 @@ def matching_ids(session: Session, flt: FileFilter) -> list[int]:
     return list(session.scalars(stmt))
 
 
+def all_statuses(present: dict[str, int] | None = None) -> list[str]:
+    """Every status a file can have, in the order of the status guide (SPEC.md section 7).
+
+    Per-tool statuses are listed for the pipeline tools that are built; a status in the
+    database that is not in this list (an older tool name) is added at the end.
+    """
+    from mam.manager.tools import PIPELINE_ORDER, TOOLS
+
+    ordered = ["Not processed"]
+    for name in PIPELINE_ORDER:
+        if name in TOOLS:
+            label = TOOLS[name].label
+            ordered += [f"Queued {label}", f"Processing {label}"]
+            ordered += [f"{label} {state}" for state in ("Done", "Review", "Failed")]
+    ordered += ["Skipped", "Excluded", "Corrupted", "Processing complete"]
+    return ordered + sorted(set(present or {}) - set(ordered))
+
+
 def facet_values(session: Session) -> dict[str, Any]:
     statuses = session.execute(
         select(m.MediaFile.status, func.count(m.MediaFile.id))
@@ -139,7 +157,7 @@ def facet_values(session: Session) -> dict[str, Any]:
         n for s, n in counts.items() if s.endswith((" Review", " Failed")) or s == "Corrupted"
     )
     return {
-        "statuses": list(statuses),
+        "statuses": [(s, counts.get(s, 0)) for s in all_statuses(counts)],
         "categories": list(categories),
         "attention": attention,
         "review": sum(n for s, n in counts.items() if s.endswith(" Review")),

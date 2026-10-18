@@ -64,7 +64,17 @@ SOURCE_LABELS = {
 }
 FIELD_LABELS = {"when": "WHEN", "what": "WHAT", "where": "WHERE", "who": "WHO"}
 
-# Shown on the status badges and in the status guide on the file list.
+# The views at the top of the Status filter, in the same order (file list status guide).
+VIEW_HELP = {
+    "Needs attention": "Files waiting for a review, failed files and corrupted files. The list "
+    "opens on this view.",
+    "All files": "Every file, whatever its status; choose it, for example, to start a tool.",
+    "Needs review": "Files with a <Tool> Review status.",
+    "Failed": "Files with a <Tool> Failed status.",
+}
+
+# Shown on the status badges and in the status guide on the file list, in the order of
+# the "One status" list (queries.all_statuses).
 STATUS_HELP = {
     "Not processed": "Imported, but no tool has changed it yet. A dry run does not change the "
     "status; its proposed name is shown with a 'dry run' label.",
@@ -73,9 +83,9 @@ STATUS_HELP = {
     "Done": "The tool finished; the file waits for the next tool in the pipeline.",
     "Review": "The tool needs your decision. Open it from the Review page.",
     "Failed": "The tool hit an error (see Jobs). Fix the cause and retry.",
-    "Corrupted": "The file cannot be read or decoded.",
-    "Excluded": "A reviewer stopped all processing of this file.",
     "Skipped": "The step does not apply to this file.",
+    "Excluded": "A reviewer stopped all processing of this file.",
+    "Corrupted": "The file cannot be read or decoded.",
     "Processing complete": "Every tool in the pipeline has finished.",
 }
 
@@ -93,6 +103,7 @@ templates.env.globals.update(
     status_color=status_color,
     status_help=status_help,
     status_guide=STATUS_HELP,
+    view_guide=VIEW_HELP,
     tools=TOOLS,
     source_labels=SOURCE_LABELS,
     field_labels=FIELD_LABELS,

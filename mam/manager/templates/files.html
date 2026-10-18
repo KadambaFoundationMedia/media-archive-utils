@@ -71,13 +71,19 @@
 </form>
 <details class="small mb-3 status-guide">
   <summary class="text-body-secondary">What do the statuses mean?</summary>
-  <dl class="row mt-2 mb-0">
-    {% for name, text in status_guide.items() %}
-    <dt class="col-sm-3 col-lg-2 fw-semibold">{% if name in ('Queued', 'Processing') %}{{ name }} &lt;tool&gt;{% elif name in ('Done', 'Review', 'Failed') %}&lt;Tool&gt; {{ name }}{% else %}{{ name }}{% endif %}</dt>
+  <div class="fw-semibold text-body-secondary mt-2 mb-1">Views</div>
+  <dl class="row mb-0">
+    {% for name, text in view_guide.items() %}
+    <dt class="col-sm-3 col-lg-2 fw-semibold">{{ name }}</dt>
     <dd class="col-sm-9 col-lg-10">{{ text }}</dd>
     {% endfor %}
-    <dt class="col-sm-3 col-lg-2 fw-semibold">Needs attention</dt>
-    <dd class="col-sm-9 col-lg-10">Files waiting for a review, failed files and corrupted files. The list opens on this view; choose <em>All files</em> to see everything, for example to start a tool.</dd>
+  </dl>
+  <div class="fw-semibold text-body-secondary mt-2 mb-1">One status <span class="fw-normal">(&lt;Tool&gt; is the tool's name, e.g. Renamer)</span></div>
+  <dl class="row mb-0">
+    {% for name, text in status_guide.items() %}
+    <dt class="col-sm-3 col-lg-2 fw-semibold">{% if name in ('Queued', 'Processing') %}{{ name }} &lt;Tool&gt;{% elif name in ('Done', 'Review', 'Failed') %}&lt;Tool&gt; {{ name }}{% else %}{{ name }}{% endif %}</dt>
+    <dd class="col-sm-9 col-lg-10">{{ text }}</dd>
+    {% endfor %}
   </dl>
 </details>
 

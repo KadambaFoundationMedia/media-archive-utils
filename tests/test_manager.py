@@ -554,3 +554,29 @@ def test_filter_reload_keeps_a_real_page_url(client):
     page = client.get("/").text
     assert 'hx-get="/" hx-select="#file-table"' in page  # the address bar stays on /?...
     assert 'id="file-count"' in page and 'id="scope-all"' in page  # counts update too
+
+
+def test_status_list_and_guide_show_the_same_statuses_in_order(client):
+    from mam.manager.app import STATUS_HELP, VIEW_HELP
+    from mam.manager.queries import all_statuses
+
+    statuses = all_statuses()
+    assert statuses[:6] == [
+        "Not processed",
+        "Queued Renamer",
+        "Processing Renamer",
+        "Renamer Done",
+        "Renamer Review",
+        "Renamer Failed",
+    ]
+    assert statuses[-4:] == ["Skipped", "Excluded", "Corrupted", "Processing complete"]
+    # the guide explains each status in the list, in the same order
+    generic = [
+        s if s in STATUS_HELP else next(k for k in STATUS_HELP if k in s.split()) for s in statuses
+    ]
+    assert list(dict.fromkeys(generic)) == list(STATUS_HELP)
+    page = client.get("/?status=__all").text
+    assert "Renamer Review (0)" in page and "Processing complete (0)" in page
+    for view in VIEW_HELP:
+        assert f'<dt class="col-sm-3 col-lg-2 fw-semibold">{view}</dt>' in page
+    assert all_statuses({"Old tool Done": 1})[-1] == "Old tool Done"
