@@ -98,14 +98,15 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - the country code contradicts a known place (`Oslo_fi`) and cannot be corrected safely
   - a different file already has the final name (it is saved with `-2`)
 - **Missing WHAT:** the file goes to `_unresolved/`, and later tools may fill in the WHAT.
+- **Dates:** European day-month-year is the default reading; other orders need supporting evidence. Dates in the ID3 title or date tag are taken as correct unless other evidence conflicts (a conflict with the folder name is flagged). See docs/references/filenaming-convention.md.
 - **More evidence used:**
   - sibling files in the same folder decide ambiguous dates (`08-04-10` among April 2008 files is 2008-04-10) and give the place of files recorded the same day
-  - the travel schedule only suggests places in the country the filename names
+  - the travel schedule only suggests places in the country the filename names; every stay on the date is shown as evidence, and on a travel day (leaving one place, arriving in another) the place is left open
   - a new place flag suggests the closest known place (`Fruska-Goranga`: did you mean `Fruska-Gora`?)
   - seed aliases (place spellings such as `Praha`, `Koln`, `Rdesh`; category words such as `Kirtany`; language words such as `GER`) are in `mam/tools/renamer/aliases.yaml`
 - **Rule-based:** the Renamer does not call the LLM; unusual names are flagged instead.
 - **Every run is copied:** a flagged file is still copied and renamed (into its category folder or `_unresolved/`), so the review edits a real copy. Running the Renamer again on a processed file moves that copy; it never makes a second one.
-- **Dry run:** shows the proposed name in the file list without copying files, changing the status or writing to Baserow.
+- **Dry run:** shows the proposed name in the file list without copying files, changing the status or writing to Baserow. It never opens a review; the file page says so and offers to run the Renamer for real.
 
 ### Kirtan-splitter
 - **Video first:** extracts the audio as mp3 in its original quality, with a name that matches the video.

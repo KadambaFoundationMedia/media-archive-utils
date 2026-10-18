@@ -16,6 +16,11 @@ This is an [ISO date standard](https://en.wikipedia.org/wiki/ISO_8601)
 Substitute the date with placeholders, YYYY, MM and DD.  
 Example: `2015-MM-DD_KKS_Jaya-radha-madhava.mp3` (year known, month and day unknown).
 
+### Reading dates in source names
+- **European order first:** a date like `05-09-11` or `11.07.2008` is read as day-month-year. Month-day-year or year-month-day is only chosen when other evidence points to it (the folder name, other files in the folder, the ID3 tags, the travel schedule).
+- **ID3 dates are trusted:** a date in the file's ID3 title tag or ID3 date tag is taken as correct unless other evidence contradicts it. When it contradicts the folder name, the file is flagged for review.
+- **Travel days:** when the travel schedule has KKS leaving one place and arriving in another on the recording date, the place is left open and both are shown for the review.
+
 ## The 3 WWW
 Each filename must provide the **WHO, WHAT and WHERE.**   
 Do not use placeholders for missing information.

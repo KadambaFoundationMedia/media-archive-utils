@@ -299,3 +299,52 @@ def test_evidence_shows_where_it_came_from(client, archive, reference, no_basero
     page = client.get(f"/files/{file_id}").text
     assert "Folder name" in page
     assert "&#34;6-13-jul-2012&#34; in folder &#34;Serbia-summercamp-6-13-jul-2012&#34;" in page
+
+
+def test_dry_run_explains_that_no_review_is_opened(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id], "dry_run": "on"})
+    run_queue()
+    assert "would need a review" in client.get("/jobs").text
+    page = client.get(f"/files/{file_id}").text
+    assert "no review was opened" in page and "Run Renamer (not a dry run)" in page
+    with session_scope() as s:
+        assert not s.scalars(select(m.Review)).all()
+
+
+def test_renamer_never_overwrites_an_approved_review(
+    client, archive, reference, no_baserow, settings
+):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
+    run_queue()
+    with session_scope() as s:
+        review_id = s.scalars(select(m.Review.id)).one()
+    client.post(
+        f"/review/{review_id}/decide",
+        data={"action": "approve", "when": "2012-07-11", "what": "Kirtan", "cc": "rs"},
+    )
+    approved = settings.media_processed_files_path / "Kirtan" / "2012-07-11_KKS_Kirtan_rs.mp3"
+    assert approved.exists()
+
+    for dry in (True, False):  # neither a dry run nor a real run changes it
+        data = {"tool": "renamer", "ids": [file_id]} | ({"dry_run": "on"} if dry else {})
+        client.post("/actions", data=data)
+        run_queue()
+    assert approved.exists()
+    with session_scope() as s:
+        rec = s.get(m.MediaFile, file_id)
+        assert rec.current_name == approved.name and rec.status == "Renamer Done"
+        assert rec.meta["proposal"]["final_name"] == approved.name
+        assert (
+            "Kept 2012-07-11_KKS_Kirtan_rs.mp3, approved by tester"
+            in s.scalars(
+                select(m.Job.result).where(m.Job.media_file_id == file_id).order_by(m.Job.id.desc())
+            ).first()["summary"]
+        )

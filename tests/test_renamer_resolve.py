@@ -113,10 +113,10 @@ def test_invalid_country_is_corrected_from_place(propose):
     assert any("Corrected country code 'sr' to 'no'" in n for n in p.notes)
 
 
-def test_ambiguous_date_is_flagged_with_known_parts(propose):
+def test_ambiguous_numbers_default_to_european_order(propose):
+    # 03-04-11 with no other evidence: day-month-year, the usual order in the archive
     p = propose("ambiguous/KKS_Lecture_03-04-11.mp3")
-    assert p.when == "YYYY-04-DD"  # 2011-04-03 or 2003-04-11: only the month is certain
-    assert any("Date format cannot be determined" in f for f in p.flags)
+    assert p.when == "2011-04-03" and not p.flags
 
 
 def test_baserow_row_is_matched_by_verse(propose):
@@ -130,19 +130,64 @@ def test_original_name_is_unchanged(propose, tree):
     assert path.exists() and Path(path).name == "HH KKS BG 7.17 2008-04-12.mp3"
 
 
-def test_tag_evidence_names_the_id3_tag(reference, settings):
+def tagged(settings, folder, name, **tags):
     from tests.conftest import make_tone
 
-    path = settings.media_sample_files_path / "tagged" / "HH KKS BG 2.54.mp3"
-    make_tone(
-        path,
-        seconds=1,
-        codec_args=["-c:a", "libmp3lame", "-metadata", "title=HH KKS BG2.54 11.07.2008"],
-    )
+    path = settings.media_sample_files_path / folder / name
+    meta = [arg for k, v in tags.items() for arg in ("-metadata", f"{k}={v}")]
+    make_tone(path, seconds=1, codec_args=["-c:a", "libmp3lame", *meta])
+    return path
+
+
+def test_id3_title_date_is_trusted(reference, settings):
+    """The real case: 'HH KKS BG 2.54.mp3' has title 'HH KKS BG2.54 11.07.2008'."""
+    path = tagged(settings, "tagged", "HH KKS BG 2.54.mp3", title="HH KKS BG2.54 11.07.2008")
     p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    assert p.when == "2008-07-11" and not p.flags  # European order, from the ID3 title
     origins = [e.detail["origin"] for e in p.evidence if e.field == "when" and e.detail]
     assert any('ID3 tags: title "HH KKS BG2.54 11.07.2008"' in o for o in origins)
-    assert any("ID3 tags" in n for n in p.notes) or p.flags  # ambiguous here, so flagged
+
+
+def test_id3_date_tag_beats_a_partial_folder_date(reference, settings):
+    path = tagged(settings, "Prague-Oct-2003", "Kirtan 2.mp3", date="2003-10-24")
+    p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    assert p.when == "2003-10-24"
+
+
+def test_id3_date_that_conflicts_with_the_folder_is_flagged(reference, settings):
+    path = tagged(settings, "Prague-Oct-2003", "Kirtan 3.mp3", title="Kirtan 24.10.2009")
+    p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    assert any("conflicts with the folder name" in f for f in p.flags)
+
+
+def test_id3_tags_confirm_an_ambiguous_filename_date(reference, settings):
+    # 05-04-11 alone reads as 5 April; the ID3 tag says 4 May (American order) -> 4 May
+    path = tagged(settings, "x", "KKS_Lecture_05-04-11.mp3", date="2011-05-04")
+    p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    assert p.when == "2011-05-04"
+    assert any("ID3 tags confirm" in n for n in p.notes)
+
+
+def test_travel_day_is_shown_but_left_open(reference, settings, tree):
+    from datetime import date
+
+    from mam.tools.renamer.knowledge import Stay
+
+    reference.stays += [
+        Stay(date(2007, 12, 29), date(2008, 1, 2), "Simhachalam", "Germany", "de"),
+        Stay(date(2008, 1, 2), date(2008, 1, 5), "Stockholm", "Sweden", "se"),
+    ]
+    path = tree / "2008" / "2008-01-02.mp3"
+    path.parent.mkdir(exist_ok=True)
+    path.write_bytes(b"")
+    p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    travel = [e for e in p.evidence if e.source == "travel"]
+    assert {e.value for e in travel} == {"Simhachalam", "Stockholm"}
+    assert p.place is None
+    assert any(
+        "Travel day on 2008-01-02: KKS leaves Simhachalam and arrives in Stockholm" in n
+        for n in p.notes
+    )
 
 
 @pytest.mark.parametrize(

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from mam.tools.renamer.countries import country_name, is_valid_cctld
-from mam.tools.renamer.dates import DateMatch, DateValue
+from mam.tools.renamer.dates import DateMatch, DateValue, find_dates
 from mam.tools.renamer.knowledge import MediaRow, Place, Reference, norm_key
 from mam.tools.renamer.naming import build_name, format_where
 from mam.tools.renamer.parse import NameParser, ParsedName
@@ -23,6 +23,7 @@ from mam.tools.renamer.parse import NameParser, ParsedName
 log = logging.getLogger(__name__)
 
 DATE_MARGIN = 0.25  # a date reading must beat the next one by this much to be chosen
+TAG_AGREES = 1.0  # a filename date reading that the ID3 tags confirm (taken as correct)
 FOLDER_LEVELS = 3
 
 
@@ -74,6 +75,7 @@ class Context:
     tag_year: int | None
     tag_origin: str | None = None  # e.g. 'ID3 tags: title "HH KKS BG2.54 11.07.2008"'
     tag_date_origin: str | None = None
+    tag_dates: list = field(default_factory=list)  # (DateMatch, origin) from the ID3 date tag
 
 
 # ------------------------------------------------------------------ context
@@ -146,7 +148,13 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
     if tags.get("date", "")[:4].isdigit():
         tag_year = int(tags["date"][:4])
     tag = parser.parse(tag_text, "folder") if tag_text else None
-    return Context(
+    date_tag = tags.get("date", "")
+    tag_dates = (
+        [(d, f'"{d.raw}" in the ID3 date tag') for d in find_dates(date_tag)]
+        if len(date_tag) > 4
+        else []
+    )
+    context = Context(
         folders,
         siblings,
         sibling_places,
@@ -154,7 +162,9 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
         tag_year,
         tag_origin,
         f'ID3 date tag "{tags["date"]}"' if tag_year else None,
+        tag_dates,
     )
+    return context
 
 
 # ------------------------------------------------------------------- resolver
@@ -240,7 +250,26 @@ class Resolver:
                 cands.append(
                     (r.value, r.prior, "filename", match, f'"{match.raw}" in the filename')
                 )
-        source_weight = {"folder": 0.6, "tag": 0.7}
+        # Dates in the ID3 title or date tag are taken as correct unless other evidence conflicts.
+        tag_cands = []
+        tag_matches = [
+            (d, f'"{d.raw}" in the {ctx.tag_origin}') for d in (ctx.tag.dates if ctx.tag else [])
+        ]
+        for match, origin in tag_matches + ctx.tag_dates:
+            for r in match.readings:
+                tag_cands.append((r.value, r.prior * 0.9, "tag", match, origin))
+        tag_full = {c[0] for c in tag_cands if c[0].is_full}
+        if cands and tag_full:
+            confirmed = [c for c in cands if c[0] in tag_full]
+            if confirmed:
+                cands = [
+                    (v, base + (TAG_AGREES if v in tag_full else 0.0), s, mt, o)
+                    for v, base, s, mt, o in cands
+                ]
+                notes.append(f"The ID3 tags confirm the date ({confirmed[0][0].text()}).")
+        source_weight = {"folder": 0.6}
+        if not cands and tag_cands:
+            cands = list(tag_cands)
         if not cands:
             for folder in ctx.folders:
                 for match in folder.dates:
@@ -250,11 +279,6 @@ class Resolver:
                         cands.append((r.value, weight, "folder", match, origin))
                 if cands:
                     break  # nearest folder with a date wins
-        if not cands and ctx.tag:
-            for match in ctx.tag.dates:
-                origin = f'"{match.raw}" in the {ctx.tag_origin}'
-                for r in match.readings:
-                    cands.append((r.value, r.prior * source_weight["tag"], "tag", match, origin))
         if not cands and ctx.tag_year:
             cands.append((DateValue(ctx.tag_year), 0.4, "tag", None, ctx.tag_date_origin))
         if not cands:
@@ -268,7 +292,7 @@ class Resolver:
         for value, base, source, match, origin in cands:
             context = (
                 self._date_context(value, folder_values, ctx, place, cc)
-                if source == "filename"
+                if source in ("filename", "tag")
                 else 0.0
             )
             specificity = 0.1 * sum(x is not None for x in (value.year, value.month, value.day))
@@ -302,7 +326,15 @@ class Resolver:
         if source == "folder":
             notes.append(f"Date taken from the folder name ('{match.raw}').")
         elif source == "tag":
-            notes.append(f"Date taken from the {ctx.tag_origin or ctx.tag_date_origin}.")
+            notes.append(
+                f"Date taken from the ID3 tags ('{match.raw if match else ctx.tag_year}')."
+            )
+            folder_years = {v.year for v in folder_values if v.year}
+            if best.year and folder_years and best.year not in folder_years:
+                flags.append(
+                    f"The ID3 date {best.text()} conflicts with the folder name "
+                    f"(year {', '.join(str(y) for y in sorted(folder_years))})."
+                )
         elif match and match.ambiguous:
             fmt = next(r.fmt for r in match.readings if r.value == best)
             notes.append(
@@ -333,7 +365,7 @@ class Resolver:
             elif years:
                 score -= 0.2
             if (value.year, value.month) in ctx.siblings:
-                score += 0.5
+                score += 0.6
             elif any(y == value.year for y, _ in ctx.siblings):
                 score += 0.15
         d = value.as_date()
@@ -386,6 +418,8 @@ class Resolver:
             return place, place_text, cc
 
         cc = self._country(name, ctx, place, when, media_row, notes, flags, ev)
+        if when is not None and when.is_full and source != "travel":
+            self._travel_evidence(when, place_text, ev, notes)
         if place_text:
             ev.append(
                 Evidence(
@@ -412,6 +446,30 @@ class Resolver:
                     + f" on {when.text()}."
                 )
         return place, place_text, cc
+
+    def _travel_evidence(self, when: DateValue, place_text, ev, notes) -> None:
+        """Show every stay on the date, even when it was not used for the place."""
+        d = when.as_date()
+        stays = self.ref.stays_on(d)
+        for s in stays:
+            origin = (
+                f"travel schedule: {s.place}, {s.country}, {s.start:%Y-%m-%d} to {s.end:%Y-%m-%d}"
+            )
+            ev.append(Evidence("where", s.place, "travel", 0.5, False, {"origin": origin}))
+        if place_text is None and len({s.place for s in stays}) > 1:
+            parts = []
+            for s in sorted(stays, key=lambda s: s.start):
+                if s.end == d and s.start != d:
+                    parts.append(f"leaves {s.place}")
+                elif s.start == d and s.end != d:
+                    parts.append(f"arrives in {s.place}")
+                else:
+                    parts.append(f"is in {s.place}")
+            notes.append(
+                f"Travel day on {when.text()}: KKS "
+                + " and ".join(parts)
+                + ". The place is left open; choose it in the review."
+            )
 
     def _country(self, name, ctx, place, when, media_row, notes, flags, ev) -> str | None:
         explicit = [(cc, raw) for cc, raw in name.ccs]

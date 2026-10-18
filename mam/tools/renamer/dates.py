@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from datetime import date
 
 MIN_YEAR = 1990
+# The archive mostly uses European day-month-year; American month-day-year is only chosen
+# when other evidence (folder, siblings, tags, travel schedule) points to it.
+MDY_PRIOR = 0.15
 
 MONTHS: dict[str, int] = {}
 _MONTH_NAMES = {
@@ -198,13 +201,16 @@ def _readings(kind: str, g: tuple[str, ...]) -> list[DateReading]:
         out.append(_reading("month-y", 0.9, int(g[1]), MONTHS[g[0].lower()], None))
     elif kind == "dmy4":
         a, b, y = int(g[0]), int(g[1]), int(g[2])
-        out += [_reading("dmy", 0.6, y, b, a), _reading("mdy", 0.3, y, a, b)]
+        out += [_reading("dmy", 0.6, y, b, a), _reading("mdy", MDY_PRIOR, y, a, b)]
     elif kind == "short3":
         a, b, c = g
         y = _year(c)
-        out += [_reading("dmy", 0.6, y, int(b), int(a)), _reading("mdy", 0.3, y, int(a), int(b))]
+        out += [
+            _reading("dmy", 0.6, y, int(b), int(a)),
+            _reading("mdy", MDY_PRIOR, y, int(a), int(b)),
+        ]
         if len(a) == 2 and len(b) == 2:  # yy-mm-dd only with zero-padded parts
-            out.append(_reading("ymd", 0.4, _year(a), int(b), int(c)))
+            out.append(_reading("ymd", 0.3, _year(a), int(b), int(c)))
     elif kind == "compact6":
         a, b, c = g
         out += [

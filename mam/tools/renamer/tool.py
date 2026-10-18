@@ -174,12 +174,35 @@ def reserve_name(record_id: int, folder: Path, name: str) -> tuple[str, str | No
     return chosen, taken.get(name.lower()) if chosen != name else None
 
 
+def latest_approval(session: Session, file_id: int) -> m.Review | None:
+    """The reviewer's decision for this file, if its latest decided review approved a name."""
+    review = session.scalar(
+        select(m.Review)
+        .where(
+            m.Review.media_file_id == file_id,
+            m.Review.tool == TOOL,
+            m.Review.outcome.in_(("approved", "edited", "rejected", "excluded")),
+        )
+        .order_by(m.Review.decided_at.desc(), m.Review.id.desc())
+    )
+    return review if review is not None and review.outcome in ("approved", "edited") else None
+
+
 # ------------------------------------------------------------------- the job
 def run_renamer(ctx: JobContext) -> ToolOutcome:
     record = ctx.media_file
     if record is None or not record.original_path:
         raise MamError("The Renamer needs an original file")
     settings = ctx.settings
+    approved = latest_approval(ctx.session, record.id)
+    if approved is not None and not ctx.params.get("override_review"):
+        # A reviewer's decision is never overwritten by a new automatic run.
+        return ToolOutcome(
+            "info",
+            f"Kept {approved.final.get('final_name')}, approved by {approved.operator} "
+            f"on {approved.decided_at:%Y-%m-%d}",
+            {"kept": approved.final.get("final_name")},
+        )
     res = resolver(settings)
     proposal = res.propose(Path(record.original_path))
 
@@ -234,7 +257,12 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
     meta["reserved"] = str(placed.dst)
     record.meta = meta
     summary = f"{'Would rename' if ctx.dry_run else 'Renamed'} to {placed.dst.name}"
-    if proposal.flags:
+    if proposal.flags and ctx.dry_run:
+        summary += (
+            f" — would need a review ({len(proposal.flags)} item(s)); "
+            "run without dry run to open it"
+        )
+    elif proposal.flags:
         summary += f" — {len(proposal.flags)} item(s) to review"
     if ctx.dry_run:
         return ToolOutcome("info", summary, {"new_name": placed.dst.name, "flags": proposal.flags})
