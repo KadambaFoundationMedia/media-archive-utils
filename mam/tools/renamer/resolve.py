@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from mam.tools.renamer.countries import country_name, is_valid_cctld
+from mam.tools.renamer.countries import cc_for_name, country_name, is_valid_cctld
 from mam.tools.renamer.dates import DateMatch, DateValue, find_dates
 from mam.tools.renamer.knowledge import MediaRow, Place, Reference, norm_key
 from mam.tools.renamer.naming import build_name, format_where
@@ -23,6 +23,39 @@ from mam.tools.renamer.parse import NameParser, ParsedName
 log = logging.getLogger(__name__)
 
 DATE_MARGIN = 0.25  # a date reading must beat the next one by this much to be chosen
+# Matching an existing Baserow media row (date must match; these decide the rest).
+MATCH_TAG = 0.6
+MATCH_TITLE = 0.5  # times the share of title words in common
+MATCH_PLACE = 0.2
+MATCH_COUNTRY = 0.1
+MATCH_CATEGORY = 0.1
+MATCH_CONFLICT = 0.4  # a different verse, place or country
+MATCH_THRESHOLD = 0.6
+MATCH_MARGIN = 0.15
+TITLE_STOPWORDS = {
+    "a",
+    "an",
+    "the",
+    "in",
+    "on",
+    "at",
+    "of",
+    "and",
+    "with",
+    "to",
+    "for",
+    "by",
+    "from",
+    "class",
+    "lecture",
+    "talk",
+    "kks",
+    "hh",
+    "kadamba",
+    "kanana",
+    "swami",
+    "maharaja",
+}
 TAG_AGREES = 1.0  # a filename date reading that the ID3 tags confirm (taken as correct)
 FOLDER_LEVELS = 3
 
@@ -168,6 +201,13 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
 
 
 # ------------------------------------------------------------------- resolver
+def cc_for_name_safe(token: str) -> str | None:
+    try:
+        return cc_for_name(token)
+    except Exception:
+        return None
+
+
 class Resolver:
     def __init__(self, ref: Reference, roots: list[Path]) -> None:
         self.ref = ref
@@ -184,7 +224,7 @@ class Resolver:
 
         place, place_text, cc = self._where(name, ctx, None, ev, flags, notes, first_pass=True)
         when = self._when(name, ctx, place, cc, ev, flags, notes)
-        media_row = self._media_match(when, name, place, ev, notes)
+        media_row = self._media_match(when, name, place, cc, ev, notes, flags)
         place, place_text, cc = self._where(name, ctx, when, ev, flags, notes, media_row=media_row)
 
         what = self._what(name)
@@ -587,7 +627,12 @@ class Resolver:
         found = difflib.get_close_matches(norm_key(text), list(self.ref.places), n=1, cutoff=0.75)
         return self.ref.places[found[0]].name if found else None
 
-    def _media_match(self, when: DateValue, name, place, ev, notes) -> MediaRow | None:
+    def _media_match(self, when: DateValue, name, place, cc, ev, notes, flags) -> MediaRow | None:
+        """An existing Baserow media row for this recording, or None (a new row is created).
+
+        The date alone never decides: a row must also agree on the verse tag and/or the title,
+        and a different verse, place or country counts against it.
+        """
         if not when.is_full:
             return None
         rows = self.ref.media_by_date.get(when.text(), [])
@@ -596,43 +641,89 @@ class Resolver:
         what = self._what(name)
         match = self.ref.matcher.match(what)
         category = match.category.name if match else None
-        tag = name.verse.tag if name.verse else None
+        tag = name.verse.tag if name.verse and name.verse.numbers else None
+        ours = self._title_tokens(name.what_words + ([name.verse.readable] if name.verse else []))
 
-        def score(row: MediaRow) -> float:
-            if tag and row.tag and row.tag.strip() == tag:
-                return 1.0
-            s = 0.0
+        def score(row: MediaRow) -> tuple[float, list[str]]:
+            s, why = 0.0, []
+            if tag and row.tag:
+                if row.tag.strip() == tag:
+                    s, why = s + MATCH_TAG, [*why, "same verse tag"]
+                else:
+                    s, why = s - MATCH_CONFLICT, [*why, f"different verse ({row.tag})"]
+            theirs = self._title_tokens([row.title or ""])
+            if ours and theirs:
+                overlap = len(ours & theirs) / len(ours | theirs)
+                if overlap:
+                    s += MATCH_TITLE * overlap
+                    why.append(f"title overlap {overlap:.0%}")
+            online = {norm_key(x) for x in self.ref.aliases.get("no_country") or []}
+            is_online = place and (
+                norm_key(place.name) in online or norm_key(row.place or "") in online
+            )
+            if place and row.place and is_online:
+                pass  # a livestream happens somewhere: neither proof nor conflict
+            elif place and row.place:
+                if row.place == place.name:
+                    s, why = s + MATCH_PLACE, [*why, "same place"]
+                else:
+                    s, why = s - MATCH_CONFLICT, [*why, f"different place ({row.place})"]
+            elif cc and row.country:
+                if cc_for_name(row.country) == cc:
+                    s, why = s + MATCH_COUNTRY, [*why, "same country"]
+                else:
+                    s, why = s - MATCH_CONFLICT, [*why, f"different country ({row.country})"]
             if category and row.category == category:
-                s += 0.4
-            if place and row.place == place.name:
-                s += 0.3
-            return s
+                s, why = s + MATCH_CATEGORY, [*why, "same category"]
+            return s, why
 
-        ranked = sorted(((score(r), r) for r in rows), key=lambda x: x[0], reverse=True)
-        best_score, best = ranked[0]
-        if best_score >= 0.7 and (len(ranked) == 1 or ranked[1][0] < best_score):
+        ranked = sorted(((*score(r), r) for r in rows), key=lambda x: x[0], reverse=True)
+        best_score, why, best = ranked[0]
+        has_identity = any(w.startswith(("same verse", "title overlap")) for w in why)
+        clear_winner = len(ranked) == 1 or ranked[1][0] <= best_score - MATCH_MARGIN
+        if best_score >= MATCH_THRESHOLD and has_identity and clear_winner:
             ev.append(
                 Evidence(
                     "baserow",
                     f"row {best.id}: {best.title}",
                     "media",
-                    best_score,
+                    round(min(best_score, 1.0), 2),
                     True,
-                    {
-                        "origin": "same date and verse"
-                        if best_score >= 1
-                        else "same date, category and place"
-                    },
+                    {"origin": "same date, " + ", ".join(why)},
                 )
             )
             notes.append(f"Matches Baserow media row {best.id} ('{best.title}').")
             return best
-        if len(rows):
-            notes.append(
-                f"{len(rows)} Baserow media row(s) on {when.text()}, "
-                "none clearly the same recording."
+        close = [
+            r
+            for sc, w, r in ranked
+            if sc >= MATCH_THRESHOLD
+            and any(x.startswith(("same verse", "title overlap")) for x in w)
+        ]
+        if len(close) > 1:
+            flags.append(
+                "Several Baserow rows may be this recording ("
+                + ", ".join(f"row {r.id} '{(r.title or '')[:40]}'" for r in close[:4])
+                + "). Choose the right row in the review, or create a new one."
             )
+            return None
+        notes.append(
+            f"{len(rows)} Baserow media row(s) on {when.text()}, none clearly the same "
+            "recording (title, tag and place compared); a new row will be created."
+        )
         return None
+
+    def _title_tokens(self, texts: list[str]) -> set[str]:
+        """Meaningful words of a title: no stop words, places or country names."""
+        tokens = set()
+        for text in texts:
+            for token in norm_key(text).split():
+                if token in TITLE_STOPWORDS or token in self.ref.places:
+                    continue
+                if len(token) > 3 and cc_for_name_safe(token):
+                    continue
+                tokens.add(token)
+        return tokens
 
     @staticmethod
     def _select(

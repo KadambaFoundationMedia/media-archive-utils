@@ -201,3 +201,76 @@ def test_travel_day_is_shown_but_left_open(reference, settings, tree):
 def test_titles_write_verses_with_dots(propose, name, title):
     """Verse numbers: hyphens in filenames, dots in titles (docs/references/verse-structure.md)."""
     assert propose(name).title == title
+
+
+@pytest.fixture
+def media_rows(reference):
+    from mam.tools.renamer.knowledge import MediaRow
+
+    def add(*rows):
+        for row in rows:
+            reference.media_by_date.setdefault(row.date, []).append(row)
+
+    return add, MediaRow
+
+
+def test_baserow_row_needs_more_than_the_date(propose, media_rows):
+    add, Row = media_rows
+    # Same date, same place, but a different recording: not a match
+    add(Row(901, "2011-08-28", "Kirtan", "Oslo", "Norway", "", "Sunday kirtan"))
+    p = propose("From JVD (8.9.11)/KKS_S.B. 1.19.30_28.8.11_Oslo_ .WMA")
+    assert p.baserow_row_id is None
+    assert any("none clearly the same recording" in n for n in p.notes)
+
+
+def test_baserow_row_matches_on_title_and_place(propose, media_rows):
+    add, Row = media_rows
+    add(
+        Row(
+            902, "2011-08-28", "Srimad-bhagavatam", "Oslo", "Norway", "", "SB 1.19.30 morning class"
+        ),
+        Row(903, "2011-08-28", "Kirtan", "Oslo", "Norway", "", "Sunday kirtan"),
+    )
+    p = propose("From JVD (8.9.11)/KKS_S.B. 1.19.30_28.8.11_Oslo_ .WMA")
+    assert p.baserow_row_id == 902
+
+
+def test_different_verse_or_place_counts_against_a_row(propose, media_rows):
+    add, Row = media_rows
+    add(Row(904, "2011-08-28", "Srimad-bhagavatam", "Berlin", "Germany", "1.19.31", "SB 1.19.31"))
+    p = propose("From JVD (8.9.11)/KKS_S.B. 1.19.30_28.8.11_Oslo_ .WMA")
+    assert p.baserow_row_id is None
+
+
+def test_several_possible_rows_are_flagged(propose, media_rows):
+    add, Row = media_rows
+    add(
+        Row(
+            905, "2011-08-28", "Srimad-bhagavatam", "Oslo", "Norway", "1.19.30", "SB 1.19.30 part 1"
+        ),
+        Row(
+            906, "2011-08-28", "Srimad-bhagavatam", "Oslo", "Norway", "1.19.30", "SB 1.19.30 part 2"
+        ),
+    )
+    p = propose("From JVD (8.9.11)/KKS_S.B. 1.19.30_28.8.11_Oslo_ .WMA")
+    assert p.baserow_row_id is None
+    assert any("Several Baserow rows may be this recording" in f for f in p.flags)
+
+
+def test_livestream_place_is_not_a_conflict(reference, settings, tree, media_rows):
+    add, Row = media_rows
+    add(
+        Row(
+            475,
+            "2020-03-30",
+            "Book-discussions",
+            "ISKCON-Durban",
+            "South-Africa",
+            "",
+            "Reading From Kirtaniyah Sada Harih",
+        )
+    )
+    path = tree / "2020-03-30_KKS_Reading-from-Kirtaniyah-sada-harih_livestream.mp4"
+    path.write_bytes(b"")
+    p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    assert p.baserow_row_id == 475

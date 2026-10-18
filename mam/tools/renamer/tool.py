@@ -88,13 +88,16 @@ def write_baserow(
     final_path: Path,
     settings: Settings,
     dry_run: bool,
+    live: bool = False,
 ) -> dict[str, Any]:
+    """Create or update the media row. Bulk runs follow BASEROW_APPLY; `live` (a reviewer's
+    approval) always writes for real."""
     from mam.helpers.baserow import BaserowClient
 
     ref = get_reference()
     values = baserow_values(proposal, final_path, record.kind, ref, settings)
     with BaserowClient(settings) as client:
-        apply = settings.baserow_apply and not dry_run
+        apply = (settings.baserow_apply or live) and not dry_run
         row_id = proposal.get("baserow_row_id") or record.baserow_row_id
         if row_id:
             result = client.update_row(
@@ -408,7 +411,10 @@ def approve_review(
         "target": str(placed.dst),
         "dry_run": False,
     }
-    approved["baserow"] = write_baserow(record, approved, placed.dst, settings, dry_run=False)
+    # Approving is an explicit decision: it writes to Baserow even when BASEROW_APPLY is false.
+    approved["baserow"] = write_baserow(
+        record, approved, placed.dst, settings, dry_run=False, live=True
+    )
 
     edited = any(
         str(proposal.get(k) or "") != str(approved.get(k) or "")
