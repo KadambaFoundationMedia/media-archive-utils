@@ -40,6 +40,13 @@ def settings(tmp_path, monkeypatch):
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
     local_db._engines.clear()
+
+    def no_network():  # tests never reach Baserow; tests that need data use `reference`
+        raise RuntimeError("no Baserow in tests")
+
+    from mam.tools.renamer import knowledge
+
+    monkeypatch.setattr(knowledge, "fetch_raw", no_network)
     s = get_settings()
     local_db.migrate()
     yield s

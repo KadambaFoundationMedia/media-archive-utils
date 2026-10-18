@@ -48,9 +48,13 @@ def merge_update(
     result = MergeResult()
     stamp = (today or date.today()).isoformat()
     for name, new in proposed.items():
+        old = _plain(current.get(name))
+        if new is None and name in overwrite:
+            if not is_empty(old):
+                result.payload[name] = None  # a person cleared it
+            continue
         if is_empty(new):
             continue
-        old = _plain(current.get(name))
         if name in APPEND_FIELDS:
             # Only lines that are not there yet, so saving again never repeats a note.
             lines = [
