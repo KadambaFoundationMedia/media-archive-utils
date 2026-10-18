@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <form id="filters" class="row g-2 align-items-end mb-3" method="get" action="/"
-      hx-get="/" hx-select="#file-table" hx-target="#file-table" hx-swap="outerHTML"
+      hx-get="/" hx-select="#file-table" hx-target="#file-table" hx-swap="outerHTML" hx-indicator="#list-loading"
       hx-select-oob="#file-count,#scope-all" hx-trigger="change, keyup changed delay:400ms from:#q" hx-push-url="true">
   <div class="col-12 col-lg-3">
     <label class="form-label small mb-0" for="q">Search</label>
@@ -96,7 +96,8 @@
     </select>
     <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
     <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
-    <span class="small text-body-secondary ms-auto" id="file-count">{{ total }} files</span>
+    <span id="list-loading" class="htmx-indicator small text-body-secondary ms-auto"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading…</span>
+    <span class="small text-body-secondary {{ '' }}" id="file-count">{{ total }} files</span>
   </div>
   <div id="file-table">
     {% include "_file_rows.html" %}

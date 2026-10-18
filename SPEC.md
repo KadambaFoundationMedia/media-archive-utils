@@ -158,6 +158,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Tools only fill empty fields and never overwrite values a person entered. Differences are shown as proposals on the review page.
   - `notes` gets a dated entry appended for each tool.
   - `language` is merged (union).
+- **Reference data cache:** the categories (with their colors), places, travel schedule and media index are read from Baserow and kept in memory and on disk (`~/.mam/cache/baserow_reference.json`). Pages and jobs always use the cached copy at once; data older than 10 minutes is refreshed in the background, so nothing waits for Baserow. Adding a place to the travel schedule refreshes it straight away.
 - **Schema:**
   - Only existing columns and select options are used. The schema is refreshed at runtime.
   - The `users` and `media_review_tasks` tables are ignored.
