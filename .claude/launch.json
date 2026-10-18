@@ -4,8 +4,51 @@
     {
       "name": "media-manager",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "mam", "serve", "--port", "8765"],
+      "runtimeArgs": [
+        "run",
+        "mam",
+        "serve",
+        "--port",
+        "8765"
+      ],
       "port": 8765
+    },
+    {
+      "name": "fake-baserow",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "python",
+        "-m",
+        "tests.fake_baserow",
+        "--port",
+        "8799"
+      ],
+      "port": 8799
+    },
+    {
+      "name": "media-manager-sandbox",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "LOCAL_DB_PATH=.sandbox/mam.sqlite",
+        "MEDIA_PROCESSED_FILES_PATH=.sandbox/processed",
+        "LOG_DIR=.sandbox/logs",
+        "WORK_DIR=.sandbox/work",
+        "INBOX_PATH=.sandbox/inbox",
+        "BASEROW_API_URL=http://127.0.0.1:8799",
+        "BASEROW_API_TOKEN=sandbox",
+        "BASEROW_MEDIA_TABLE_ID=1",
+        "BASEROW_TRAVEL_SCHEDULE_TABLE_ID=2",
+        "BASEROW_CATEGORY_TERMS_TABLE_ID=3",
+        "OPERATOR_NAME=sandbox",
+        "uv",
+        "run",
+        "mam",
+        "serve",
+        "--port",
+        "8766"
+      ],
+      "port": 8766
     }
   ]
 }

@@ -154,3 +154,108 @@ def test_notes_are_kept_and_sent_to_baserow(client, imported, no_baserow, refere
     page = client.get(f"/files/{file_id}").text
     assert note in page  # shown on the file page and kept in the form
     assert f">{note}</textarea>" in page
+
+
+def test_a_never_previewed_file_starts_with_a_proposed_name(client, imported):
+    """Without a preview the form must not start with the original name (it would never save)."""
+    page = client.get(f"/files/{imported['R09_0004.MP3']}").text
+    assert 'name="filename" value="2012-07-DD_KKS_rs.mp3"' in page
+    assert 'id="edit-problems" class="small text-danger mt-3 mb-0"></ul>' in page  # no problems
+
+
+def test_the_form_is_not_replaced_while_syncing(client, imported):
+    """The bug: the sync replaced the form (and its Save button) under the user's click."""
+    page = client.get(f"/files/{imported['R09_0004.MP3']}").text
+    assert 'data-sync="/files/' in page and "hx-swap" not in page.split('id="edit-form"')[1][:400]
+    response = client.post(
+        f"/files/{imported['R09_0004.MP3']}/edit/sync",
+        data={"filename": "2012-07-12_KKS_Kirtan_rs.mp3", "changed": "filename"},
+    )
+    assert response.headers["content-type"].startswith("application/json")
+
+
+def test_save_then_page_shows_the_saved_values(client, imported, settings):
+    """Save works the first time and the page shows what was saved."""
+    file_id = imported["R09_0004.MP3"]
+    note = "Home program at Uddhava/Visakha"
+    response = client.post(
+        f"/files/{file_id}/edit",
+        data={**save_form("2008-MM-DD_KKS_Home-program_rs.mp3"), "notes": note},
+        follow_redirects=False,
+    )
+    assert "Saved 2008-MM-DD_KKS_Home-program_rs.mp3" in response.headers["location"].replace(
+        "%20", " "
+    )
+    page = client.get(f"/files/{file_id}").text
+    assert 'name="filename" value="2008-MM-DD_KKS_Home-program_rs.mp3"' in page
+    assert f">{note}</textarea>" in page
+    copy = (
+        settings.media_processed_files_path / "Home-program" / "2008-MM-DD_KKS_Home-program_rs.mp3"
+    )
+    assert copy.exists()
+    # change the filename and save again: the copy is renamed, not duplicated
+    client.post(
+        f"/files/{file_id}/edit",
+        data={**save_form("2008-MM-DD_KKS_Home-program-Uddhava_rs.mp3"), "notes": note},
+    )
+    renamed = copy.with_name("2008-MM-DD_KKS_Home-program-Uddhava_rs.mp3")
+    assert renamed.exists() and not copy.exists()
+    assert (
+        'value="2008-MM-DD_KKS_Home-program-Uddhava_rs.mp3"' in client.get(f"/files/{file_id}").text
+    )
+
+
+def test_resaving_updates_the_linked_row_with_the_persons_values(
+    client,
+    archive,
+    reference,
+    settings,
+    monkeypatch,  # noqa: F811
+):
+    """A person's save replaces the row's values and the file location; tools only fill gaps."""
+    calls = []
+
+    class Client:
+        def __init__(self, *a, **k):
+            self.media_table = 1
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def create_row(self, table, values, **kw):
+            calls.append(("create", values, kw))
+            from mam.helpers.baserow.client import WriteResult
+
+            return WriteResult(1, False, 777, values)
+
+        def update_row(self, table, row_id, values, **kw):
+            calls.append(("update", values, kw))
+            from mam.helpers.baserow.client import WriteResult
+
+            return WriteResult(2, False, row_id, values)
+
+    monkeypatch.setattr("mam.helpers.baserow.BaserowClient", Client)
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    first = client.post(
+        f"/files/{file_id}/edit",
+        data=save_form("2012-07-12_KKS_Kirtan_rs.mp3"),
+        follow_redirects=False,
+    )
+    assert "error" not in first.headers["location"], first.headers["location"]
+    client.post(
+        f"/files/{file_id}/edit",
+        data={
+            **save_form("2012-07-12_KKS_Kirtan_Prague-cz.mp3", place="Prague"),
+            "baserow_row_id": "777",
+        },
+    )
+    action, values, kw = calls[-1]
+    assert action == "update"
+    assert values["audio_file_location"] == "/Kirtan/2012-07-12_KKS_Kirtan_Prague-cz.mp3"
+    assert {"audio_file_location", "title", "place_location", "country"} <= set(kw["overwrite"])

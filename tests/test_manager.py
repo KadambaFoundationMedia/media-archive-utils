@@ -143,13 +143,18 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
     page = client.get(f"/review/{review.id}").text
     assert "Non-descriptive filename" in page
     flag_id = by_name["R09_0004.MP3"]
-    # editing the filename fills the table fields
+    # editing the filename fills the table fields (values only; the form is not replaced)
     synced = client.post(
         f"/files/{flag_id}/edit/sync",
-        data={"filename": "2012-07-12_KKS_Kirtan_rs.mp3", "changed": "filename"},
-    ).text
-    assert 'name="when" value="2012-07-12"' in synced
-    assert '<option value="Kirtan" selected>' in synced and 'value="rs" selected' in synced
+        data={
+            "filename": "2012-07-12_KKS_Kirtan_rs.mp3",
+            "changed": "filename",
+            "notes": "keep me",
+        },
+    ).json()
+    assert synced["values"]["when"] == "2012-07-12"
+    assert synced["values"]["category"] == "Kirtan" and synced["values"]["cc"] == "rs"
+    assert synced["values"]["notes"] == "keep me"  # a typed note is never lost
     # changing the date rewrites the filename
     synced = client.post(
         f"/files/{flag_id}/edit/sync",
@@ -159,12 +164,14 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
             "cc": "rs",
             "changed": "when",
         },
-    ).text
-    assert 'value="2012-07-13_KKS_Kirtan_rs.mp3"' in synced
-    bad = client.post(
-        f"/files/{flag_id}/edit/sync",
-        data={"filename": "12-07-2012_KKS.mp3", "when": "12-07-2012", "changed": "when"},
-    ).text
+    ).json()
+    assert synced["values"]["filename"] == "2012-07-13_KKS_Kirtan_rs.mp3"
+    bad = " ".join(
+        client.post(
+            f"/files/{flag_id}/edit/sync",
+            data={"filename": "12-07-2012_KKS.mp3", "when": "12-07-2012", "changed": "when"},
+        ).json()["problems"]
+    )
     assert "date must be YYYY-MM-DD" in bad
 
     response = client.post(

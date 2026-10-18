@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from mam.config import get_settings
 from mam.errors import MamError
@@ -31,7 +31,7 @@ def form_context(record: m.MediaFile, values: dict, checked: dict | None = None)
     return {
         "ev": values,
         "edit_problems": checked["problems"],
-        "edit_notes": checked["notes"],
+        "edit_hints": checked["hints"],
         "candidates": candidates,
         "place_names": sorted({p.name for p in ref.places.values()}),
         "category_options": sorted(ref.category_options),
@@ -42,8 +42,10 @@ def form_context(record: m.MediaFile, values: dict, checked: dict | None = None)
 
 
 def register_edit_routes(app: FastAPI, render, notify) -> None:
-    @app.post("/files/{file_id}/edit/sync", response_class=HTMLResponse)
-    async def edit_sync(request: Request, file_id: int):
+    @app.post("/files/{file_id}/edit/sync")
+    async def edit_sync(request: Request, file_id: int) -> JSONResponse:
+        """New values for the form after one field changed. Only values are returned: the
+        page fills them into the existing fields, so the form and its buttons stay in place."""
         from mam.tools.renamer.editing import sync
 
         form = await request.form()
@@ -52,14 +54,9 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
             if record is None:
                 raise HTTPException(404)
             ext = Path(record.original_path).suffix.lower().lstrip(".")
-            values = sync(form_values(form), form.get("changed", ""), ext)
-            checked = {"problems": values.pop("problems"), "notes": values.pop("notes")}
-            context = form_context(record, values, checked)
-            mode = form.get("mode", "file")
-            review_id = form.get("review_id") or None
-        return render(
-            request, "_edit_form.html", f=record, mode=mode, review_id=review_id, **context
-        )
+        values = sync(form_values(form), form.get("changed", ""), ext)
+        problems, hints = values.pop("problems"), values.pop("hints")
+        return JSONResponse({"values": values, "problems": problems, "hints": hints})
 
     @app.post("/files/{file_id}/edit")
     async def edit_save(request: Request, file_id: int):

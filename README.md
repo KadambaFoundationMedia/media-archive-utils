@@ -44,3 +44,10 @@ uv run pytest                                    # fast tests
 uv run pytest -m slow                            # tests on real samples in trimming-samples/
 uv run ruff check . && uv run ruff format .      # lint and format
 ```
+
+## Testing the portal without touching real data
+
+`.claude/launch.json` has two extra servers for manual testing:
+
+- **fake-baserow**: `uv run python -m tests.fake_baserow --port 8799`, a stand-in Baserow with the test fixtures. It accepts creates and updates and prints them.
+- **media-manager-sandbox**: the portal on port 8766 with its own database and processed folder in `.sandbox/`, connected to the stand-in Baserow. Your real database, processed files and the live Baserow are never touched; originals are only read.
