@@ -7,3 +7,16 @@
 @media (max-width: 576px) {
   main.container-fluid { padding-left: 1rem; padding-right: 1rem; }
 }
+
+/* File list: one header row per folder, alternating rows inside a folder. */
+.file-table tr.folder-row td {
+  background: var(--bs-secondary-bg);
+  border-top: 2px solid var(--bs-border-color);
+  padding-top: .5rem;
+}
+.file-table tr.file-row.stripe td { background: var(--bs-tertiary-bg); }
+.file-table tr.file-row td { padding-top: .45rem; padding-bottom: .45rem; }
+.file-table tbody tr.file-row:hover td { background: var(--bs-primary-bg-subtle); }
+.status-guide summary { cursor: pointer; }
+/* Evidence: keep values readable in narrow cards. */
+.evidence-table td:nth-child(2) { min-width: 7rem; }

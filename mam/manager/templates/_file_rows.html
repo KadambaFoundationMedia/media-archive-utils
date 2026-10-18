@@ -1,6 +1,6 @@
 <div {% if active %}hx-get="/files/rows?{{ request.url.query }}" hx-trigger="every 3s" hx-target="#file-table" hx-swap="innerHTML"{% endif %}>
 <div class="table-responsive">
-<table class="table table-sm table-hover align-middle file-table">
+<table class="table table-sm table-hover align-middle file-table{% if flt.sort != 'path' %} table-striped{% endif %}">
   <thead>
     <tr>
       <th style="width:2rem"><input class="form-check-input" type="checkbox" id="select-page" aria-label="Select all on this page"></th>
@@ -13,13 +13,25 @@
     </tr>
   </thead>
   <tbody>
+  {% set ns = namespace(folder=None, stripe=0) %}
   {% for f in rows %}
     {% set proposal = (f.meta or {}).get('proposal') %}
-    <tr>
+    {% set folder = f.original_path | dirname %}
+    {% if flt.sort == 'path' and folder != ns.folder %}
+      {% set ns.folder = folder %}{% set ns.stripe = 0 %}
+    <tr class="folder-row">
+      <td colspan="7">
+        <i class="fa-regular fa-folder-open me-2"></i><span class="fw-semibold">{{ f.original_path | rel_folder }}</span>
+        <a class="small ms-2" href="/?{{ flt.query_args(folder=folder, page=1) | urlencode }}" title="Show only this folder">only this folder</a>
+      </td>
+    </tr>
+    {% endif %}
+    {% set ns.stripe = ns.stripe + 1 %}
+    <tr class="file-row{% if flt.sort == 'path' and ns.stripe is even %} stripe{% endif %}">
       <td><input class="form-check-input row-select" type="checkbox" name="ids" value="{{ f.id }}" aria-label="Select"></td>
       <td class="text-break">
         <a href="/files/{{ f.id }}" class="fw-medium">{{ f.original_path | basename }}</a>
-        <div class="small text-body-secondary text-break">{{ f.original_path | dirname }}</div>
+        {% if flt.sort != 'path' %}<div class="small text-body-secondary text-break">{{ f.original_path | rel_folder }}</div>{% endif %}
       </td>
       <td class="text-break small">
         {% if f.current_name %}<span class="font-monospace">{{ f.current_name }}</span>
@@ -34,7 +46,9 @@
     </tr>
   {% else %}
     <tr><td colspan="7" class="text-center text-body-secondary py-4">
-      No files yet. <a href="/import">Import a folder</a> to get started.
+      {% if flt.status == '__attention' %}Nothing needs your attention.
+        <a href="/?{{ flt.query_args(status='__all', page=1) | urlencode }}">Show all files</a>
+      {% else %}No files match. <a href="/import">Import a folder</a> or <a href="/?status=__all">show all files</a>.{% endif %}
     </td></tr>
   {% endfor %}
   </tbody>

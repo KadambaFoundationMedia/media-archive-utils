@@ -72,6 +72,8 @@ class Context:
     sibling_places: dict[str, set[str]]  # full date -> known places named by siblings that day
     tag: ParsedName | None
     tag_year: int | None
+    tag_origin: str | None = None  # e.g. 'ID3 tags: title "HH KKS BG2.54 11.07.2008"'
+    tag_date_origin: str | None = None
 
 
 # ------------------------------------------------------------------ context
@@ -128,19 +130,31 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
                 for place in parsed.places:
                     sibling_places.setdefault(v.text(), set()).add(place.name)
     tags = read_tags(path)
-    tag_text = " ".join(
-        v
+    useful = {
+        k: v
         for k, v in tags.items()
         if k in ("title", "album")
         and norm_key(v) != norm_key(path.stem)
         and norm_key(v) != norm_key(path.name)
         and not norm_key(v).startswith(RECORDER_ALBUMS)
+    }
+    tag_text = " ".join(useful.values())
+    tag_origin = (
+        "ID3 tags: " + ", ".join(f'{k} "{v}"' for k, v in useful.items()) if useful else None
     )
     tag_year = None
     if tags.get("date", "")[:4].isdigit():
         tag_year = int(tags["date"][:4])
     tag = parser.parse(tag_text, "folder") if tag_text else None
-    return Context(folders, siblings, sibling_places, tag, tag_year)
+    return Context(
+        folders,
+        siblings,
+        sibling_places,
+        tag,
+        tag_year,
+        tag_origin,
+        f'ID3 date tag "{tags["date"]}"' if tag_year else None,
+    )
 
 
 # ------------------------------------------------------------------- resolver
@@ -165,7 +179,7 @@ class Resolver:
 
         what = self._what(name)
         if what:
-            ev.append(Evidence("what", what, "filename", 0.9, True))
+            ev.append(Evidence("what", what, "filename", 0.9, True, {"origin": f'"{path.stem}"'}))
         if not name.descriptive:
             flags.append(
                 "Non-descriptive filename: it gives no WHAT (scripture, verse or title)."
@@ -220,43 +234,52 @@ class Resolver:
 
     # ------------------------------------------------------------- WHEN
     def _when(self, name, ctx, place, cc, ev, flags, notes) -> DateValue:
-        cands: list[tuple[DateValue, float, str, DateMatch]] = []
+        cands: list[tuple[DateValue, float, str, DateMatch | None, str]] = []
         for match in name.dates:
             for r in match.readings:
-                cands.append((r.value, r.prior, "filename", match))
+                cands.append(
+                    (r.value, r.prior, "filename", match, f'"{match.raw}" in the filename')
+                )
         source_weight = {"folder": 0.6, "tag": 0.7}
         if not cands:
             for folder in ctx.folders:
                 for match in folder.dates:
+                    origin = f'"{match.raw}" in folder "{folder.text}"'
                     for r in match.readings:
-                        cands.append((r.value, r.prior * source_weight["folder"], "folder", match))
+                        weight = r.prior * source_weight["folder"]
+                        cands.append((r.value, weight, "folder", match, origin))
                 if cands:
                     break  # nearest folder with a date wins
         if not cands and ctx.tag:
             for match in ctx.tag.dates:
+                origin = f'"{match.raw}" in the {ctx.tag_origin}'
                 for r in match.readings:
-                    cands.append((r.value, r.prior * source_weight["tag"], "tag", match))
+                    cands.append((r.value, r.prior * source_weight["tag"], "tag", match, origin))
         if not cands and ctx.tag_year:
-            cands.append((DateValue(ctx.tag_year), 0.4, "tag", None))
+            cands.append((DateValue(ctx.tag_year), 0.4, "tag", None, ctx.tag_date_origin))
         if not cands:
-            ev.append(Evidence("when", "YYYY-MM-DD", "rule", 0.0, True))
+            ev.append(
+                Evidence("when", "YYYY-MM-DD", "rule", 0.0, True, {"origin": "no date found"})
+            )
             return DateValue()
 
         folder_values = [r.value for f in ctx.folders for d in f.dates for r in d.readings]
         scored = []
-        for value, base, source, match in cands:
+        for value, base, source, match, origin in cands:
             context = (
                 self._date_context(value, folder_values, ctx, place, cc)
                 if source == "filename"
                 else 0.0
             )
             specificity = 0.1 * sum(x is not None for x in (value.year, value.month, value.day))
-            scored.append((base + context + specificity, value, source, match))
+            scored.append((base + context + specificity, value, source, match, origin))
         scored.sort(key=lambda s: s[0], reverse=True)
-        for score, value, source, _ in scored:
-            ev.append(Evidence("when", value.text(), source, round(score, 2)))
+        for score, value, source, match, origin in scored:
+            fmt = next((r.fmt for r in match.readings if r.value == value), None) if match else None
+            detail = {"origin": origin + (f" (read as {fmt})" if fmt and match.ambiguous else "")}
+            ev.append(Evidence("when", value.text(), source, round(score, 2), detail=detail))
 
-        best_score, best, source, match = scored[0]
+        best_score, best, source, match, _ = scored[0]
         rivals = [s for s in scored[1:] if s[1] != best and s[1].is_full and best.is_full]
         if rivals and best_score - rivals[0][0] < DATE_MARGIN:
             options = [best] + [r[1] for r in rivals if best_score - r[0] < DATE_MARGIN]
@@ -271,13 +294,15 @@ class Resolver:
                 + " or ".join(o.text() for o in options)
                 + ". Not resolved by folder, travel schedule or media table."
             )
-            self._select(ev, "when", common.text(), add_source="rule")
+            self._select(
+                ev, "when", common.text(), "rule", "only the date parts all readings agree on"
+            )
             return common
 
-        if source != "filename":
-            notes.append(
-                f"Date taken from the {source} name ('{match.raw if match else ctx.tag_year}')."
-            )
+        if source == "folder":
+            notes.append(f"Date taken from the folder name ('{match.raw}').")
+        elif source == "tag":
+            notes.append(f"Date taken from the {ctx.tag_origin or ctx.tag_date_origin}.")
         elif match and match.ambiguous:
             fmt = next(r.fmt for r in match.readings if r.value == best)
             notes.append(
@@ -326,20 +351,24 @@ class Resolver:
         place: Place | None = name.places[0] if name.places else None
         place_text = place.display if place else name.unknown_place
         source = "filename" if place_text else None
+        origin = f'"{place_text}" in the filename' if place_text else None
         if place_text is None and when is not None and when.is_full:
             same_day = ctx.sibling_places.get(when.text(), set())
             if len(same_day) == 1:
                 place = self.ref.find_place(next(iter(same_day)))
                 if place:
                     place_text, source = place.display, "siblings"
+                    origin = f"other files in this folder recorded on {when.text()}"
         if place_text is None:
-            folder_places = {p.name: p for f in ctx.folders for p in f.places}
+            folder_places = {p.name: (p, f.text) for f in ctx.folders for p in f.places}
             if len(folder_places) == 1:
-                place = next(iter(folder_places.values()))
+                place, folder_text = next(iter(folder_places.values()))
                 place_text, source = place.display, "folder"
+                origin = f'folder "{folder_text}"'
         if place_text is None and media_row and media_row.place:
             place = self.ref.find_place(media_row.place)
             place_text, source = (place.display if place else media_row.place), "media"
+            origin = f"Baserow media row {media_row.id}"
         if place_text is None and when is not None and when.is_full:
             named_cc = name.ccs[0][0] if name.ccs else None
             stays = {
@@ -351,6 +380,7 @@ class Resolver:
                 place = self.ref.find_place(stays.pop())
                 if place:
                     place_text, source = place.display, "travel"
+                    origin = f"travel schedule on {when.text()}"
         if first_pass:
             cc = name.ccs[0][0] if name.ccs else (place.cc if place else None)
             return place, place_text, cc
@@ -366,6 +396,7 @@ class Resolver:
                         source
                     ],
                     True,
+                    {"origin": origin},
                 )
             )
             if source == "travel":
@@ -386,9 +417,14 @@ class Resolver:
         explicit = [(cc, raw) for cc, raw in name.ccs]
         place_cc = place.cc if place else None
         for cc, raw in explicit:
-            ev.append(Evidence("where", cc, "filename", 0.9, detail={"raw": raw}))
+            ev.append(
+                Evidence(
+                    "where", cc, "filename", 0.9, detail={"origin": f'"{raw}" in the filename'}
+                )
+            )
         if place_cc:
-            ev.append(Evidence("where", place_cc, "place", 0.85))
+            origin = f"{place.name} is in {place.country} (Baserow places)"
+            ev.append(Evidence("where", place_cc, "place", 0.85, detail={"origin": origin}))
         if explicit:
             chosen, raw = explicit[0]
             visited = set(self.ref.country_options)
@@ -414,12 +450,14 @@ class Resolver:
             return chosen
         if place_cc:
             return place_cc
-        folder_ccs = {cc for f in ctx.folders for cc, _ in f.ccs} | {
-            p.cc for f in ctx.folders for p in f.places if p.cc
+        folder_ccs = {cc: f.text for f in ctx.folders for cc, _ in f.ccs} | {
+            p.cc: f.text for f in ctx.folders for p in f.places if p.cc
         }
         if len(folder_ccs) == 1:
-            ev.append(Evidence("where", next(iter(folder_ccs)), "folder", 0.6))
-            return next(iter(folder_ccs))
+            cc, folder_text = next(iter(folder_ccs.items()))
+            detail = {"origin": f'folder "{folder_text}"'}
+            ev.append(Evidence("where", cc, "folder", 0.6, detail=detail))
+            return cc
         if media_row and media_row.country:
             from mam.tools.renamer.countries import cc_for_name
 
@@ -427,7 +465,8 @@ class Resolver:
         if when is not None and when.is_full:
             ccs = {s.cc for s in self.ref.stays_on(when.as_date()) if s.cc}
             if len(ccs) == 1:
-                ev.append(Evidence("where", next(iter(ccs)), "travel", 0.5))
+                detail = {"origin": f"travel schedule on {when.text()}"}
+                ev.append(Evidence("where", next(iter(ccs)), "travel", 0.5, detail=detail))
                 notes.append("Country from the travel schedule; not proof.")
                 return ccs.pop()
         return None
@@ -440,12 +479,17 @@ class Resolver:
         return "-".join(parts) or None
 
     def _category(self, what, name, ctx, media_row, ev) -> str | None:
-        found = None
+        found = origin = None
         match = self.ref.matcher.match(what)
         if match:
             found, source = match.category.name, "filename"
+            origin = f'"{match.term}" in the WHAT (Baserow category terms)'
         elif name.categories:
-            found, source = name.categories[0], "filename"
+            found, source, origin = (
+                name.categories[0],
+                "filename",
+                "a category word in the filename",
+            )
         else:
             for folder in ctx.folders:
                 hint = folder.categories[0] if folder.categories else None
@@ -453,12 +497,13 @@ class Resolver:
                     folder_match = self.ref.matcher.match(folder.text)
                     hint = folder_match.category.name if folder_match else None
                 if hint:
-                    found, source = hint, "folder"
+                    found, source, origin = hint, "folder", f'folder "{folder.text}"'
                     break
         if found is None and media_row and media_row.category:
             found, source = media_row.category, "media"
+            origin = f"Baserow media row {media_row.id}"
         if found:
-            ev.append(Evidence("category", found, source, 0.8, True))
+            ev.append(Evidence("category", found, source, 0.8, True, {"origin": origin}))
         return found
 
     @staticmethod
@@ -509,7 +554,18 @@ class Resolver:
         best_score, best = ranked[0]
         if best_score >= 0.7 and (len(ranked) == 1 or ranked[1][0] < best_score):
             ev.append(
-                Evidence("baserow", f"row {best.id}: {best.title}", "media", best_score, True)
+                Evidence(
+                    "baserow",
+                    f"row {best.id}: {best.title}",
+                    "media",
+                    best_score,
+                    True,
+                    {
+                        "origin": "same date and verse"
+                        if best_score >= 1
+                        else "same date, category and place"
+                    },
+                )
             )
             notes.append(f"Matches Baserow media row {best.id} ('{best.title}').")
             return best
@@ -522,10 +578,15 @@ class Resolver:
 
     @staticmethod
     def _select(
-        ev: list[Evidence], field_name: str, value: str, add_source: str | None = None
+        ev: list[Evidence],
+        field_name: str,
+        value: str,
+        add_source: str | None = None,
+        origin: str | None = None,
     ) -> None:
         for e in ev:
             if e.field == field_name and e.value == value:
                 e.selected = True
                 return
-        ev.append(Evidence(field_name, value, add_source or "rule", 0.0, True))
+        detail = {"origin": origin} if origin else None
+        ev.append(Evidence(field_name, value, add_source or "rule", 0.0, True, detail))

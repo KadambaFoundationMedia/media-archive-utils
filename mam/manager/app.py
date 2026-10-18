@@ -51,9 +51,69 @@ def status_color(status: str) -> str:
     return "secondary"
 
 
-templates.env.globals.update(status_color=status_color, tools=TOOLS)
+SOURCE_LABELS = {
+    "filename": "Filename",
+    "folder": "Folder name",
+    "tag": "Embedded tags (ID3)",
+    "siblings": "Other files in the folder",
+    "media": "Baserow media table",
+    "travel": "Travel schedule",
+    "place": "Known place (Baserow)",
+    "rule": "Naming rule",
+}
+FIELD_LABELS = {"when": "WHEN", "what": "WHAT", "where": "WHERE", "who": "WHO"}
+
+# Shown on the status badges and in the status guide on the file list.
+STATUS_HELP = {
+    "Not processed": "Imported, but no tool has changed it yet. A dry run does not change the "
+    "status; its proposed name is shown with a 'dry run' label.",
+    "Queued": "Waiting in the job queue for a tool.",
+    "Processing": "A tool is working on it now.",
+    "Done": "The tool finished; the file waits for the next tool in the pipeline.",
+    "Review": "The tool needs your decision. Open it from the Review page.",
+    "Failed": "The tool hit an error (see Jobs). Fix the cause and retry.",
+    "Corrupted": "The file cannot be read or decoded.",
+    "Excluded": "A reviewer stopped all processing of this file.",
+    "Skipped": "The step does not apply to this file.",
+    "Processing complete": "Every tool in the pipeline has finished.",
+}
+
+
+def status_help(status: str) -> str:
+    if status in STATUS_HELP:
+        return STATUS_HELP[status]
+    for key in ("Queued", "Processing", "Done", "Review", "Failed"):
+        if key in status.split():
+            return STATUS_HELP[key]
+    return ""
+
+
+templates.env.globals.update(
+    status_color=status_color,
+    status_help=status_help,
+    status_guide=STATUS_HELP,
+    tools=TOOLS,
+    source_labels=SOURCE_LABELS,
+    field_labels=FIELD_LABELS,
+)
 templates.env.filters["basename"] = lambda p: Path(p).name if p else ""
 templates.env.filters["dirname"] = lambda p: str(Path(p).parent) if p else ""
+
+
+def rel_folder(path: str | None) -> str:
+    """Folder of a file relative to its import root: 'Sample files / 2012 / Radhadesh Jan 2012'."""
+    if not path:
+        return ""
+    folder = Path(path).parent
+    for label, root in get_settings().import_roots:
+        root = root.resolve()
+        if folder == root or root in folder.parents:
+            parts = folder.relative_to(root).parts
+            return " / ".join([label, *parts])
+    return str(folder)
+
+
+templates.env.filters["rel_folder"] = rel_folder
 
 
 def create_app(start_queue: bool = True) -> FastAPI:
@@ -133,7 +193,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
             raise HTTPException(400, f"Unknown tool {tool}")
         with session_scope() as session:
             if form.get("scope") == "all":
-                ids = queries.matching_ids(session, queries.FileFilter.from_params(form))
+                # An action without a status filter applies to all files.
+                flt = queries.FileFilter.from_params(form, default_status="__all")
+                ids = queries.matching_ids(session, flt)
             else:
                 ids = [int(i) for i in form.getlist("ids")]
             queued = enqueue(session, tool, ids, dry_run=dry_run, pipeline=pipeline)

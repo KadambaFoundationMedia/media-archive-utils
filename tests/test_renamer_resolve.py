@@ -128,3 +128,31 @@ def test_original_name_is_unchanged(propose, tree):
     path = tree / "UNCATEGORIZED/HH KKS BG 7.17 2008-04-12.mp3"
     propose("UNCATEGORIZED/HH KKS BG 7.17 2008-04-12.mp3")
     assert path.exists() and Path(path).name == "HH KKS BG 7.17 2008-04-12.mp3"
+
+
+def test_tag_evidence_names_the_id3_tag(reference, settings):
+    from tests.conftest import make_tone
+
+    path = settings.media_sample_files_path / "tagged" / "HH KKS BG 2.54.mp3"
+    make_tone(
+        path,
+        seconds=1,
+        codec_args=["-c:a", "libmp3lame", "-metadata", "title=HH KKS BG2.54 11.07.2008"],
+    )
+    p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
+    origins = [e.detail["origin"] for e in p.evidence if e.field == "when" and e.detail]
+    assert any('ID3 tags: title "HH KKS BG2.54 11.07.2008"' in o for o in origins)
+    assert any("ID3 tags" in n for n in p.notes) or p.flags  # ambiguous here, so flagged
+
+
+@pytest.mark.parametrize(
+    ("name", "title"),
+    [
+        ("UNCATEGORIZED/HH KKS BG 7.17 2008-04-12.mp3", "BG 7.17"),
+        ("From JVD (8.9.11)/KKS-Adi-4-142-05-9-11_Berlin.WMA", "CC Adi 4.142"),
+        ("KKS DUBEN 2008 MP3/06 KKS SB 3.1.25.mp3", "SB 3.1.25"),
+    ],
+)
+def test_titles_write_verses_with_dots(propose, name, title):
+    """Verse numbers: hyphens in filenames, dots in titles (docs/references/verse-structure.md)."""
+    assert propose(name).title == title

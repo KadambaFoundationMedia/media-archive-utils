@@ -1,0 +1,20 @@
+<div class="card mb-3">
+  <div class="card-header d-flex align-items-center">
+    <span class="me-auto">Evidence</span>
+    <span class="small text-body-secondary" title="How strongly each piece of evidence counts (0 to 1). Bold rows were used for the name.">score 0–1, <strong>bold</strong> = used</span>
+  </div>
+  <div class="table-responsive"><table class="table table-sm mb-0 small align-top evidence-table">
+    <thead><tr><th>Field</th><th>Value</th><th>Found in</th><th class="text-end">Score</th></tr></thead>
+    <tbody>{% for e in evidence %}
+      <tr class="{% if e.selected %}fw-semibold{% endif %}">
+        <td>{{ field_labels.get(e.field, e.field) }}</td>
+        <td class="text-break">{{ e.value }}</td>
+        <td class="text-break">
+          <span title="{{ e.source }}">{{ source_labels.get(e.source, e.source) }}</span>
+          {% if e.detail and e.detail.origin %}<div class="fw-normal text-body-secondary">{{ e.detail.origin }}</div>{% endif %}
+        </td>
+        <td class="text-end">{{ '%.2f' % e.score }}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div>
+</div>

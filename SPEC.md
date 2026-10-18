@@ -174,13 +174,16 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 ## 8. Media manager UI
 - **General:** Bootstrap with Font Awesome, a dark/light switch, and a mobile-friendly layout.
 - **File list:**
+  - Opens on **Needs attention** (files waiting for a review, failed or corrupted); *All files*, *Needs review*, *Failed* and each single status (with counts) are one choice away. A short guide on the page explains every status.
+  - Sorted by path, files are grouped under a header row per folder (shown relative to its import root, e.g. `Sample files / 2012 / Radhadesh Jan 2012`) with alternating row colors.
+  - An action without a status filter applies to all files.
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all at once.
   - The action menu lists each tool plus "Run full pipeline", with a dry-run toggle.
   - Statuses update live through HTMX.
 - **Review detail page:**
   - Edit each W (the date allows placeholders), with a live filename preview validated against the convention.
-  - See the evidence for each field and pick from conflicting candidates.
+  - See the evidence for each field and pick from conflicting candidates. Each item says where it was found: the filename, a folder name, the embedded ID3 tags (with the tag text), other files in the folder, the Baserow media table, the travel schedule or a naming rule.
   - Link the file to an existing Baserow row (dedupe) or create a new row, and edit its Baserow fields.
   - Buttons: Edit/Save, Approve, **Reject result** (discards the output, reverts through the history and re-queues with a note), **Exclude file** (stops all processing).
 - **Waveform editor** (for splitter and trimmer reviews):

@@ -84,18 +84,7 @@
   </div>
 
   <div class="col-12 col-lg-6">
-    {% if evidence %}
-    <div class="card mb-3">
-      <div class="card-header">Evidence</div>
-      <div class="table-responsive"><table class="table table-sm mb-0 small">
-        <thead><tr><th>Field</th><th>Value</th><th>Source</th><th>Score</th></tr></thead>
-        <tbody>{% for e in evidence %}
-        <tr class="{% if e.selected %}fw-semibold{% endif %}">
-          <td>{{ e.field }}</td><td class="text-break">{{ e.value }}</td><td>{{ e.source }}</td><td>{{ '%.2f' % e.score }}</td>
-        </tr>{% endfor %}</tbody>
-      </table></div>
-    </div>
-    {% endif %}
+    {% if evidence %}{% include "_evidence.html" %}{% endif %}
 
     {% if children %}
     <div class="card mb-3"><div class="card-header">Derived files</div>

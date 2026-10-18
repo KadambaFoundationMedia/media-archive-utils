@@ -51,6 +51,7 @@ Add a new row. Use the following defaults for the columns listed below
   - If there is a title in the filename, use that
   - If there is a title in the parent folder name, use that
   - If no title is available, use the filename
+  - Verse numbers in a title use dots, not hyphens: `BG 2.54`, `CC Madhya 20.154` (see docs/references/verse-structure.md)
 - date : Set the recording date in the format YYYY-MM-DD
 - category (single select): The media category of the recording. The media category is determined by the Renamer Tool or by consecutive tools.
 - tag: When a verse is mentioned in the filename add it in this field
