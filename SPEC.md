@@ -180,12 +180,17 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - An action without a status filter applies to all files.
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all at once.
-  - The action menu lists each tool plus "Run full pipeline", with a dry-run toggle.
-  - Statuses update live through HTMX.
+  - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run for real**.
+  - The list refreshes itself while any job is queued or running.
+- **File page:**
+  - The run buttons are at the top, with a "Last run" line showing the latest job's result and an "Open the review" button when a review is waiting.
+  - While a job for the file is queued or running, the page shows it and reloads itself when the job finishes.
+  - Times are shown in the computer's own time zone.
 - **Review detail page:**
   - Edit each W (the date allows placeholders), with a live filename preview validated against the convention.
   - See the evidence for each field and pick from conflicting candidates. Each item says where it was found: the filename, a folder name, the embedded ID3 tags (with the tag text), other files in the folder, the Baserow media table, the travel schedule or a naming rule.
   - Link the file to an existing Baserow row (dedupe) or create a new row, and edit its Baserow fields.
+  - When Baserow is in dry-run mode the page says so, and after approving the message says the Baserow row was logged but not written.
   - Buttons: Edit/Save, Approve, **Reject result** (discards the output, reverts through the history and re-queues with a note), **Exclude file** (stops all processing).
 - **Waveform editor** (for splitter and trimmer reviews):
   - Colored, labeled, draggable regions, each with a KEEP/TRIM toggle. Colors come from Baserow `category_terms_folder.color`.

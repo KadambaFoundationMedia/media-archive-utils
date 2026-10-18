@@ -89,6 +89,11 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
         action = form.get("action")
         operator = get_settings().operator_name
         note = (form.get("note") or "").strip() or None
+        messages = {
+            "reject": "Result rejected: the copy was removed and the file is Not processed",
+            "exclude": "File excluded from further processing",
+        }
+        result_msg = messages.get(action, "")
         try:
             with session_scope() as session:
                 review = session.get(m.Review, review_id)
@@ -96,6 +101,17 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                     raise HTTPException(409, "This review is already decided")
                 if action == "approve":
                     record = renamer.approve_review(session, review, dict(form), operator)
+                    baserow = (record.meta or {}).get("proposal", {}).get("baserow", {})
+                    if baserow.get("dry_run"):
+                        result_msg = (
+                            "Approved. Baserow is in dry-run mode, so the "
+                            f"{'new row' if baserow.get('action') == 'create' else 'row update'} "
+                            "was logged on the file page but not written"
+                        )
+                    else:
+                        result_msg = (
+                            f"Approved and written to Baserow (row {baserow.get('row_id')})"
+                        )
                     if session.scalar(
                         select(m.Job.id).where(
                             m.Job.media_file_id == record.id,
@@ -114,7 +130,7 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
             return RedirectResponse(f"/review/{review_id}?error={exc}", status_code=303)
         notify(request)
         target = form.get("next") or "/reviews"
-        return RedirectResponse(f"{target}?msg=Review {action}d", status_code=303)
+        return RedirectResponse(f"{target}?msg={result_msg}", status_code=303)
 
     @app.post("/review/{review_id}/add-place")
     async def add_place(request: Request, review_id: int):
