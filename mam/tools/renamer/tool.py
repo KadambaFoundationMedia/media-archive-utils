@@ -191,6 +191,17 @@ def latest_approval(session: Session, file_id: int) -> m.Review | None:
     return review if review is not None and review.outcome in ("approved", "edited") else None
 
 
+def baserow_summary(baserow: dict | None, flagged: bool = False) -> str:
+    """One line for the job result: what happened in Baserow."""
+    if flagged or not baserow:
+        return "Baserow: written when you approve the review"
+    what = "new row" if baserow.get("action") == "create" else "row update"
+    if baserow.get("dry_run"):
+        return f"Baserow: {what} logged only (BASEROW_APPLY=false)"
+    row = baserow.get("row_id")
+    return f"Baserow: {what} written (row {row})" if row else f"Baserow: {what} written"
+
+
 # ------------------------------------------------------------------- the job
 def run_renamer(ctx: JobContext) -> ToolOutcome:
     record = ctx.media_file
@@ -269,6 +280,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         summary += f" — {len(proposal.flags)} item(s) to review"
     if ctx.dry_run:
         return ToolOutcome("info", summary, {"new_name": placed.dst.name, "flags": proposal.flags})
+    summary += " — " + baserow_summary(data.get("baserow"), flagged=bool(proposal.flags))
 
     _store_evidence(ctx.session, record, proposal)
     _apply_display(record, data, placed.dst)

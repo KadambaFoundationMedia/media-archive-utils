@@ -311,7 +311,7 @@ def test_dry_run_explains_that_no_review_is_opened(client, archive, reference, n
     run_queue()
     assert "would need a review" in client.get("/jobs").text
     page = client.get(f"/files/{file_id}").text
-    assert "no review was opened" in page and "Run Renamer (not a dry run)" in page
+    assert "no review was opened" in page and "Run the Renamer" in page
     with session_scope() as s:
         assert not s.scalars(select(m.Review)).all()
 
@@ -356,7 +356,7 @@ def test_file_page_updates_itself_and_shows_the_last_result(client, archive, ref
     run_queue()
     with session_scope() as s:
         file_id = ids(s)["R09_0004.MP3"]
-    # "Run for real" button on the file page
+    # "Run" button on the file page
     client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
     page = client.get(f"/files/{file_id}").text
     assert f'hx-get="/files/{file_id}/activity"' in page and "waiting in the queue" in page
@@ -421,3 +421,22 @@ def test_approve_writes_baserow_live_even_in_dry_run_mode(
         log = s.scalars(select(m.BaserowWriteLog)).one()
         assert not log.dry_run and log.row_id == 999 and log.payload["date"] == "2012-07-11"
         assert s.get(m.MediaFile, file_id).baserow_row_id == 999
+
+
+def test_run_result_says_what_happened_in_baserow(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    client.post("/actions", data={"tool": "renamer", "scope": "all", "mode": "run"})
+    run_queue()
+    with session_scope() as s:
+        by_name = ids(s)
+        summaries = {
+            j.media_file_id: j.result["summary"]
+            for j in s.scalars(select(m.Job).where(m.Job.tool == "renamer"))
+        }
+    clean = summaries[by_name["KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"]]
+    flagged = summaries[by_name["R09_0004.MP3"]]
+    assert clean.endswith("Baserow: new row logged only (BASEROW_APPLY=false)")
+    assert flagged.endswith("Baserow: written when you approve the review")
+    page = client.get("/").text
+    assert ">Run</button>" in page and "Run for real" not in page

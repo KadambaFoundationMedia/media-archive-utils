@@ -35,7 +35,7 @@
           {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
         </select>
         <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows what would happen. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
-        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run for real</button>
+        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written only when BASEROW_APPLY=true or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
       </div>
 </form>
 <div class="row g-3">
@@ -79,7 +79,7 @@
             <input type="hidden" name="ids" value="{{ f.id }}">
             <input type="hidden" name="tool" value="renamer">
             <input type="hidden" name="back" value="/files/{{ f.id }}">
-            <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run Renamer (not a dry run)</button>
+            <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run the Renamer</button>
           </form>
         </div>
         {% endif %}

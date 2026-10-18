@@ -148,7 +148,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Baserow writes are dry-run by default and are sent only with an explicit `--apply` or the manager's apply action.
   - Every write is logged in the local DB with before and after values, so it can be undone.
 - **When tools write:** the Renamer writes a file's row when its name is final: right away for an unflagged file, and after approval for a flagged one.
-- **Live or dry-run:** bulk runs (Run for real, the pipeline) follow `BASEROW_APPLY`. **Approving a review always writes live**, because it is an explicit human decision; the review page says so.
+- **Live or dry-run:** runs (**Run**, the pipeline) follow `BASEROW_APPLY`. **Approving a review always writes live**, because it is an explicit human decision; the review page says so.
 - **Matching an existing row:** the date alone never decides. Among the rows on the same date, a row matches only when it also agrees on the verse `tag` and/or the `title` (shared title words, ignoring stop words, places and countries), with `place_location`/`country` and category as further evidence. A different verse, place or country counts against the row; an online place (`Zoom-livestream`) is neutral, because a livestream happens somewhere. When several rows fit, the file is flagged so the reviewer picks the row; otherwise a new row is created.
 - **Formats:**
   - `audio_file_location` / `video_file_location`: the path below the processed-files root, e.g. `/Srimad-bhagavatam/2011-08-28_KKS_SB-1-19-30_Oslo-no.wma`
@@ -181,7 +181,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - An action without a status filter applies to all files.
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all at once.
-  - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run for real**.
+  - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
   - The list refreshes itself while any job is queued or running.
 - **File page:**
   - The run buttons are at the top, with a "Last run" line showing the latest job's result and an "Open the review" button when a review is waiting.

@@ -73,7 +73,7 @@
       <option value="all">All {{ total }} matching files</option>
     </select>
     <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
-    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens reviews when needed. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run for real</button>
+    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written only when BASEROW_APPLY=true or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
     <span class="small text-body-secondary ms-auto">{{ total }} files</span>
   </div>
   <div id="file-table">
