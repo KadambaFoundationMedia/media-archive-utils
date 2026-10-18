@@ -154,13 +154,10 @@ def category_style(name: str | None) -> str:
     if not name:
         return ""
     from mam.manager.colors import badge_style
+    from mam.tools.renamer.knowledge import reference_if_ready
 
-    try:
-        from mam.tools.renamer.knowledge import get_reference
-
-        category = get_reference().matcher.by_name(name)
-    except Exception:  # Baserow unreachable and no cache yet: plain pill
-        return ""
+    ref = reference_if_ready()  # never wait for Baserow just for a color
+    category = ref.matcher.by_name(name) if ref else None
     return badge_style(category.color) if category else ""
 
 
@@ -174,6 +171,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
     async def lifespan(app: FastAPI):
         settings.ensure_dirs()
         migrate()
+        from mam.tools.renamer.knowledge import preload_reference
+
+        preload_reference()  # so the first page with files does not wait for Baserow
         queue = JobQueue(settings)
         app.state.queue = queue
         if start_queue:

@@ -26,3 +26,6 @@
 .file-table a.file-link:hover { text-decoration: underline; color: var(--bs-link-hover-color); }
 .cat-pill { font-weight: 500; font-size: .8rem; white-space: normal; text-align: left; border: 1px solid transparent; }
 .clear-filter:disabled { opacity: .35; }
+
+/* While the list reloads: dim it (htmx adds .htmx-request to the filter form). */
+#filters.htmx-request ~ #actions #file-table { opacity: .45; transition: opacity .15s; }

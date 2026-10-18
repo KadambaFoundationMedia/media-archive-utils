@@ -241,24 +241,85 @@ def learned_place_aliases() -> dict[str, str]:
         return {r.token: r.replacement for r in rules}
 
 
-def get_reference(refresh: bool = False) -> Reference:
-    """Cached reference data; refreshed from Baserow every 10 minutes."""
+def _fetch_and_store() -> Reference:
+    """Fetch from Baserow (no lock held while waiting on the network) and update both caches."""
     global _cached
+    raw = fetch_raw()
+    cache = _cache_file()
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    ref = build_reference(raw, learned_place_aliases())
     with _lock:
-        if _cached and not refresh and time.time() - _cached.loaded_at < CACHE_TTL_S:
-            return _cached
-        cache = _cache_file()
+        _cached = ref
+    return ref
+
+
+def _from_disk() -> Reference | None:
+    """The last Baserow data saved on disk (category colors, places, ...), instantly."""
+    global _cached
+    cache = _cache_file()
+    if not cache.exists():
+        return None
+    try:
+        ref = build_reference(
+            json.loads(cache.read_text(encoding="utf-8")), learned_place_aliases()
+        )
+    except Exception:
+        log.warning("Ignoring an unreadable reference cache %s", cache, exc_info=True)
+        return None
+    ref.loaded_at = cache.stat().st_mtime  # its real age decides when to refresh
+    with _lock:
+        if _cached is None:
+            _cached = ref
+    return _cached
+
+
+def get_reference(refresh: bool = False) -> Reference:
+    """Reference data from memory, else from the disk cache, else from Baserow.
+
+    Data older than 10 minutes is still returned at once while a background refresh runs,
+    so pages and jobs never wait for Baserow. `refresh=True` fetches now (e.g. after adding
+    a place to the travel schedule).
+    """
+    if refresh:
         try:
-            raw = fetch_raw()
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            cache.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+            return _fetch_and_store()
         except Exception as exc:
-            if not cache.exists():
-                raise
             log.warning("Baserow unreachable (%s); using cached reference data", exc)
-            raw = json.loads(cache.read_text(encoding="utf-8"))
-        _cached = build_reference(raw, learned_place_aliases())
-        return _cached
+    ref = _cached or _from_disk()
+    if ref is None:  # first run ever: nothing cached yet
+        return _fetch_and_store()
+    if time.time() - ref.loaded_at >= CACHE_TTL_S:
+        preload_reference()
+    return ref
+
+
+def reference_if_ready() -> Reference | None:
+    """Cached reference data (memory or disk) without ever waiting for Baserow."""
+    ref = _cached or _from_disk()
+    if ref is None or time.time() - ref.loaded_at >= CACHE_TTL_S:
+        preload_reference()
+    return ref
+
+
+_preloading = threading.Event()
+
+
+def preload_reference() -> None:
+    """Refresh the reference data from Baserow in the background."""
+    if _preloading.is_set():
+        return
+    _preloading.set()
+
+    def load() -> None:
+        try:
+            _fetch_and_store()
+        except Exception:
+            log.warning("Could not refresh Baserow reference data in the background", exc_info=True)
+        finally:
+            _preloading.clear()
+
+    threading.Thread(target=load, name="mam-reference", daemon=True).start()
 
 
 def reset_cache() -> None:

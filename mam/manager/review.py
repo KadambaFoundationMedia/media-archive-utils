@@ -130,7 +130,7 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
     async def add_place(request: Request, review_id: int):
         """One-click add of a new place to the travel schedule (respects Baserow dry-run)."""
         from mam.helpers.baserow import BaserowClient
-        from mam.tools.renamer.knowledge import reset_cache
+        from mam.tools.renamer.knowledge import get_reference, reset_cache
 
         form = await request.form()
         place = (form.get("place") or "").strip()
@@ -147,7 +147,10 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
         }
         with BaserowClient() as client:
             result = client.create_row(client.travel_table, row, tool="renamer-review")
-        reset_cache()
+        try:
+            get_reference(refresh=True)  # the new place is known at once
+        except Exception:
+            reset_cache()
         msg = (
             f"Would add {place} to the travel schedule (Baserow dry-run)"
             if result.dry_run
