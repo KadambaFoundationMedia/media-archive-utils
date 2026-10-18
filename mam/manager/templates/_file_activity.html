@@ -1,0 +1,8 @@
+<div id="activity" class="alert alert-info d-flex align-items-center gap-2 py-2"
+     hx-get="/files/{{ f_id }}/activity" hx-trigger="every 2s" hx-swap="outerHTML">
+  <i class="fa-solid fa-spinner fa-spin"></i>
+  {% for j in running %}
+    <span>{{ tools[j.tool].label if j.tool in tools else j.tool }}{% if j.dry_run %} (preview){% endif %} is {{ 'running' if j.state == 'running' else 'waiting in the queue' }}…</span>
+  {% endfor %}
+  <span class="small text-body-secondary ms-auto">This page updates by itself.</span>
+</div>

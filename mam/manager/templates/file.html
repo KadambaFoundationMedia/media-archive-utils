@@ -13,6 +13,31 @@
   {% endfor %}
 </div>
 
+{% set running = jobs | selectattr('state', 'in', ['queued', 'running']) | list %}
+{% if running %}{% with f_id=f.id %}{% include "_file_activity.html" %}{% endwith %}
+{% elif jobs %}{% set last = jobs[0] %}{% set pending = reviews | selectattr('outcome', 'equalto', 'pending') | list %}
+<div class="alert {{ 'alert-danger' if last.state == 'failed' else 'alert-warning' if pending else 'alert-secondary' }} d-flex flex-wrap align-items-center gap-2 py-2">
+  <div class="me-auto">
+    <strong>Last run:</strong> {{ tools[last.tool].label if last.tool in tools else last.tool }}{% if last.dry_run %} (preview, nothing changed){% endif %},
+    {{ (last.finished_at | localtime('%H:%M:%S')) if last.finished_at else '' }} —
+    {% if last.result %}{{ last.result.summary }}{% elif last.error %}{{ last.error.split('\n')[0] }}{% endif %}
+  </div>
+  {% for r in pending %}<a class="btn btn-sm btn-warning" href="/review/{{ r.id }}"><i class="fa-solid fa-flag me-1"></i>Open the review</a>{% endfor %}
+</div>
+{% endif %}
+
+<form method="post" action="/actions" class="card mb-3 run-card">
+      <div class="card-header">Run a tool on this file</div>
+      <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+        <input type="hidden" name="ids" value="{{ f.id }}">
+        <input type="hidden" name="back" value="/files/{{ f.id }}">
+        <select class="form-select form-select-sm w-auto" name="tool" aria-label="Tool" required>
+          {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows what would happen. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
+        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run for real</button>
+      </div>
+</form>
 <div class="row g-3">
   <div class="col-12 col-lg-6">
     <div class="card mb-3">
@@ -78,21 +103,6 @@
       </div>
     </div>
 
-    <form method="post" action="/actions" class="card mb-3">
-      <div class="card-header">Run a tool on this file</div>
-      <div class="card-body d-flex flex-wrap gap-2 align-items-center">
-        <input type="hidden" name="ids" value="{{ f.id }}">
-        <input type="hidden" name="back" value="/files/{{ f.id }}">
-        <select class="form-select form-select-sm w-auto" name="tool" aria-label="Tool" required>
-          {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
-        </select>
-        <div class="form-check form-switch mb-0">
-          <input class="form-check-input" type="checkbox" role="switch" id="dry_run_one" name="dry_run" checked>
-          <label class="form-check-label small" for="dry_run_one">Dry run</label>
-        </div>
-        <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run</button>
-      </div>
-    </form>
   </div>
 
   <div class="col-12 col-lg-6">
@@ -110,7 +120,7 @@
           <strong>{{ tools[j.tool].label if j.tool in tools else j.tool }}</strong>
           {% if j.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}
           <span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'info' }}">{{ j.state }}</span>
-          <span class="text-body-secondary">{{ j.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          <span class="text-body-secondary">{{ (j.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
           {% if j.result %}<div>{{ j.result.summary }}</div>{% endif %}
           {% if j.error %}<pre class="small text-danger mb-0 text-wrap">{{ j.error.split('\n')[0] }}</pre>{% endif %}
         </li>{% else %}<li class="list-group-item text-body-secondary">No jobs yet</li>{% endfor %}</ul>
@@ -120,18 +130,18 @@
       <ul class="list-group list-group-flush small">
         {% for e in events %}
         <li class="list-group-item text-break">
-          <span class="text-body-secondary">{{ e.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          <span class="text-body-secondary">{{ (e.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
           {{ e.tool }}: {{ e.action }}{% if e.dry_run %} (dry run){% endif %}
           {% if e.dst %}→ {{ e.dst }}{% endif %}
         </li>{% endfor %}
         {% for h in history %}
         <li class="list-group-item">
-          <span class="text-body-secondary">{{ h.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          <span class="text-body-secondary">{{ (h.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
           {{ h.old_status }} → {{ h.new_status }}{% if h.note %} <span class="text-body-secondary">({{ h.note }})</span>{% endif %}
         </li>{% endfor %}
         {% for w in baserow_writes %}
         <li class="list-group-item text-break">
-          <span class="text-body-secondary">{{ w.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+          <span class="text-body-secondary">{{ (w.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
           Baserow {{ w.action }}{% if w.dry_run %} (dry run){% endif %}{% if w.row_id %} row {{ w.row_id }}{% endif %}:
           <span class="font-monospace">{{ w.payload | tojson }}</span>
         </li>{% endfor %}

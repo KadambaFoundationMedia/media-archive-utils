@@ -25,8 +25,8 @@ uv run mam serve          # http://127.0.0.1:8000
 ```
 
 1. **Import**: browse to a folder (sample files, trimming samples, inbox or the NAS) and import it. Files are only indexed; originals are never changed.
-2. **Files**: filter and select files, pick an action (Renamer, Verify, Measure loudness, Run full pipeline) and run it. Leave **Dry run** on to see the proposed names first.
-3. **Review**: files the Renamer could not settle on its own wait here. Edit the date, WHAT and place with a live filename preview, then approve, reject the result or exclude the file.
+2. **Files**: filter and select files, pick an action (Renamer, Verify, Measure loudness, Run full pipeline), then **Preview (dry run)** to see the proposed names, or **Run for real** to copy and rename into processed-files and open reviews. The list and the file page update by themselves while jobs run.
+3. **Review**: files the Renamer could not settle on its own wait here (a preview never opens a review). Edit the date, WHAT and place with a live filename preview, then approve, reject the result or exclude the file.
 4. **Jobs**: the queue, with errors and a retry button.
 
 ## Useful commands

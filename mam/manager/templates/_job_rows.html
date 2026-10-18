@@ -19,7 +19,7 @@
         {% if j.result %}{{ j.result.summary }}{% endif %}
         {% if j.error %}<details><summary class="text-danger">{{ j.error.split('\n')[0][:160] }}</summary><pre class="small text-wrap">{{ j.error }}</pre></details>{% endif %}
       </td>
-      <td class="text-nowrap">{{ j.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+      <td class="text-nowrap">{{ (j.created_at | localtime('%m-%d %H:%M:%S')) }}</td>
       <td>{% if j.state in ('failed', 'done', 'cancelled') %}
         <form method="post" action="/jobs/{{ j.id }}/retry"><button class="btn btn-sm btn-outline-secondary" type="submit" title="Run again"><i class="fa-solid fa-rotate-right"></i></button></form>
       {% endif %}</td>

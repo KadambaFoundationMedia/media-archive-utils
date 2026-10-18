@@ -6,6 +6,7 @@ import logging
 import re
 import shutil
 from contextlib import asynccontextmanager
+from datetime import UTC
 from pathlib import Path
 from typing import Annotated
 
@@ -116,6 +117,18 @@ def rel_folder(path: str | None) -> str:
 templates.env.filters["rel_folder"] = rel_folder
 
 
+def localtime(value, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    """Show a stored UTC time in the computer's own time zone."""
+    if value is None:
+        return ""
+    if value.tzinfo is None:  # SQLite returns naive datetimes; they are UTC
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone().strftime(fmt)
+
+
+templates.env.filters["localtime"] = localtime
+
+
 def create_app(start_queue: bool = True) -> FastAPI:
     settings = get_settings()
 
@@ -135,12 +148,11 @@ def create_app(start_queue: bool = True) -> FastAPI:
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 
     def render(request: Request, name: str, **context) -> HTMLResponse:
-        if "rows" in context and "active" not in context:
-            context["active"] = any(
-                r.status.startswith(("Queued ", "Processing ")) for r in context["rows"]
-            )
         with session_scope() as session:
             context.setdefault("counts", queries.counts(session))
+        if "rows" in context and "active" not in context:
+            # Keep refreshing the list while any job (also a dry run) is queued or running.
+            context["active"] = context["counts"]["jobs"] > 0
         context["settings"] = settings
         return templates.TemplateResponse(request, name, context)
 
@@ -185,7 +197,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
     async def run_action(request: Request):
         form = await request.form()
         tool = form.get("tool", "")
-        dry_run = form.get("dry_run") == "on"
+        # Two buttons: "Preview (dry run)" sends mode=preview, "Run for real" sends mode=run.
+        dry_run = form.get("dry_run") == "on" or form.get("mode") == "preview"
         pipeline = tool == "__pipeline"
         if pipeline:
             tool = pipeline_start()
@@ -250,6 +263,19 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 ).all(),
             }
         return render(request, "file.html", menu=menu_tools(), **context)
+
+    @app.get("/files/{file_id}/activity", response_class=HTMLResponse)
+    def file_activity(request: Request, file_id: int):
+        """Polled by the file page while a job runs; reloads the page when it is done."""
+        with session_scope() as session:
+            running = session.scalars(
+                select(m.Job)
+                .where(m.Job.media_file_id == file_id, m.Job.state.in_(("queued", "running")))
+                .order_by(m.Job.id)
+            ).all()
+        if not running:
+            return HTMLResponse("", headers={"HX-Redirect": f"/files/{file_id}"})
+        return render(request, "_file_activity.html", f_id=file_id, running=running)
 
     @app.get("/files/{file_id}/audio")
     def file_audio(file_id: int, which: str = "original"):

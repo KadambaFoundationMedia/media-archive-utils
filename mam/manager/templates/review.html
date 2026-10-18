@@ -74,6 +74,9 @@
         {% if next_id %}<input type="hidden" name="next" value="/review/{{ next_id }}">{% endif %}
       </div>
       {% if review.outcome == 'pending' %}
+      {% if not settings.baserow_apply %}
+      <div class="small text-body-secondary px-3 pb-2"><i class="fa-solid fa-database me-1"></i>Baserow is in dry-run mode: approving logs the Baserow row on the file page but does not write it. Set <code>BASEROW_APPLY=true</code> in <code>.env</code> to write for real.</div>
+      {% endif %}
       <div class="card-footer d-flex flex-wrap gap-2">
         <button class="btn btn-success btn-sm" name="action" value="approve" type="submit"><i class="fa-solid fa-check me-1"></i>Approve</button>
         <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>

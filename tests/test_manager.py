@@ -348,3 +348,62 @@ def test_renamer_never_overwrites_an_approved_review(
                 select(m.Job.result).where(m.Job.media_file_id == file_id).order_by(m.Job.id.desc())
             ).first()["summary"]
         )
+
+
+def test_file_page_updates_itself_and_shows_the_last_result(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    # "Run for real" button on the file page
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
+    page = client.get(f"/files/{file_id}").text
+    assert f'hx-get="/files/{file_id}/activity"' in page and "waiting in the queue" in page
+    assert "waiting in the queue" in client.get(f"/files/{file_id}/activity").text
+    run_queue()
+    done = client.get(f"/files/{file_id}/activity")
+    assert done.headers.get("HX-Redirect") == f"/files/{file_id}"  # the page reloads by itself
+    page = client.get(f"/files/{file_id}").text
+    assert "Last run:" in page and "Open the review" in page
+
+
+def test_preview_button_is_a_dry_run(client, archive, reference, no_baserow, settings):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    client.post("/actions", data={"tool": "renamer", "scope": "all", "mode": "preview"})
+    run_queue()
+    assert not any(settings.media_processed_files_path.rglob("*.mp3"))
+    with session_scope() as s:
+        assert all(j.dry_run for j in s.scalars(select(m.Job).where(m.Job.tool == "renamer")))
+
+
+def test_approve_says_baserow_is_in_dry_run(client, archive, reference, settings, monkeypatch):
+    from mam.helpers.baserow.client import BaserowClient, Field
+
+    class AnyColumn(dict):  # every column exists and is plain text: no Baserow needed
+        def get(self, name, default=None):
+            return Field(name, "text", {})
+
+    monkeypatch.setattr(BaserowClient, "fields", lambda self, table_id, refresh=False: AnyColumn())
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
+    run_queue()
+    with session_scope() as s:
+        review_id = s.scalars(select(m.Review.id)).one()
+    assert "Baserow is in dry-run mode" in client.get(f"/review/{review_id}").text
+    response = client.post(
+        f"/review/{review_id}/decide",
+        data={"action": "approve", "when": "2012-07-11", "what": "Kirtan", "cc": "rs"},
+        follow_redirects=False,
+    )
+    from urllib.parse import unquote
+
+    assert "logged on the file page but not written" in unquote(response.headers["location"])
+    with session_scope() as s:
+        log = s.scalars(
+            select(m.BaserowWriteLog).where(m.BaserowWriteLog.media_file_id == file_id)
+        ).one()
+        assert log.dry_run and log.action == "create" and log.payload["date"] == "2012-07-11"
