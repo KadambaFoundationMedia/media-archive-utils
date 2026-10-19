@@ -29,12 +29,13 @@
     </button>
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto">
+        {% from "_nav_badges.html" import badge, poll %}
         <li class="nav-item"><a class="nav-link" href="/"><i class="fa-solid fa-list me-1"></i>Files
-          <span class="badge text-bg-secondary">{{ counts.files }}</span></a></li>
+          {{ badge('files', counts.files, 'secondary', always=True) }}</a></li>
         <li class="nav-item"><a class="nav-link" href="/reviews"><i class="fa-solid fa-flag me-1"></i>Review
-          {% if counts.review %}<span class="badge text-bg-warning">{{ counts.review }}</span>{% endif %}</a></li>
+          {{ badge('review', counts.review, 'warning') }}</a></li>
         <li class="nav-item"><a class="nav-link" href="/jobs"><i class="fa-solid fa-gears me-1"></i>Jobs
-          {% if counts.jobs %}<span class="badge text-bg-info">{{ counts.jobs }}</span>{% endif %}</a></li>
+          {{ badge('jobs', counts.jobs, 'info') }}{{ poll(counts.jobs) }}</a></li>
         <li class="nav-item"><a class="nav-link" href="/import"><i class="fa-solid fa-folder-plus me-1"></i>Import</a></li>
         <li class="nav-item"><a class="nav-link" href="/settings"><i class="fa-solid fa-gear me-1"></i>Settings</a></li>
       </ul>
@@ -47,8 +48,13 @@
 </nav>
 <main class="container-fluid py-3">
   {% if request.query_params.get('msg') %}
-  <div class="alert alert-info alert-dismissible fade show" role="alert">
+  {% set live = request.query_params.get('live') and counts.jobs %}
+  <div class="alert {{ 'alert-info' if live or not request.query_params.get('live') else 'alert-success' }} alert-dismissible fade show" role="alert"
+       {% if request.query_params.get('live') %}id="flash-live"{% endif %}>
+    <span class="flash-spinner spinner-border spinner-border-sm me-2" aria-hidden="true" {% if not live %}hidden{% endif %}></span>
+    <span class="flash-done fw-semibold me-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}><i class="fa-solid fa-check me-1"></i>Finished:</span>
     {{ request.query_params.get('msg') }}
+    <span class="flash-hint small text-body-secondary ms-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}>See the result in the job list.</span>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
   {% endif %}

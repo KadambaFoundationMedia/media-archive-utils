@@ -177,6 +177,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 
 ## 8. Media manager UI
 - **General:** Bootstrap with Font Awesome, a dark/light switch, and a mobile-friendly layout.
+- **Live updates:** while jobs are queued or running, the navbar counts (Files, Review, Jobs) update every 2 seconds on every page and stop when the queue is empty. A message about queued work (an import, "Renamer: 10 file(s) queued") shows a spinner and turns into "Finished" when the jobs are done. Messages are shown once: a reload does not bring them back.
 - **File list:**
   - Opens on **Needs attention** (files waiting for a review, failed or corrupted); *All files*, *Needs review*, *Failed* and each single status (with counts) are one choice away. Under *One status* every status of section 7 is listed, also when no file has it (count 0), with the per-tool statuses for each tool that is built (`Queued Renamer`, `Renamer Review`, ...). The guide on the page explains the views and the statuses in the same order as the list.
   - Sorted by path, files are grouped under a header row per folder (shown relative to its import root, e.g. `Sample files / 2012 / Radhadesh Jan 2012`) with alternating row colors.

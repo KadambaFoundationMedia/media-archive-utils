@@ -1,0 +1,14 @@
+{# Navbar counts. While jobs are queued or running, #nav-poll asks /nav/badges every 2 s and the
+   answer swaps the badges out of band; the last answer (no jobs left) has no trigger, so it stops. #}
+{% macro badge(name, n, color, always=False, oob=False) -%}
+<span id="nav-{{ name }}" class="badge text-bg-{{ color }}" {% if not n and not always %}hidden{% endif %}{% if oob %} hx-swap-oob="true"{% endif %}>{{ n }}</span>
+{%- endmacro %}
+{% macro poll(jobs, oob=False) -%}
+<span id="nav-poll" data-active="{{ 1 if jobs else 0 }}"{% if oob %} hx-swap-oob="true"{% endif %}{% if jobs %} hx-get="/nav/badges" hx-trigger="every 2s" hx-swap="none"{% endif %}></span>
+{%- endmacro %}
+{% if oob %}
+{{ badge('files', counts.files, 'secondary', always=True, oob=True) }}
+{{ badge('review', counts.review, 'warning', oob=True) }}
+{{ badge('jobs', counts.jobs, 'info', oob=True) }}
+{{ poll(counts.jobs, oob=True) }}
+{% endif %}
