@@ -36,6 +36,12 @@ def reference_raw() -> dict:
                 "country": "Czech-Republic",
             },
             {
+                "start_date": "2008-04-14",
+                "end_date": "2008-04-16",
+                "place_location": "Brno",
+                "country": "Czech-Republic",
+            },
+            {
                 "start_date": "2012-07-10",
                 "end_date": "2012-07-13",
                 "place_location": "Fruska-Gora",
@@ -65,6 +71,7 @@ def reference_raw() -> dict:
                 "Berlin",
                 "Radhadesh",
                 "Prague",
+                "Brno",
                 "Fruska-Gora",
                 "ISKCON-Ljubljana",
                 "Farma-Krishna-Dvur",

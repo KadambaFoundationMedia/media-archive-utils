@@ -101,6 +101,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Dates:** European day-month-year is the default reading; other orders need supporting evidence. Dates in the ID3 title or date tag are taken as correct unless other evidence conflicts (a conflict with the folder name is flagged). See docs/references/filenaming-convention.md.
 - **More evidence used:**
   - sibling files in the same folder decide ambiguous dates (`08-04-10` among April 2008 files is 2008-04-10) and give the place of files recorded the same day
+  - when nothing else gives the country, the places named by the other files in the folder do, if they are all in one country (`KKS DUBEN 2008 MP3/02 KKS. SB. 3.1.20.mp3` gets `cz` because `03 BRNO LEKCE…` is in the same folder); the city stays open, and places in two countries give no country
   - the travel schedule only suggests places in the country the filename names; every stay on the date is shown as evidence, and on a travel day (leaving one place, arriving in another) the place is left open
   - a new place flag suggests the closest known place (`Fruska-Goranga`: did you mean `Fruska-Gora`?)
   - seed aliases (place spellings such as `Praha`, `Koln`, `Rdesh`; category words such as `Kirtany`; language words such as `GER`) are in `mam/tools/renamer/aliases.yaml`

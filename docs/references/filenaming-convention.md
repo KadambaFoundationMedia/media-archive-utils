@@ -54,6 +54,8 @@ WHERE has one of three forms:
 
 The ccTLD must be a valid country code (`no` for Norway, `se` for Sweden, `in` for India).
 
+When a file names no place or country, the Renamer may take the country from the other files in the same folder: if the places they name are all in one country, that country is used (e.g. `cz` for the files next to `03 BRNO LEKCE.mp3`). The city is left out until it is known.
+
 ## Partial information
 A file is always renamed with whatever is known. A WHO, WHAT or WHERE that is not known is left out, never replaced by a placeholder; only the date uses placeholders.
 

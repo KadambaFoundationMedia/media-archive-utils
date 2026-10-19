@@ -109,6 +109,7 @@ class Context:
     tag_origin: str | None = None  # e.g. 'ID3 tags: title "HH KKS BG2.54 11.07.2008"'
     tag_date_origin: str | None = None
     tag_dates: list = field(default_factory=list)  # (DateMatch, origin) from the ID3 date tag
+    sibling_ccs: dict = field(default_factory=dict)  # cc -> places other files in the folder name
 
 
 # ------------------------------------------------------------------ context
@@ -154,6 +155,7 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
     folders = [parser.parse(name, "folder") for name in folder_chain(path, roots)]
     siblings: Counter = Counter()
     sibling_places: dict[str, set[str]] = {}
+    sibling_ccs: dict[str, set[str]] = {}
     for name in _sibling_names(str(path.parent)):
         if name == path.name:
             continue
@@ -164,6 +166,9 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
                 siblings[(v.year, v.month)] += 1
                 for place in parsed.places:
                     sibling_places.setdefault(v.text(), set()).add(place.name)
+        for place in parsed.places:
+            if place.known and place.cc:
+                sibling_ccs.setdefault(place.cc, set()).add(place.name)
     tags = read_tags(path)
     useful = {
         k: v
@@ -196,6 +201,7 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
         tag_origin,
         f'ID3 date tag "{tags["date"]}"' if tag_year else None,
         tag_dates,
+        sibling_ccs,
     )
     return context
 
@@ -567,6 +573,15 @@ class Resolver:
                 ev.append(Evidence("where", next(iter(ccs)), "travel", 0.5, detail=detail))
                 notes.append("Country from the travel schedule; not proof.")
                 return ccs.pop()
+        if len(ctx.sibling_ccs) == 1:
+            # Every known place named by the other files in this folder is in one country
+            # (e.g. 'BRNO LEKCE.mp3' next to 'KKS SB 3.1.20.mp3'): the folder is one trip.
+            cc, places = next(iter(ctx.sibling_ccs.items()))
+            named = ", ".join(sorted(places))
+            detail = {"origin": f"other files in this folder name {named}"}
+            ev.append(Evidence("where", cc, "siblings", 0.5, detail=detail))
+            notes.append(f"Country from other files in this folder ({named}); not proof.")
+            return cc
         return None
 
     # ------------------------------------------------------- WHAT & more
