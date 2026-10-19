@@ -19,6 +19,11 @@ def tree(settings):
         "Prague-Oct-2003/Lekce/A019 03-10-23 BG 3.12 Praha.mp3",
         "Prague-Oct-2003/Kirtany/JRM.mp3",
         "KKS DUBEN 2008 MP3/06 KKS SB 3.1.25.mp3",
+        "KKS DUBEN 2008 MP3/03 BRNO LEKCE STEREO JET.mp3",
+        "KKS DUBEN 2008 MP3/07 KKS PRUHON.mp3",
+        "two-countries/KKS SB 1.1.1.mp3",
+        "two-countries/KKS Brno.mp3",
+        "two-countries/KKS Oslo.mp3",
         "Serbia-summercamp-6-13-jul-2012/R09_0004.MP3",
         "Serbia-summercamp-6-13-jul-2012/2012-07-12_SNS_Maha-Mantra_Serbia-Summercamp_rs.mp3",
         "2011-08-20_KKS_Jaya-radha-madhava_oslo_fi.mp3",
@@ -62,7 +67,8 @@ def propose(reference, settings, tree):
         ),
         # no date or place in the name: both from the folder above
         ("Prague-Oct-2003/Kirtany/JRM.mp3", "2003-10-DD_KKS_JRM_Prague-cz.mp3"),
-        ("KKS DUBEN 2008 MP3/06 KKS SB 3.1.25.mp3", "2008-04-DD_KKS_SB-3-1-25.mp3"),
+        # DUBEN is April in Czech; the country comes from 'BRNO LEKCE' in the same folder
+        ("KKS DUBEN 2008 MP3/06 KKS SB 3.1.25.mp3", "2008-04-DD_KKS_SB-3-1-25_cz.mp3"),
         (
             "HH Kadamba Kanana Swami - SB 3.6.6 - Sweden - 27_8_15.mp3",
             "2015-08-27_KKS_SB-3-6-6_se.mp3",
@@ -274,3 +280,13 @@ def test_livestream_place_is_not_a_conflict(reference, settings, tree, media_row
     path.write_bytes(b"")
     p = Resolver(reference, [settings.media_sample_files_path]).propose(path)
     assert p.baserow_row_id == 475
+
+
+def test_country_from_places_named_by_other_files_in_the_folder(propose):
+    proposal = propose("KKS DUBEN 2008 MP3/06 KKS SB 3.1.25.mp3")
+    assert proposal.cc == "cz" and proposal.place is None  # the city stays open
+    origins = [e.detail.get("origin") for e in proposal.evidence if e.source == "siblings"]
+    assert origins == ["other files in this folder name Brno"]
+    assert any("not proof" in n for n in proposal.notes)
+    # places in two countries: no country is guessed
+    assert propose("two-countries/KKS SB 1.1.1.mp3").cc is None
