@@ -580,3 +580,19 @@ def test_status_list_and_guide_show_the_same_statuses_in_order(client):
     for view in VIEW_HELP:
         assert f'<dt class="col-sm-3 col-lg-2 fw-semibold">{view}</dt>' in page
     assert all_statuses({"Old tool Done": 1})[-1] == "Old tool Done"
+
+
+def test_navbar_counts_follow_running_jobs(client):
+    with session_scope() as s:
+        s.add(m.Job(tool="scan", pool="io", dry_run=False, params={"path": "/x"}))
+    page = client.get("/jobs?msg=Scanning x&live=1").text
+    assert 'id="flash-live"' in page and 'hx-get="/nav/badges"' in page  # polls while a job waits
+    badges = client.get("/nav/badges").text
+    assert 'id="nav-jobs"' in badges and 'hx-swap-oob="true"' in badges and "every 2s" in badges
+    with session_scope() as s:
+        for job in s.scalars(select(m.Job)):
+            job.state = "done"
+    badges = client.get("/nav/badges").text
+    assert 'data-active="0"' in badges and "every 2s" not in badges  # the last answer stops it
+    page = client.get("/jobs?msg=Scanning x&live=1").text
+    assert "alert-success" in page and "Finished:" in page  # finished before the page loaded

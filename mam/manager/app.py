@@ -267,9 +267,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
         notify(request)
         label = "Full pipeline" if pipeline else TOOLS[tool].label
         msg = f"{label}: {queued} file(s) queued" + (" as a dry run" if dry_run else "")
-        back = re.sub(r"[?&]msg=[^&]*", "", form.get("back") or "/")
+        back = re.sub(r"[?&](msg|live)=[^&]*", "", form.get("back") or "/")
         sep = "&" if "?" in back else "?"
-        return RedirectResponse(f"{back}{sep}msg={msg}", status_code=303)
+        return RedirectResponse(f"{back}{sep}msg={msg}&live=1", status_code=303)
 
     # ----------------------------------------------------------- file detail
     @app.get("/files/{file_id}", response_class=HTMLResponse)
@@ -355,6 +355,11 @@ def create_app(start_queue: bool = True) -> FastAPI:
         return FileResponse(path)
 
     # ------------------------------------------------------------------ jobs
+    @app.get("/nav/badges", response_class=HTMLResponse)
+    def nav_badges(request: Request):
+        """Navbar counts, swapped out of band while jobs run (see _nav_badges.html)."""
+        return render(request, "_nav_badges.html", oob=True)
+
     @app.get("/jobs", response_class=HTMLResponse)
     def jobs_page(request: Request):
         return render(request, "jobs.html", **_jobs_context(request))
@@ -463,7 +468,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
         with session_scope() as session:
             enqueue(session, "scan", dry_run=False, params={"path": str(folder)})
         notify(request)
-        return RedirectResponse(f"/jobs?msg=Scanning {folder.name or folder}", status_code=303)
+        return RedirectResponse(
+            f"/jobs?msg=Scanning {folder.name or folder}&live=1", status_code=303
+        )
 
     @app.post("/upload")
     async def upload(request: Request, files: list[UploadFile]):
@@ -485,7 +492,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
         with session_scope() as session:
             enqueue(session, "scan", dry_run=False, params={"path": str(inbox)})
         notify(request)
-        return RedirectResponse(f"/jobs?msg={saved} file(s) uploaded to the inbox", status_code=303)
+        return RedirectResponse(
+            f"/jobs?msg={saved} file(s) uploaded to the inbox&live=1", status_code=303
+        )
 
     # -------------------------------------------------------------- settings
     @app.get("/settings", response_class=HTMLResponse)
@@ -501,7 +510,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
         form = await request.form()
         enabled = form.get("enabled") == "on"
         set_baserow_writes(enabled)
-        back = re.sub(r"[?&]msg=[^&]*", "", form.get("back") or "/")
+        back = re.sub(r"[?&](msg|live)=[^&]*", "", form.get("back") or "/")
         sep = "&" if "?" in back else "?"
         msg = (
             "Baserow writes are ON: runs now write to the live media table"

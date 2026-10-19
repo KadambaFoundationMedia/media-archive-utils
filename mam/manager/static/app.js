@@ -112,3 +112,26 @@ if (editForm) {
     });
   });
 }
+
+// A message about queued work ("Scanning …", "Renamer: 10 file(s) queued") shows a spinner while
+// jobs run; when the navbar poll reports no jobs left, it turns into a "Finished" message.
+function finishLiveFlash() {
+  const flash = document.getElementById("flash-live");
+  const poll = document.getElementById("nav-poll");
+  if (!flash || !poll || poll.dataset.active !== "0") return;
+  flash.classList.replace("alert-info", "alert-success");
+  flash.querySelector(".flash-spinner")?.setAttribute("hidden", "");
+  flash.querySelectorAll(".flash-done, .flash-hint").forEach((el) => el.removeAttribute("hidden"));
+}
+document.body.addEventListener("htmx:oobAfterSwap", (event) => {
+  if (event.detail.target?.id === "nav-poll") finishLiveFlash();
+});
+
+// The message is shown once: a reload or a bookmark does not bring it back.
+(() => {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("msg") && !url.searchParams.has("live")) return;
+  url.searchParams.delete("msg");
+  url.searchParams.delete("live");
+  history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+})();
