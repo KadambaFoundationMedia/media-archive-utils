@@ -77,3 +77,6 @@ cache/
 
 # Manual-testing sandbox (media-manager-sandbox in .claude/launch.json)
 .sandbox/
+
+# Full session exports (large; the Markdown transcript is committed)
+docs/sessions/*.zip
