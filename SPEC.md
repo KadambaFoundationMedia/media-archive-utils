@@ -85,14 +85,14 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 
 ### Renamer
 - **Evidence order:** filename > parent folder names > ID3/tags (medium to high confidence) > Baserow media table > travel schedule. Each W is resolved on its own.
-- **Travel schedule:** evidence only, never a source on its own.
+- **Travel schedule:** evidence only, never a source on its own: it says where KKS possibly was on a date. It never gives a place its country and is never written by the portal.
   - A date inside the exact `[start_date, end_date]` range supports the place, and the reverse.
   - It fills WHERE only when the filename has no place.
   - It never overrides the filename or the folder.
 - **The Renamer flags a file for review when:**
   - the filename is non-descriptive
   - the date format cannot be determined, even with the travel schedule and the media table
-  - a new place or country is needed. The review page then offers a one-click add to `travel_schedule` (and to the select option), applied only after confirmation.
+  - a new place or country is needed. The review page says to add the place as a `place_location` option in Baserow; saving the file with that place and its country adds it to `place_country`.
 - **The Renamer also flags a file when:**
   - the filename names another speaker (e.g. `SNS`, `BVS`) and not KKS, since WHO is always KKS
   - the country code contradicts a known place (`Oslo_fi`) and cannot be corrected safely
@@ -159,9 +159,10 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Tools only fill empty fields and never overwrite values a person entered. Differences are shown as proposals on the review page.
   - `notes` gets a dated entry appended for each tool.
   - `language` is merged (union).
-- **Reference data cache:** the categories (with their colors), places, travel schedule and media index are read from Baserow and kept in memory and on disk (`~/.mam/cache/baserow_reference.json`). Pages and jobs always use the cached copy at once; data older than 10 minutes is refreshed in the background, so nothing waits for Baserow. Adding a place to the travel schedule refreshes it straight away.
+- **Reference data cache:** the categories (with their colors), places, travel schedule and media index are read from Baserow and kept in memory and on disk (`~/.mam/cache/baserow_reference.json`). Pages and jobs always use the cached copy at once; data older than 10 minutes is refreshed in the background, so nothing waits for Baserow. Saving a file with a new place and country refreshes it straight away.
 - **Schema:**
   - Only existing columns and select options are used. The schema is refreshed at runtime.
+- **Place and country:** the `place_country` table (one row per media `place_location` option: `place_location`, `country`, `ccTLD`) is the only source of a place's country. General places (Zoom-livestream, Home-program, Summercamp, Govindas; `no_country` in `mam/tools/renamer/aliases.yaml`) have no country: the file's own evidence decides. It was filled once with `uv run mam place-country sync`, which also gave media rows with a place but no country that place's country and unified the `Czech-republic`/`Czech-Republic` spelling. A person's save adds a missing row or fills an empty country, live; a row with another country is never changed (the file page warns at the Country field).
   - The `users` and `media_review_tasks` tables are ignored.
 
 ## 7. File statuses
@@ -192,6 +193,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **File page:**
   - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, Notes, and which Baserow row to link; the note is kept with the file and added to the Baserow `notes` column with the person's name). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
   - **Place is a list of the Baserow `place_location` options**, like Category and Country, so only places Baserow knows can be chosen. A place that comes from a filename and is not an option (e.g. `Fruska-Goranga`) is shown as "(not in Baserow)" with a red warning at the field and a suggestion ("did you mean Fruska-Gora?"); it is used in the filename but `place_location` stays empty (and an old value is cleared). To use a new place, add the option in Baserow, then save again: saving refreshes the place list when a place is not known (or use **Refresh Baserow data** on the Settings page). A real Baserow option always beats a Renamer alias.
+  - Choosing a place fills Country from `place_country`. Saving a place with a country that `place_country` does not have yet adds it there; choosing another country than `place_country` has shows a warning at the Country field (the media row gets the chosen country, `place_country` is not changed).
   - The portal cannot add or delete select options itself: the Baserow database token and the Baserow MCP connection only allow row actions (create, read, update, delete rows), not field changes. Options are added in Baserow.
   - **Save** renames the copy in processed-files, writes the media row live, confirms the values and closes any open review. The review page uses the same form, with Approve / Reject result / Exclude file.
   - The run buttons are at the top, with a "Last run" line showing the latest job's result and an "Open the review" button when a review is waiting.
@@ -205,6 +207,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Buttons: Edit/Save, Approve, **Reject result** (discards the output, reverts through the history and re-queues with a note), **Exclude file** (stops all processing).
 - **Settings page:**
   - Shows the current settings from `.env` (read-only).
+  - **Place → country:** how many places `place_country` has, the place options without a country (general places excluded), and rows that cannot be used (a place or country Baserow does not know, a place with two rows).
   - **Reset the media manager** for a clean start: clears all file records, jobs, reviews, evidence, history and the Baserow write log, and (optionally, on by default) deletes the copies in processed-files. Learned corrections and caches are kept unless chosen.
   - A full database backup is made first (`~/.mam/backups`, restore with `mam db import`). Originals and Baserow are never changed. It refuses while jobs run and needs `RESET` typed to confirm. The same reset is available as `uv run mam reset`.
 - **Waveform editor** (for splitter and trimmer reviews):

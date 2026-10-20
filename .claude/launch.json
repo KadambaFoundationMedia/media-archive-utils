@@ -40,6 +40,7 @@
         "BASEROW_MEDIA_TABLE_ID=1",
         "BASEROW_TRAVEL_SCHEDULE_TABLE_ID=2",
         "BASEROW_CATEGORY_TERMS_TABLE_ID=3",
+        "BASEROW_PLACE_COUNTRY_TABLE_ID=4",
         "OPERATOR_NAME=sandbox",
         "uv",
         "run",

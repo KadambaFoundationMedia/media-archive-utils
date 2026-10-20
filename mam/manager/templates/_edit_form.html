@@ -51,6 +51,7 @@
           {% if ev.cc and ev.cc not in known %}<option value="{{ ev.cc }}" selected>{{ ev.cc }} (not a Baserow option)</option>{% endif %}
           {% for code, name in country_options %}<option value="{{ code }}" {% if ev.cc == code %}selected{% endif %}>{{ name }} ({{ code }})</option>{% endfor %}
         </select>
+        <div id="country-warning" class="small text-warning-emphasis mt-1" {% if not country_warning %}hidden{% endif %}>{{ country_warning }}</div>
       </div>
       <div class="col-12">
         <div class="form-label small mb-0">Language</div>

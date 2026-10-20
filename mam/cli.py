@@ -20,6 +20,8 @@ baserow_app = typer.Typer(help="Baserow helper.", no_args_is_help=True)
 app.add_typer(db_app, name="db")
 app.add_typer(audio_app, name="audio")
 app.add_typer(baserow_app, name="baserow")
+place_country_app = typer.Typer(help="Baserow place_country table.", no_args_is_help=True)
+app.add_typer(place_country_app, name="place-country")
 
 console = Console()
 
@@ -190,6 +192,47 @@ def baserow_undo(log_id: int, dry_run: DryRun = True) -> None:
     console.print(
         f"undo{' (dry-run)' if result.dry_run else ''}: {result.payload or 'row deleted'}"
     )
+
+
+@place_country_app.command("sync")
+def place_country_sync(
+    apply: Annotated[bool, typer.Option("--apply", help="Write to Baserow (live).")] = False,
+    yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation.")] = False,
+) -> None:
+    """One-time fill of place_country (one row per media place) and tidy media countries.
+
+    Without --apply nothing is written: the rows are only listed.
+    """
+    import yaml
+
+    from mam.helpers.baserow import BaserowClient
+    from mam.tools.renamer.knowledge import ALIASES_FILE, fetch_raw
+    from mam.tools.renamer.place_country import apply_sync, plan_sync
+
+    _ready_db()
+    raw = fetch_raw()
+    aliases = yaml.safe_load(ALIASES_FILE.read_text(encoding="utf-8"))
+    plan = plan_sync(raw, aliases.get("no_country") or [])
+    out = Table("Place", "Country", "ccTLD", "From", "Action")
+    for row in plan.rows:
+        out.add_row(row.place, row.country or "–", row.cc or "–", row.source, row.action)
+    console.print(out)
+    fixes = Table("Media row", "Place", "Country now", "Becomes", "Why")
+    for fix in plan.media:
+        fixes.add_row(str(fix.row_id), fix.place or "–", fix.old or "–", fix.new, fix.reason)
+    console.print(fixes)
+    if plan.skipped:
+        console.print("No row (other spelling of a place): " + ", ".join(plan.skipped))
+    if plan.unknown:
+        console.print("[yellow]No country found:[/yellow] " + ", ".join(plan.unknown))
+    if not apply:
+        console.print("Dry run: nothing written. Run again with --apply to write.")
+        return
+    if not yes:
+        typer.confirm("Write these rows to the live Baserow?", abort=True)
+    with BaserowClient(apply=True) as client:
+        done = apply_sync(plan, client, dry_run=False)
+    console.print(f"Written: {done}")
 
 
 # ------------------------------------------------------------------- manager

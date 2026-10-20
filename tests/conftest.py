@@ -4,6 +4,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -111,12 +112,41 @@ def reference(monkeypatch):
 
 @pytest.fixture
 def no_baserow(monkeypatch):
-    """Record Renamer Baserow writes instead of sending them."""
-    calls = []
+    """Record Renamer Baserow writes instead of sending them (place_country writes are in
+    `calls.place_country`)."""
+
+    class Calls(list):
+        place_country: list
+
+    calls = Calls()
+    calls.place_country = []
 
     def fake(record, proposal, final_path, settings, dry_run, live=False):
         calls.append({"file": record.id, "values": proposal, "path": str(final_path), "live": live})
         return {"action": "create", "row_id": None, "dry_run": True, "conflicts": {}}
 
+    class FakeClient:
+        """Records place_country writes (editing.remember_place_country)."""
+
+        place_country_table = 1271584
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def create_row(self, table, values, **kwargs):
+            calls.place_country.append({"action": "create", "values": values})
+            return SimpleNamespace(row_id=99)
+
+        def update_row(self, table, row_id, values, **kwargs):
+            calls.place_country.append({"action": "update", "row_id": row_id, "values": values})
+            return SimpleNamespace(row_id=row_id)
+
     monkeypatch.setattr("mam.tools.renamer.tool.write_baserow", fake)
+    monkeypatch.setattr("mam.helpers.baserow.BaserowClient", FakeClient)
     return calls

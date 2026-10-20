@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
-
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
@@ -125,35 +123,3 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
         notify(request)
         target = form.get("next") or "/reviews"
         return RedirectResponse(f"{target}?msg={result_msg}", status_code=303)
-
-    @app.post("/review/{review_id}/add-place")
-    async def add_place(request: Request, review_id: int):
-        """One-click add of a new place to the travel schedule (respects Baserow dry-run)."""
-        from mam.helpers.baserow import BaserowClient
-        from mam.tools.renamer.knowledge import get_reference, reset_cache
-
-        form = await request.form()
-        place = (form.get("place") or "").strip()
-        country = (form.get("country") or "").strip()
-        when = (form.get("when") or "").strip()
-        if not place:
-            raise HTTPException(400, "Place is required")
-        row = {
-            "place_location": place,
-            "country": country,
-            "start_date": when if "Y" not in when and "M" not in when and "D" not in when else "",
-            "end_date": when if "Y" not in when and "M" not in when and "D" not in when else "",
-            "original_schedule": f"Added from the media manager on {date.today().isoformat()}",
-        }
-        with BaserowClient() as client:
-            result = client.create_row(client.travel_table, row, tool="renamer-review")
-        try:
-            get_reference(refresh=True)  # the new place is known at once
-        except Exception:
-            reset_cache()
-        msg = (
-            f"Would add {place} to the travel schedule (Baserow dry-run)"
-            if result.dry_run
-            else f"Added {place} to the travel schedule"
-        )
-        return RedirectResponse(f"/review/{review_id}?msg={msg}", status_code=303)

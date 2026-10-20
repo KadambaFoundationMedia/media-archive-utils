@@ -42,7 +42,7 @@ The filename provides the best evidence for the type of recording and provides t
 The MP3 tag information embedded in media files could also provide metadata. The confidence for that data is medium to high.
 
 ## Travel schedule
-The travel_schedule does not provide 100% proof that the speaker/recording was at that location. If there is a date and/or a location in the filename this should always take precedence. In those cases the travel_schedule can be used to provide further proof.
+The travel_schedule does not provide 100% proof that the speaker/recording was at that location. If there is a date and/or a location in the filename this should always take precedence. In those cases the travel_schedule can be used to provide further proof. The country of a place never comes from the travel_schedule: it comes from the Baserow `place_country` table (see helpers/baserow/SPECS.md).
 
 ## Parent (sub)folder evidence
 It is possible that the filename won't provide all the required information but the (sub)folder might provide evidence on its location or date. For example: 

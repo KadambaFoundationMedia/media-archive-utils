@@ -90,4 +90,21 @@ def reference_raw() -> dict:
             "category": [c["category"] for c in categories],
             "language": ["English", "German", "Dutch", "Czech"],
         },
+        # Baserow place_country: the only source of a place's country.
+        "place_country": [
+            {"id": i, "place": place, "country": country, "cc": cc}
+            for i, (place, country, cc) in enumerate(
+                [
+                    ("Oslo", "Norway", "no"),
+                    ("Berlin", "Germany", "de"),
+                    ("Radhadesh", "Belgium", "be"),
+                    ("Prague", "Czech-Republic", "cz"),
+                    ("Brno", "Czech-Republic", "cz"),
+                    ("Fruska-Gora", "Serbia", "rs"),
+                    ("ISKCON-Ljubljana", "Slovenia", "si"),
+                    ("Zoom-livestream", "", ""),  # used in many countries
+                ],
+                start=1,
+            )
+        ],
     }
