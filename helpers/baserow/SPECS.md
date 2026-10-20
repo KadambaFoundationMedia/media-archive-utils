@@ -25,7 +25,7 @@ This helper is responsible for connecting to Baserow and performing CRUD actions
 - Changes in the review portal will be processed by this helper
 - Only use the available columns
 - Only use the available options in single/multiselect columns
-- Notify user when new countries/locations are required. This would require adding them to the travel_schedule table as well
+- Notify user when new countries/locations are required. A new place is added as a `place_location` option in Baserow; its country goes in the `place_country` table (the portal adds it when a person saves a file). The travel schedule is never written.
 
 ## Database and table information
 The .env provides the database name and relevant tables. The important tables in the "media-db" database are:
@@ -33,6 +33,7 @@ The .env provides the database name and relevant tables. The important tables in
 - media: This contains all the verified media items
 - travel-schedule: the travel schedule of Kadamba Kanana Swami. It provides clues and sometimes evidence for date and locations
 - category_filename_folder: Provides the media categories, filename search terms, folder names and their colour scheme.
+- place_country: one row per media `place_location` option with its country. This is the only link between a place and its country.
 
 ### Tables to ignore
 - users
@@ -91,6 +92,13 @@ Column end_date: Departure date
 Column original_schedule: The original travel schedule text that was used to determine the start/end date
 Column place_location: places (usually temples or city names) and recording locations.
 column country: Country of recording.
+
+## place_country table scheme
+Column place_location (text, primary): exactly a media `place_location` option, e.g. `Brno`
+Column country (text): a media `country` option, e.g. `Czech-Republic`; empty for general places used in many countries (Zoom-livestream, Home-program, Summercamp, Govindas)
+Column ccTLD (text): the country code used in filenames, e.g. `cz`
+
+The table id is `BASEROW_PLACE_COUNTRY_TABLE_ID` in `.env`. It was filled once with `uv run mam place-country sync` (dry run first, `--apply` to write). Afterwards the portal adds a row (or fills an empty country) when a person saves a file with a place and a country; a row with another country is never changed.
 
 ## category_terms_folder table scheme
 Column category: the main media category. This is a clone from the media.category column

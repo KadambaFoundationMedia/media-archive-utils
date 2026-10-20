@@ -26,18 +26,14 @@
     {% if review.outcome == 'pending' %}{% include "_edit_form.html" %}{% endif %}
 
     {% if p.new_place %}
-    <form method="post" action="/review/{{ review.id }}/add-place" class="card mb-3">
+    <div class="card mb-3">
       <div class="card-header">New place</div>
-      <div class="card-body row g-2 align-items-end">
-        <div class="col-12 col-md-4"><label class="form-label small" for="np">Place</label>
-          <input class="form-control form-control-sm" id="np" name="place" value="{{ p.new_place.place }}"></div>
-        <div class="col-12 col-md-4"><label class="form-label small" for="nc">Country</label>
-          <input class="form-control form-control-sm" id="nc" name="country" value="{{ p.new_place.country }}"></div>
-        <input type="hidden" name="when" value="{{ p.when }}">
-        <div class="col-12 col-md-4"><button class="btn btn-sm btn-outline-primary w-100" type="submit">Add to travel schedule</button></div>
-        <div class="small text-body-secondary">Adds a travel schedule row for {{ p.when }}{% if not baserow_on %} (Baserow writes are off: logged, not sent){% endif %}. A new place option for the media table must be added in Baserow itself.</div>
+      <div class="card-body small">
+        <strong>{{ p.new_place.place }}</strong>{% if p.new_place.country %} ({{ p.new_place.country }}){% endif %} is not a place in Baserow yet.
+        Add it as a <code>place_location</code> option in the Baserow media table, choose it under Place and save:
+        saving also adds it with its country to the <code>place_country</code> table.
       </div>
-    </form>
+    </div>
     {% endif %}
   </div>
 

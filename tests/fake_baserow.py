@@ -1,7 +1,8 @@
 """A stand-in Baserow for manual testing of the media manager (never the live database).
 
 Run:  uv run python -m tests.fake_baserow --port 8799
-Then start the portal with BASEROW_API_URL=http://127.0.0.1:8799 and table ids 1/2/3.
+Then start the portal with BASEROW_API_URL=http://127.0.0.1:8799 and table ids 1/2/3/4
+(media, travel schedule, category terms, place_country).
 It serves the fixture categories, places, travel schedule and media rows, and accepts
 creates and updates (kept in memory and printed).
 """
@@ -44,6 +45,22 @@ for field in MEDIA_FIELDS:
     values = OPTIONS.get(field["name"], EXTRA_OPTIONS.get(field["name"], []))
     FIELDS.append({**field, "select_options": [{"id": next(ids), "value": v} for v in values]})
 ROWS: dict[int, dict] = {}
+# place_country (table 4): one row per place; Amsterdam has no row yet.
+PLACE_ROWS: dict[int, dict] = {
+    r["id"]: {
+        "id": r["id"],
+        "place_location": r["place"],
+        "country": r["country"],
+        "ccTLD": r["cc"],
+    }
+    for r in RAW["place_country"]
+}
+PLACE_ROWS[100] = {
+    "id": 100,
+    "place_location": "ISKCON-Amsterdam",
+    "country": "Netherlands",
+    "ccTLD": "nl",
+}
 BY_ID = {o["id"]: o["value"] for f in FIELDS for o in f["select_options"]}
 SELECTS = {f["name"]: f["type"] for f in FIELDS if f["type"].endswith("select")}
 
@@ -75,6 +92,8 @@ def page(rows: list[dict]) -> dict:
 def fields(table_id: int):
     if table_id == 1:
         return FIELDS
+    if table_id == 4:
+        return [{"name": n, "type": "text"} for n in ("place_location", "country", "ccTLD")]
     if table_id == 2:
         return [
             {"name": n, "type": "text"}
@@ -91,29 +110,33 @@ def rows(table_id: int):
         return page(RAW["travel"])
     if table_id == 3:
         return page(RAW["categories"])
+    if table_id == 4:
+        return page(list(PLACE_ROWS.values()))
     return page(list(ROWS.values()))
 
 
 @app.get("/api/database/rows/table/{table_id}/{row_id}/")
 def row(table_id: int, row_id: int):
-    return ROWS.get(row_id, {"id": row_id})
+    return (PLACE_ROWS if table_id == 4 else ROWS).get(row_id, {"id": row_id})
 
 
 @app.post("/api/database/rows/table/{table_id}/")
 async def create(table_id: int, request: Request):
     data = await request.json()
     row_id = next(row_ids)
-    ROWS[row_id] = as_baserow({"id": row_id, **data})
+    store = PLACE_ROWS if table_id == 4 else ROWS
+    store[row_id] = as_baserow({"id": row_id, **data}) if table_id != 4 else {"id": row_id, **data}
     print("CREATE", table_id, row_id, data, flush=True)
-    return ROWS[row_id]
+    return store[row_id]
 
 
 @app.patch("/api/database/rows/table/{table_id}/{row_id}/")
 async def update(table_id: int, row_id: int, request: Request):
     data = await request.json()
-    ROWS.setdefault(row_id, {"id": row_id}).update(as_baserow(data))
+    store = PLACE_ROWS if table_id == 4 else ROWS
+    store.setdefault(row_id, {"id": row_id}).update(as_baserow(data) if table_id != 4 else data)
     print("UPDATE", table_id, row_id, data, flush=True)
-    return ROWS[row_id]
+    return store[row_id]
 
 
 if __name__ == "__main__":

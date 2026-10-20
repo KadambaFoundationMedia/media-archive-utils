@@ -12,6 +12,7 @@ records the values as *confirmed*, so later Renamer runs keep them and only fill
 from __future__ import annotations
 
 import contextlib
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,8 @@ from mam.helpers.local_db.repo import set_status
 from mam.tools.renamer.knowledge import Place, Reference, get_reference, norm_key
 from mam.tools.renamer.naming import build_name, format_where, problems
 from mam.tools.renamer.parse import NameParser
+
+log = logging.getLogger(__name__)
 
 FIELDS = (
     "filename",
@@ -142,7 +145,8 @@ def sync(values: dict[str, Any], changed: str, ext: str) -> dict[str, Any]:
 def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dict[str, Any]:
     """Problems that block saving, and hints about what will be written.
 
-    The keys are `problems`, `hints` and `place_warning` (not `notes`: that is a form field).
+    The keys are `problems`, `hints`, `place_warning` and `country_warning` (not `notes`:
+    that is a form field).
     """
     from mam.tools.renamer.tool import valid_when
 
@@ -166,10 +170,61 @@ def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dic
             "from the list, or add it as an option in Baserow (media table, place_location) and "
             "save again." + (f" Did you mean {suggestion}?" if suggestion else "")
         )
+    country_warning = ""
+    known = exact_place(place, ref) if place else None
+    cc = _clean(values.get("cc")).lower()
+    if known and known.cc and cc and cc != known.cc:
+        country_warning = (
+            f"Baserow place_country has {known.name} in {known.country}. The media row gets "
+            f"'{cc}', but place_country is not changed; correct it in Baserow if it is wrong."
+        )
     category = _clean(values.get("category"))
     if category and category not in ref.category_options:
         issues.append(f"'{category}' is not a Baserow category")
-    return {"problems": issues, "hints": hints, "place_warning": place_warning}
+    return {
+        "problems": issues,
+        "hints": hints,
+        "place_warning": place_warning,
+        "country_warning": country_warning,
+    }
+
+
+def remember_place_country(place: Place | None, cc: str | None, ref: Reference) -> dict[str, Any]:
+    """Add a place and its country to the Baserow place_country table (a person's save).
+
+    No row yet: create it. A row without a country: fill it in. A row with another country
+    is never changed (the warning at the Country field said so). General places
+    (aliases.yaml no_country, e.g. Zoom-livestream) keep an empty country on purpose.
+    """
+    from mam.helpers.baserow import BaserowClient
+
+    if not place or not cc or place.name not in ref.place_options:
+        return {"action": "none"}
+    key = norm_key(place.name)
+    if key in {norm_key(p) for p in ref.aliases.get("no_country") or []}:
+        return {"action": "none", "reason": "general place"}
+    country = ref.country_option(cc)
+    if not country:
+        return {"action": "none", "reason": f"'{cc}' is not a Baserow country"}
+    row = ref.place_rows.get(key)
+    if row and row.get("cc"):
+        return {"action": "none" if row["cc"] == cc else "kept", "row_id": row["id"]}
+    values = {"place_location": place.name, "country": country, "ccTLD": cc}
+    try:
+        with BaserowClient() as client:
+            table = client.place_country_table
+            if row:
+                result = client.update_row(
+                    table, row["id"], values, tool="manual-edit", dry_run=False
+                )
+            else:
+                result = client.create_row(table, values, tool="manual-edit", dry_run=False)
+    except Exception as exc:  # the save itself is done; report, never fail it
+        log.warning("place_country not updated for %s: %s", place.name, exc)
+        return {"action": "failed", "error": str(exc)}
+    with contextlib.suppress(Exception):
+        get_reference(refresh=True)  # the new country is known at once
+    return {"action": "update" if row else "create", "row_id": result.row_id, **values}
 
 
 def initial_values(record: m.MediaFile) -> dict[str, Any]:
@@ -278,6 +333,7 @@ def save(
     }
     # A person's decision: write the media row live, also when the Baserow switch is off.
     data["baserow"] = write_baserow(record, data, placed.dst, settings, dry_run=False, live=True)
+    data["place_country"] = remember_place_country(place, cc, ref)
 
     now = datetime.now(UTC)
     meta = dict(record.meta or {})

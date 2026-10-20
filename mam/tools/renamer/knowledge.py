@@ -11,7 +11,7 @@ import logging
 import re
 import threading
 import time
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -92,6 +92,8 @@ class Reference:
     aliases: dict[str, Any]
     max_place_words: int = 3
     loaded_at: float = field(default_factory=time.time)
+    place_rows: dict[str, dict[str, Any]] = field(default_factory=dict)  # place_country rows
+    place_country_problems: list[str] = field(default_factory=list)
 
     def find_place(self, text: str) -> Place | None:
         return self.places.get(norm_key(text))
@@ -157,7 +159,27 @@ def fetch_raw() -> dict[str, Any]:
                 for name in ("place_location", "country", "category", "language")
                 if name in media_fields
             },
+            "place_country": _place_country_rows(client),
         }
+
+
+def _place_country_rows(client) -> list[dict[str, Any]]:
+    from mam.errors import BaserowError
+
+    try:
+        rows = client.place_country()
+    except BaserowError as exc:  # table id not set yet: places have no country
+        log.warning("place_country table not read: %s", exc)
+        return []
+    return [
+        {
+            "id": r["id"],
+            "place": (r.get("place_location") or "").strip(),
+            "country": (r.get("country") or "").strip(),
+            "cc": (r.get("ccTLD") or "").strip().lower(),
+        }
+        for r in rows
+    ]
 
 
 def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) -> Reference:
@@ -176,8 +198,7 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
         if cc:
             country_options.setdefault(cc, name)
 
-    # Country of each place: most common country in the travel schedule, then the media table.
-    place_country: dict[str, Counter] = defaultdict(Counter)
+    # Travel stays are dated evidence of where KKS was, never the country of a place.
     stays: list[Stay] = []
     for row in raw.get("travel", []):
         start, end = _parse_date(row.get("start_date")), _parse_date(row.get("end_date"))
@@ -185,30 +206,29 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
             (row.get("place_location") or "").strip(),
             (row.get("country") or "").strip(),
         )
-        if place and country:
-            place_country[place][country] += 1
         if start and place:
             stays.append(Stay(start, end or start, place, country or None, cc_for_name(country)))
     media_by_date: dict[str, list[MediaRow]] = defaultdict(list)
     for row in raw.get("media", []):
         media = MediaRow(**row)
-        if media.place and media.country:
-            place_country[media.place][media.country] += 1
         if media.date:
             media_by_date[media.date[:10]].append(media)
 
+    # The country of a place comes only from the Baserow place_country table.
+    place_names = [n for n in options.get("place_location", []) if isinstance(n, str)]
+    option_by_key = {norm_key(n): n for n in sorted(place_names)}
+    place_rows, problems = read_place_country(raw.get("place_country", []), option_by_key)
     no_country = {norm_key(p) for p in aliases.get("no_country") or []}
     places: dict[str, Place] = {}
-    names = set(options.get("place_location", [])) | set(place_country)
     built: list[Place] = []
-    for name in sorted(n for n in names if isinstance(n, str)):
+    for name in sorted(place_names):
         key = norm_key(name)
         if key in not_places:
             continue
-        country = place_country[name].most_common(1)[0][0] if place_country[name] else None
-        if key in no_country:
-            country = None
-        place = Place(name, country, cc_for_name(country) if country else None)
+        row = place_rows.get(key)
+        cc = row["cc"] if row and key not in no_country else None
+        country = country_options.get(cc) if cc else None
+        place = Place(name, country, cc if country else None)
         places.setdefault(key, place)  # exact names first ...
         built.append(place)
     for place in built:  # ... then the name without the ISKCON- prefix
@@ -233,7 +253,33 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
         language_options=set(options.get("language", [])),
         aliases=aliases,
         max_place_words=min(max_words, 4),
+        place_rows=place_rows,
+        place_country_problems=problems,
     )
+
+
+def read_place_country(
+    rows: list[dict[str, Any]], option_by_key: dict[str, str]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """place_country rows by place key, and the rows that could not be used (for Settings)."""
+    by_key: dict[str, dict[str, Any]] = {}
+    problems: list[str] = []
+    for row in rows:
+        name = row.get("place") or ""
+        if not name:
+            continue
+        key = norm_key(name)
+        if key not in option_by_key:
+            problems.append(f"'{name}' is not a place_location option of the media table")
+            continue
+        cc = row.get("cc") or (cc_for_name(row["country"]) if row.get("country") else None)
+        if row.get("country") and not cc:
+            problems.append(f"{name}: '{row['country']}' is not a known country")
+        if key in by_key:
+            problems.append(f"'{name}' has more than one row; the first one is used")
+            continue
+        by_key[key] = {**row, "cc": cc or None}
+    return by_key, problems
 
 
 def learned_place_aliases() -> dict[str, str]:

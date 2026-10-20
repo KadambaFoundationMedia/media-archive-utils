@@ -91,6 +91,11 @@ if (editForm) {
       warning.hidden = !out.place_warning;
       document.getElementById("place")?.classList.toggle("is-invalid", Boolean(out.place_warning));
     }
+    const countryWarning = document.getElementById("country-warning");
+    if (countryWarning) {
+      countryWarning.textContent = out.country_warning || "";
+      countryWarning.hidden = !out.country_warning;
+    }
     editForm.querySelectorAll(".edit-save").forEach((b) => { b.disabled = out.problems.length > 0; });
   }
 

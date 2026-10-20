@@ -20,6 +20,25 @@
             </form>
             <div class="text-body-secondary">Places, categories, travel schedule and media rows are cached and refreshed every 10 minutes. Refresh now after adding a place or category in Baserow.</div>
           </dd>
+          <dt class="col-5">Place → country</dt>
+          <dd class="col-7">
+            {% if not places.ready %}<span class="text-body-secondary">Loading the Baserow data…</span>
+            {% else %}
+            {{ places.rows }} places in the Baserow <code>place_country</code> table.
+            {% if places.missing %}
+            <details class="mt-1"><summary class="text-warning-emphasis">{{ places.missing | length }} place(s) without a country</summary>
+              <div class="small">{{ places.missing | join(', ') }}</div>
+              <div class="small text-body-secondary">Add the country in <code>place_country</code>, or choose it once on a file page and save.</div>
+            </details>
+            {% else %}<span class="text-success">Every place has a country.</span>{% endif %}
+            {% if places.problems %}
+            <details class="mt-1"><summary class="text-danger">{{ places.problems | length }} row(s) not used</summary>
+              <ul class="small mb-0">{% for p in places.problems %}<li>{{ p }}</li>{% endfor %}</ul>
+            </details>
+            {% endif %}
+            <div class="text-body-secondary">General places (Zoom-livestream, Home-program, Summercamp, Govindas) have no country on purpose.</div>
+            {% endif %}
+          </dd>
           <dt class="col-5">Operator</dt><dd class="col-7">{{ settings.operator_name }}</dd>
           <dt class="col-5">Processed files</dt><dd class="col-7 text-break">{{ settings.media_processed_files_path }}</dd>
           {% for label, path in settings.import_roots %}

@@ -497,11 +497,37 @@ def create_app(start_queue: bool = True) -> FastAPI:
         )
 
     # -------------------------------------------------------------- settings
+    def place_country_status() -> dict:
+        """Place options without a country in the Baserow place_country table (Settings)."""
+        from mam.tools.renamer.knowledge import norm_key, reference_if_ready
+
+        ref = reference_if_ready()
+        if ref is None:
+            return {"ready": False}
+        general = {norm_key(p) for p in ref.aliases.get("no_country") or []}
+        missing = sorted(
+            {
+                name
+                for name in ref.place_options
+                if norm_key(name) not in general
+                and not (ref.place_rows.get(norm_key(name)) or {}).get("cc")
+            },
+            key=str.casefold,
+        )
+        return {
+            "ready": True,
+            "rows": len(ref.place_rows),
+            "missing": missing,
+            "problems": ref.place_country_problems,
+        }
+
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request):
         from mam.manager.maintenance import summary
 
-        return render(request, "settings.html", info=summary(settings))
+        return render(
+            request, "settings.html", info=summary(settings), places=place_country_status()
+        )
 
     @app.post("/settings/baserow-writes")
     async def toggle_baserow_writes(request: Request):

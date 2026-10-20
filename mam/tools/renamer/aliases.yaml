@@ -4,6 +4,8 @@
 
 # Spellings and local names of places -> place name as used in Baserow.
 places:
+  # other spellings of a Baserow place option
+  sumercamp: Summercamp
   praha: Prague
   koln: ISKCON-Cologne
   cologne: ISKCON-Cologne
@@ -31,7 +33,11 @@ not_places:
 
 # Places that have no country (online recordings).
 no_country:
+  # general places, used in many countries: the file's own evidence decides the country
   - Zoom-livestream
+  - Home-program
+  - Summercamp
+  - Govindas
 
 # Words that point to a category (used for folders and names without a verse).
 categories:

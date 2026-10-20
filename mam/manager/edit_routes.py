@@ -35,6 +35,7 @@ def form_context(record: m.MediaFile, values: dict, checked: dict | None = None)
         "candidates": candidates,
         "place_names": sorted(ref.place_options, key=str.casefold),
         "place_warning": checked.get("place_warning", ""),
+        "country_warning": checked.get("country_warning", ""),
         "category_options": sorted(ref.category_options),
         "country_options": sorted(ref.country_options.items(), key=lambda kv: kv[1]),
         "language_options": sorted(ref.language_options),
@@ -57,10 +58,8 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
             ext = Path(record.original_path).suffix.lower().lstrip(".")
         values = sync(form_values(form), form.get("changed", ""), ext)
         problems, hints = values.pop("problems"), values.pop("hints")
-        warning = values.pop("place_warning", "")
-        return JSONResponse(
-            {"values": values, "problems": problems, "hints": hints, "place_warning": warning}
-        )
+        warnings = {k: values.pop(k, "") for k in ("place_warning", "country_warning")}
+        return JSONResponse({"values": values, "problems": problems, "hints": hints, **warnings})
 
     @app.post("/files/{file_id}/edit")
     async def edit_save(request: Request, file_id: int):
@@ -78,4 +77,7 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
             return RedirectResponse(f"/files/{file_id}?error={exc}", status_code=303)
         notify(request)
         msg = f"Saved {data['final_name']} — {baserow_summary(data.get('baserow'))}"
+        added = data.get("place_country") or {}
+        if added.get("action") in ("create", "update"):
+            msg += f"; {added['place_location']} is now in {added['country']} (place_country)"
         return RedirectResponse(f"/files/{file_id}?msg={msg}", status_code=303)

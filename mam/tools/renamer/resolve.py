@@ -527,7 +527,7 @@ class Resolver:
                 )
             )
         if place_cc:
-            origin = f"{place.name} is in {place.country} (Baserow places)"
+            origin = f"{place.name} is in {place.country} (Baserow place_country)"
             ev.append(Evidence("where", place_cc, "place", 0.85, detail={"origin": origin}))
         if explicit:
             chosen, raw = explicit[0]

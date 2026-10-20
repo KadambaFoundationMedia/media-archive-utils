@@ -119,6 +119,12 @@ class BaserowClient:
             self.settings.baserow_category_terms_table_id, "BASEROW_CATEGORY_TERMS_TABLE_ID"
         )
 
+    @property
+    def place_country_table(self) -> int:
+        return self._table_id(
+            self.settings.baserow_place_country_table_id, "BASEROW_PLACE_COUNTRY_TABLE_ID"
+        )
+
     @staticmethod
     def _table_id(value: int | None, name: str) -> int:
         if value is None:
@@ -251,6 +257,10 @@ class BaserowClient:
 
     def category_terms(self) -> list[dict[str, Any]]:
         return list(self.iter_rows(self.category_table))
+
+    def place_country(self) -> list[dict[str, Any]]:
+        """The place -> country table (one row per media place_location option)."""
+        return list(self.iter_rows(self.place_country_table))
 
     # ---------------------------------------------------------------- writes
     def _log(self, **kwargs: Any) -> int:
