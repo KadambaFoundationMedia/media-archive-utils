@@ -95,6 +95,12 @@ def test_import_page_lists_media_files(client, archive):
     assert "notes.txt" not in client.get("/import", params={"root": 0, "path": ""}).text
 
 
+def test_add_media_button_and_import_buttons(client):
+    assert 'href="/import"' in client.get("/").text and "Add media" in client.get("/").text
+    page = client.get("/import").text
+    assert page.index(">Import (") < page.index("Import all</button>")
+
+
 def test_import_selected_items_only(client, archive):
     client.post(
         "/import",
