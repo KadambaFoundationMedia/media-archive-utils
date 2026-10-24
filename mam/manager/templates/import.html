@@ -20,13 +20,19 @@
   <input type="hidden" name="root" value="{{ root }}">
   <input type="hidden" name="path" value="{{ path }}">
   <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass me-1"></i>Import this folder and all subfolders</button>
-  <span class="small text-body-secondary">{{ media_count }} media file(s) directly in this folder. Other files are ignored; originals are never changed.</span>
+  <span class="small text-body-secondary">{{ files | length }} media file(s) directly in this folder. Other files are ignored; originals are never changed.</span>
 </form>
 <div class="list-group mb-4">
   {% for name in folders %}
   <a class="list-group-item list-group-item-action" href="/import?root={{ root }}&path={{ ((path ~ '/' if path else '') ~ name) | urlencode }}">
     <i class="fa-regular fa-folder me-2"></i>{{ name }}</a>
   {% else %}<div class="list-group-item text-body-secondary">No subfolders</div>{% endfor %}
+  {% for f in files %}
+  <div class="list-group-item d-flex justify-content-between text-break">
+    <span><i class="fa-regular {{ 'fa-file-video' if f.kind == 'video' else 'fa-file-audio' }} me-2"></i>{{ f.name }}</span>
+    <span class="small text-body-secondary ms-3 text-nowrap">{{ '%.1f' | format(f.size / 1048576) }} MB</span>
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
 

@@ -89,6 +89,12 @@ def test_import_scan_and_list(client, archive, settings):
     assert "R09_0004.MP3" in page and "S.B. 1.19.30" not in page
 
 
+def test_import_page_lists_media_files(client, archive):
+    page = client.get("/import", params={"root": 0, "path": "Serbia-summercamp-6-13-jul-2012"}).text
+    assert "R09_0004.MP3" in page and "1 media file(s)" in page
+    assert "notes.txt" not in client.get("/import", params={"root": 0, "path": ""}).text
+
+
 def test_import_refuses_paths_outside_root(client):
     assert client.get("/import", params={"root": 0, "path": "../.."}).status_code == 400
 
