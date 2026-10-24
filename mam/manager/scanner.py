@@ -29,6 +29,10 @@ class ScanResult:
 
 
 def iter_media(root: Path):
+    if root.is_file():
+        if not root.name.startswith("."):
+            yield root
+        return
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
         for name in sorted(filenames):
