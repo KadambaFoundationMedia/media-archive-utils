@@ -440,7 +440,13 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 if child.is_dir():
                     folders.append(child.name)
                 elif media_kind(child):
-                    files.append({"name": child.name, "kind": media_kind(child), "size": child.stat().st_size})
+                    files.append(
+                        {
+                            "name": child.name,
+                            "kind": media_kind(child),
+                            "size": child.stat().st_size,
+                        }
+                    )
         crumbs = []
         parts = Path(path).parts if path else ()
         for i in range(len(parts)):
@@ -461,16 +467,24 @@ def create_app(start_queue: bool = True) -> FastAPI:
 
     @app.post("/import")
     def import_folder(
-        request: Request, root: Annotated[int, Form()], path: Annotated[str, Form()] = ""
+        request: Request,
+        root: Annotated[int, Form()],
+        path: Annotated[str, Form()] = "",
+        items: Annotated[list[str] | None, Form()] = None,
+        all: Annotated[str, Form()] = "",
     ):
+        """Import the ticked folders and files; the whole current folder with `all` or no ticks."""
         _, base = settings.import_roots[root]
         folder = _safe_join(base, path)
+        targets = [_safe_join(folder, name) for name in ([] if all else items or [])] or [folder]
         with session_scope() as session:
-            enqueue(session, "scan", dry_run=False, params={"path": str(folder)})
+            for target in targets:
+                enqueue(session, "scan", dry_run=False, params={"path": str(target)})
         notify(request)
-        return RedirectResponse(
-            f"/jobs?msg=Scanning {folder.name or folder}&live=1", status_code=303
-        )
+        label = targets[0].name or str(targets[0])
+        if len(targets) > 1:
+            label = f"{len(targets)} selected items"
+        return RedirectResponse(f"/jobs?msg=Scanning {label}&live=1", status_code=303)
 
     @app.post("/upload")
     async def upload(request: Request, files: list[UploadFile]):

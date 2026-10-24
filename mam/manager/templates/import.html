@@ -16,24 +16,47 @@
 {% if not exists %}
   <div class="alert alert-warning">This folder does not exist (check the path in .env).</div>
 {% else %}
-<form method="post" action="/import" class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+<form method="post" action="/import" class="mb-3" id="import-form">
   <input type="hidden" name="root" value="{{ root }}">
   <input type="hidden" name="path" value="{{ path }}">
-  <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass me-1"></i>Import this folder and all subfolders</button>
-  <span class="small text-body-secondary">{{ files | length }} media file(s) directly in this folder. Other files are ignored; originals are never changed.</span>
-</form>
-<div class="list-group mb-4">
-  {% for name in folders %}
-  <a class="list-group-item list-group-item-action" href="/import?root={{ root }}&path={{ ((path ~ '/' if path else '') ~ name) | urlencode }}">
-    <i class="fa-regular fa-folder me-2"></i>{{ name }}</a>
-  {% else %}<div class="list-group-item text-body-secondary">No subfolders</div>{% endfor %}
-  {% for f in files %}
-  <div class="list-group-item d-flex justify-content-between text-break">
-    <span><i class="fa-regular {{ 'fa-file-video' if f.kind == 'video' else 'fa-file-audio' }} me-2"></i>{{ f.name }}</span>
-    <span class="small text-body-secondary ms-3 text-nowrap">{{ '%.1f' | format(f.size / 1048576) }} MB</span>
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <button class="btn btn-primary btn-sm" type="submit" name="all" value="1"><i class="fa-solid fa-magnifying-glass me-1"></i>Import this folder and all subfolders</button>
+    <button class="btn btn-outline-primary btn-sm" type="submit" id="import-selected" disabled><i class="fa-solid fa-square-check me-1"></i>Import selected (<span id="sel-count">0</span>)</button>
+    <span class="small text-body-secondary">{{ files | length }} media file(s) directly in this folder. Other files are ignored; originals are never changed.</span>
   </div>
-  {% endfor %}
-</div>
+  <div class="list-group mb-4">
+    {% if folders or files %}
+    <label class="list-group-item small text-body-secondary"><input class="form-check-input me-2" type="checkbox" id="select-all">Select all folders and files below</label>
+    {% endif %}
+    {% for name in folders %}
+    <div class="list-group-item list-group-item-action d-flex align-items-center">
+      <input class="form-check-input me-3 sel" type="checkbox" name="items" value="{{ name }}" aria-label="Select {{ name }}">
+      <a class="flex-grow-1 text-reset text-decoration-none" href="/import?root={{ root }}&path={{ ((path ~ '/' if path else '') ~ name) | urlencode }}">
+        <i class="fa-regular fa-folder me-2"></i>{{ name }}</a>
+    </div>
+    {% else %}<div class="list-group-item text-body-secondary">No subfolders</div>{% endfor %}
+    {% for f in files %}
+    <label class="list-group-item d-flex align-items-center text-break">
+      <input class="form-check-input me-3 sel" type="checkbox" name="items" value="{{ f.name }}" aria-label="Select {{ f.name }}">
+      <span class="flex-grow-1"><i class="fa-regular {{ 'fa-file-video' if f.kind == 'video' else 'fa-file-audio' }} me-2"></i>{{ f.name }}</span>
+      <span class="small text-body-secondary ms-3 text-nowrap">{{ '%.1f' | format(f.size / 1048576) }} MB</span>
+    </label>
+    {% endfor %}
+  </div>
+</form>
+<script>
+(function () {
+  const boxes = () => Array.from(document.querySelectorAll('#import-form .sel'));
+  const update = () => {
+    const n = boxes().filter(b => b.checked).length;
+    document.getElementById('sel-count').textContent = n;
+    document.getElementById('import-selected').disabled = n === 0;
+  };
+  document.querySelectorAll('#import-form .sel').forEach(b => b.addEventListener('change', update));
+  const all = document.getElementById('select-all');
+  if (all) all.addEventListener('change', () => { boxes().forEach(b => b.checked = all.checked); update(); });
+})();
+</script>
 {% endif %}
 
 <h2 class="h6">Upload to the inbox</h2>

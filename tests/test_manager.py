@@ -95,6 +95,22 @@ def test_import_page_lists_media_files(client, archive):
     assert "notes.txt" not in client.get("/import", params={"root": 0, "path": ""}).text
 
 
+def test_import_selected_items_only(client, archive):
+    client.post(
+        "/import",
+        data={"root": 0, "path": "Serbia-summercamp-6-13-jul-2012", "items": ["R09_0004.MP3"]},
+    )
+    run_queue()
+    with session_scope() as s:
+        names = [f.original_path.rsplit("/", 1)[-1] for f in s.scalars(select(m.MediaFile))]
+    assert names == ["R09_0004.MP3"]
+
+
+def test_import_selected_refuses_outside_paths(client):
+    r = client.post("/import", data={"root": 0, "path": "", "items": ["../x"]})
+    assert r.status_code == 400
+
+
 def test_import_refuses_paths_outside_root(client):
     assert client.get("/import", params={"root": 0, "path": "../.."}).status_code == 400
 
