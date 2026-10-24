@@ -20,9 +20,9 @@
   <input type="hidden" name="root" value="{{ root }}">
   <input type="hidden" name="path" value="{{ path }}">
   <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-    <button class="btn btn-primary btn-sm" type="submit" name="all" value="1"><i class="fa-solid fa-magnifying-glass me-1"></i>Import this folder and all subfolders</button>
-    <button class="btn btn-outline-primary btn-sm" type="submit" id="import-selected" disabled><i class="fa-solid fa-square-check me-1"></i>Import selected (<span id="sel-count">0</span>)</button>
+    <button class="btn btn-primary btn-sm" type="submit" id="import-selected" disabled><i class="fa-solid fa-square-check me-1"></i>Import (<span id="sel-count">0</span>)</button>
     <span class="small text-body-secondary">{{ files | length }} media file(s) directly in this folder. Other files are ignored; originals are never changed.</span>
+    <button class="btn btn-outline-primary btn-sm ms-auto" type="submit" name="all" value="1"><i class="fa-solid fa-magnifying-glass me-1"></i>Import all</button>
   </div>
   <div class="list-group mb-4">
     {% if folders or files %}
