@@ -188,7 +188,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - The WHAT of each file is shown as a pill in its category's color from the Baserow `category_terms_folder.color` column (e.g. Bhagavad-gita blue, Srimad-bhagavatam light-red), with the category name below it. File names use the normal text color; finished tool steps are green.
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all at once.
-  - The action menu lists each tool plus "Run full pipeline", with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
+  - The action menu lists only the pipeline tools that are built (currently the Renamer) plus "Run full pipeline"; helper functions such as the audio-optimizer's verify and measure are not menu actions (they stay available as `mam audio ...` commands), with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
   - The list refreshes itself while any job is queued or running.
 - **File page:**
   - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, Notes, and which Baserow row to link; the note is kept with the file and added to the Baserow `notes` column with the person's name). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
