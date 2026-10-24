@@ -65,3 +65,30 @@ def test_file_list_never_waits_for_baserow(settings, disk_cache, slow_baserow, t
         started = time.time()
         page = client.get("/", params={"status": "__all"})
         assert page.status_code == 200 and time.time() - started < 2
+
+
+def test_filing_work_refreshes_cached_terms_older_than_the_limit(disk_cache, monkeypatch):
+    """A term added in Baserow minutes ago must file the next recording, not the stale copy."""
+    old = time.time() - 120  # younger than the 10 minute background refresh, older than the limit
+    os.utime(disk_cache, (old, old))
+    raw = reference_raw()
+    for row in raw["categories"]:
+        if row["category"] == "Festivals":
+            row["filename_terms"] += ", Govardhana"
+    monkeypatch.setattr(knowledge, "fetch_raw", lambda: raw)
+    stale = knowledge.get_reference()
+    assert stale.matcher.match("Govardhana-lekce") is None  # pages still use the cached copy
+    ref = knowledge.get_reference(max_age=knowledge.PLACEMENT_MAX_AGE_S)
+    assert ref.matcher.match("Govardhana-lekce").category.name == "Festivals"
+
+
+def test_filing_work_falls_back_to_the_cache_when_baserow_is_down(disk_cache, monkeypatch):
+    old = time.time() - 120
+    os.utime(disk_cache, (old, old))
+
+    def down():
+        raise RuntimeError("Baserow unreachable")
+
+    monkeypatch.setattr(knowledge, "fetch_raw", down)
+    ref = knowledge.get_reference(max_age=knowledge.PLACEMENT_MAX_AGE_S)
+    assert ref.matcher.by_name("Bhagavad-gita") is not None
