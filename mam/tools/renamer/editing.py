@@ -25,7 +25,13 @@ from mam.errors import MamError
 from mam.helpers.file_organizer import FileOrganizer
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.repo import set_status
-from mam.tools.renamer.knowledge import Place, Reference, get_reference, norm_key
+from mam.tools.renamer.knowledge import (
+    PLACEMENT_MAX_AGE_S,
+    Place,
+    Reference,
+    get_reference,
+    norm_key,
+)
 from mam.tools.renamer.naming import build_name, format_where, problems
 from mam.tools.renamer.parse import NameParser
 
@@ -278,7 +284,7 @@ def save(
         write_baserow,
     )
 
-    ref = get_reference()
+    ref = get_reference(max_age=PLACEMENT_MAX_AGE_S)
     if _clean(values.get("place")) and not exact_place(_clean(values.get("place")), ref):
         with contextlib.suppress(Exception):  # an option just added in Baserow counts at once
             ref = get_reference(refresh=True)

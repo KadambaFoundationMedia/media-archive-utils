@@ -31,6 +31,7 @@ log = logging.getLogger(__name__)
 
 ALIASES_FILE = Path(__file__).with_name("aliases.yaml")
 CACHE_TTL_S = 600
+PLACEMENT_MAX_AGE_S = 60  # files are filed with category terms at most this old
 
 
 def norm_key(text: str) -> str:
@@ -323,19 +324,22 @@ def _from_disk() -> Reference | None:
     return _cached
 
 
-def get_reference(refresh: bool = False) -> Reference:
+def get_reference(refresh: bool = False, max_age: float | None = None) -> Reference:
     """Reference data from memory, else from the disk cache, else from Baserow.
 
     Data older than 10 minutes is still returned at once while a background refresh runs,
     so pages and jobs never wait for Baserow. `refresh=True` fetches now (e.g. after adding
-    a place to the travel schedule).
+    a place to the travel schedule). `max_age` (seconds) fetches now when the cached copy is
+    older, for work that files recordings: a search term just added in Baserow must count.
     """
-    if refresh:
+    ref = None if refresh else (_cached or _from_disk())
+    too_old = max_age is not None and ref is not None and time.time() - ref.loaded_at >= max_age
+    if refresh or too_old:
         try:
             return _fetch_and_store()
         except Exception as exc:
             log.warning("Baserow unreachable (%s); using cached reference data", exc)
-    ref = _cached or _from_disk()
+        ref = _cached or _from_disk()
     if ref is None:  # first run ever: nothing cached yet
         return _fetch_and_store()
     if time.time() - ref.loaded_at >= CACHE_TTL_S:

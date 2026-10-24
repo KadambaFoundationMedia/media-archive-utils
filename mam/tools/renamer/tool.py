@@ -21,7 +21,12 @@ from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.renamer.dates import DateValue
-from mam.tools.renamer.knowledge import Reference, get_reference, norm_key
+from mam.tools.renamer.knowledge import (
+    PLACEMENT_MAX_AGE_S,
+    Reference,
+    get_reference,
+    norm_key,
+)
 from mam.tools.renamer.naming import build_name, format_where
 from mam.tools.renamer.resolve import Proposal, Resolver
 
@@ -32,7 +37,9 @@ ALIAS_ACTIVATION = 3  # a correction made this many times becomes a rule (SPEC.m
 
 def resolver(settings: Settings | None = None) -> Resolver:
     settings = settings or get_settings()
-    return Resolver(get_reference(), [p for _, p in settings.import_roots])
+    return Resolver(
+        get_reference(max_age=PLACEMENT_MAX_AGE_S), [p for _, p in settings.import_roots]
+    )
 
 
 def source_path(record: m.MediaFile) -> Path:
