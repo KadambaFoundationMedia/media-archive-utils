@@ -55,7 +55,7 @@ Items under "Open decisions" are not decided: ask instead of guessing.
   - Same name and same size (a duplicate): copy it with a `_duplicate` suffix, as the file-organizer spec requires.
 - **After a kirtan/class split:** the combined processed copy is discarded and the original stays on the NAS. The combined file's Baserow row becomes the class row, and the kirtan gets a new row.
 - **Ingest:** four ways to add files:
-  - browse and import NAS folders
+  - browse and import NAS folders (the Import page lists the subfolders first, then the media files directly in the browsed folder with their size; other file types are not listed)
   - a full archive scan (index only, no processing)
   - drag-and-drop upload into an inbox folder
   - a watched inbox folder, whose new files are registered automatically

@@ -432,7 +432,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
             raise HTTPException(404)
         label, base = roots[root]
         current = _safe_join(base, path)
-        folders, media_count = [], 0
+        folders, files = [], []
         if current.is_dir():
             for child in sorted(current.iterdir(), key=lambda p: p.name.lower()):
                 if child.name.startswith("."):
@@ -440,7 +440,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 if child.is_dir():
                     folders.append(child.name)
                 elif media_kind(child):
-                    media_count += 1
+                    files.append({"name": child.name, "kind": media_kind(child), "size": child.stat().st_size})
         crumbs = []
         parts = Path(path).parts if path else ()
         for i in range(len(parts)):
@@ -455,7 +455,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
             current=current,
             exists=current.is_dir(),
             folders=folders,
-            media_count=media_count,
+            files=files,
             crumbs=crumbs,
         )
 
