@@ -1,5 +1,4 @@
 <div {% if active %}hx-get="/files/rows?{{ request.url.query }}" hx-trigger="every 3s" hx-target="#file-table" hx-swap="innerHTML"{% endif %}>
-<div class="table-responsive">
 <table class="table table-sm table-hover align-middle file-table{% if flt.sort != 'path' %} table-striped{% endif %}">
   <thead>
     <tr>
@@ -9,6 +8,7 @@
       <th>Status</th>
       <th>Date</th>
       <th>Title / WHAT</th>
+      <th>Category</th>
       <th>Location</th>
     </tr>
   </thead>
@@ -20,7 +20,7 @@
     {% if flt.sort == 'path' and folder != ns.folder %}
       {% set ns.folder = folder %}{% set ns.stripe = 0 %}
     <tr class="folder-row">
-      <td colspan="7">
+      <td colspan="8">
         <i class="fa-regular fa-folder-open me-2"></i><span class="fw-semibold">{{ f.original_path | rel_folder }}</span>
         <a class="small ms-2" href="/?{{ flt.query_args(folder=folder, page=1) | urlencode }}" title="Show only this folder">only this folder</a>
       </td>
@@ -43,14 +43,14 @@
       <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>
       {% set what = f.title or (proposal.what if proposal else '') %}
       {% set category = f.category or (proposal.category if proposal else '') %}
+      <td class="small">{{ what }}</td>
       <td class="small">
-        {% if what %}<span class="badge cat-pill {% if not category %}text-bg-light border{% endif %}" style="{{ category_style(category) }}" title="{{ category or 'No category yet' }}">{{ what }}</span>{% endif %}
-        {% if category %}<div class="text-body-secondary mt-1">{{ category }}</div>{% endif %}
+        {% if category %}<span class="badge cat-pill" style="{{ category_style(category) }}">{{ category }}</span>{% endif %}
       </td>
       <td class="small">{{ f.location or (proposal.where if proposal else '') or '' }}</td>
     </tr>
   {% else %}
-    <tr><td colspan="7" class="text-center text-body-secondary py-4">
+    <tr><td colspan="8" class="text-center text-body-secondary py-4">
       {% if flt.status == '__attention' %}Nothing needs your attention.
         <a href="/?{{ flt.query_args(status='__all', page=1) | urlencode }}">Show all files</a>
       {% else %}No files match. <a href="/import">Import a folder</a> or <a href="/?status=__all">show all files</a>.{% endif %}
@@ -58,7 +58,6 @@
   {% endfor %}
   </tbody>
 </table>
-</div>
 {% set pages = ((total + page_size - 1) // page_size) %}
 {% if pages > 1 %}
 <nav aria-label="Pages">

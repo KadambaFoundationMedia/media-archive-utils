@@ -36,10 +36,10 @@
           {{ badge('review', counts.review, 'warning') }}</a></li>
         <li class="nav-item"><a class="nav-link" href="/jobs"><i class="fa-solid fa-gears me-1"></i>Jobs
           {{ badge('jobs', counts.jobs, 'info') }}{{ poll(counts.jobs) }}</a></li>
-        <li class="nav-item"><a class="nav-link" href="/import"><i class="fa-solid fa-folder-plus me-1"></i>Import</a></li>
         <li class="nav-item"><a class="nav-link" href="/settings"><i class="fa-solid fa-gear me-1"></i>Settings</a></li>
       </ul>
       <div class="navbar-text me-3 py-1">{% with switch_id='nav' %}{% include "_baserow_switch.html" %}{% endwith %}</div>
+      <a class="btn btn-primary btn-sm me-2" href="/import"><i class="fa-solid fa-folder-plus me-1"></i>Add media</a>
       <button class="btn btn-sm btn-outline-secondary" type="button" id="theme-toggle" aria-label="Toggle dark mode">
         <i class="fa-solid fa-circle-half-stroke"></i>
       </button>

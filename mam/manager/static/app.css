@@ -1,6 +1,7 @@
 .file-table td, .file-table th { vertical-align: top; }
 .file-table td:nth-child(2) { min-width: 14rem; }
 .file-table td:nth-child(3) { min-width: 14rem; }
+.file-table td:nth-child(7) { min-width: 8rem; }
 .border-dashed { border-style: dashed !important; }
 .dropzone.dragover { background: var(--bs-tertiary-bg); }
 .evidence-chip { cursor: pointer; }
@@ -29,3 +30,13 @@
 
 /* While the list reloads: dim it (htmx adds .htmx-request to the filter form). */
 #filters.htmx-request ~ #actions #file-table { opacity: .45; transition: opacity .15s; }
+
+/* Sticky table header: sits below the fixed navbar once the filters have scrolled away.
+   (No overflow wrapper around the table, that would stop sticky from working.) */
+.file-table thead th {
+  position: sticky;
+  top: var(--nav-h, 56px);
+  z-index: 2;
+  background: var(--bs-body-bg);
+  box-shadow: inset 0 -2px 0 var(--bs-border-color);
+}
