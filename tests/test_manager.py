@@ -565,7 +565,7 @@ def test_filters_have_clear_buttons(client):
     assert "Clear folder" in page
 
 
-def test_what_is_shown_in_its_category_color(client, archive, reference, no_baserow):
+def test_category_is_shown_in_its_color_not_the_title(client, archive, reference, no_baserow):
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
     client.post("/actions", data={"tool": "renamer", "scope": "all", "mode": "run"})
@@ -573,9 +573,11 @@ def test_what_is_shown_in_its_category_color(client, archive, reference, no_base
     page = client.get("/?status=__all").text
     # Srimad-bhagavatam is 'light-red' in category_terms_folder
     assert (
-        'style="background-color:#edaba8;color:#1f2328;border-color:#edaba8" '
-        'title="Srimad-bhagavatam">SB-1-19-30' in page
+        'style="background-color:#edaba8;color:#1f2328;border-color:#edaba8">'
+        "Srimad-bhagavatam</span>" in page
     )
+    assert 'cat-pill" style="background-color:#edaba8;color:#1f2328;border-color:#edaba8">SB' not in page
+    assert "<th>Category</th>" in page and "table-responsive" not in page  # sticky header needs this
 
 
 def test_filter_reload_keeps_a_real_page_url(client):

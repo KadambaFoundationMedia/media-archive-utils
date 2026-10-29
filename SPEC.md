@@ -55,7 +55,7 @@ Items under "Open decisions" are not decided: ask instead of guessing.
   - Same name and same size (a duplicate): copy it with a `_duplicate` suffix, as the file-organizer spec requires.
 - **After a kirtan/class split:** the combined processed copy is discarded and the original stays on the NAS. The combined file's Baserow row becomes the class row, and the kirtan gets a new row.
 - **Ingest:** four ways to add files:
-  - browse and import NAS folders (the Import page lists the subfolders first, then the media files directly in the browsed folder with their size; other file types are not listed). Each folder and file has a checkbox (plus select all); **Import** (left) imports only the ticked ones (a ticked folder with all its subfolders, a ticked file alone), and **Import all** (right) imports the whole browsed folder with its subfolders). The Files page has an **Add media** button that opens the Import page
+  - browse and import NAS folders (the Import page lists the subfolders first, then the media files directly in the browsed folder with their size; other file types are not listed). Each folder and file has a checkbox (plus select all); **Import** (left) imports only the ticked ones (a ticked folder with all its subfolders, a ticked file alone), and **Import all** (right) imports the whole browsed folder with its subfolders). The top bar has an **Add media** button (on every page) that opens the Import page
   - a full archive scan (index only, no processing)
   - drag-and-drop upload into an inbox folder
   - a watched inbox folder, whose new files are registered automatically
@@ -185,7 +185,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Sorted by path, files are grouped under a header row per folder (shown relative to its import root, e.g. `Sample files / 2012 / Radhadesh Jan 2012`) with alternating row colors.
   - An action without a status filter applies to all files.
   - Every filter has an always-visible × that clears only that filter (dimmed when there is nothing to clear). Clearing Status shows all files; **Reset all** returns every filter to its default (Needs attention, sorted by path).
-  - The WHAT of each file is shown as a pill in its category's color from the Baserow `category_terms_folder.color` column (e.g. Bhagavad-gita blue, Srimad-bhagavatam light-red), with the category name below it. File names use the normal text color; finished tool steps are green.
+  - The Title / WHAT column is plain text. The **Category** column shows the category as a pill in its color from the Baserow `category_terms_folder.color` column (e.g. Bhagavad-gita blue, Srimad-bhagavatam light-red). The top bar (with the **Add media** button) stays fixed; the filters scroll away, and once they are out of view the table header row sticks just below the top bar. File names use the normal text color; finished tool steps are green.
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all at once.
   - The action menu lists only the pipeline tools that are built (currently the Renamer) plus "Run full pipeline"; helper functions such as the audio-optimizer's verify and measure are not menu actions (they stay available as `mam audio ...` commands), with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).

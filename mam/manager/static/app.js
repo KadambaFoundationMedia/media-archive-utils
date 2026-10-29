@@ -140,3 +140,13 @@ document.body.addEventListener("htmx:oobAfterSwap", (event) => {
   url.searchParams.delete("live");
   history.replaceState(history.state, "", url.pathname + url.search + url.hash);
 })();
+
+// Keep the sticky table header just below the (sticky) navbar, whatever its height.
+(function () {
+  const nav = document.querySelector("nav.sticky-top");
+  if (!nav) return;
+  const set = () => document.documentElement.style.setProperty("--nav-h", nav.offsetHeight + "px");
+  set();
+  window.addEventListener("resize", set);
+  if (window.ResizeObserver) new ResizeObserver(set).observe(nav);
+})();
