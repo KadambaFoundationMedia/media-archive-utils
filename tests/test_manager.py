@@ -626,3 +626,48 @@ def test_navbar_counts_follow_running_jobs(client):
     assert 'data-active="0"' in badges and "every 2s" not in badges  # the last answer stops it
     page = client.get("/jobs?msg=Scanning x&live=1").text
     assert "alert-success" in page and "Finished:" in page  # finished before the page loaded
+
+
+def add_files(count):
+    with session_scope() as s:
+        for i in range(count):
+            s.add(
+                m.MediaFile(
+                    fingerprint=f"fp{i}",
+                    size=1,
+                    mtime=0.0,
+                    kind="audio",
+                    original_path=f"/nas/folder/file_{i:03d}.mp3",
+                )
+            )
+
+
+def test_files_load_more(client):
+    add_files(120)
+    page = client.get("/", params={"status": "__all"}).text
+    assert page.count('class="file-row') == 50
+    assert "Showing 50 of 120 files" in page and "Load 50 more" in page
+    assert '<option value="500"' in page
+    # Load more continues after the rows already shown, without repeating the folder header
+    more = client.get(
+        "/files/more",
+        params={"status": "__all", "offset": 50, "last_folder": "/nas/folder", "stripe": 50},
+    ).text
+    assert more.count('class="file-row') == 50
+    assert "file_049" not in more and "file_050" in more and "file_099" in more
+    assert 'class="folder-row"' not in more
+    assert "Showing 100 of 120 files" in more and "Load 20 more" in more
+    last = client.get("/files/more", params={"status": "__all", "offset": 100}).text
+    assert "Showing 120 of 120 files" in last and "load-more-btn" not in last
+
+
+def test_files_page_size_and_rerender(client):
+    add_files(120)
+    page = client.get("/", params={"status": "__all", "size": 100}).text
+    assert page.count('class="file-row') == 100 and "Load 20 more" in page
+    # an unknown size falls back to 50; limit re-renders the rows already loaded
+    assert (
+        client.get("/", params={"status": "__all", "size": 7}).text.count('class="file-row') == 50
+    )
+    rows = client.get("/files/rows", params={"status": "__all", "limit": 110}).text
+    assert rows.count('class="file-row') == 110

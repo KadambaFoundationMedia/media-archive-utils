@@ -227,7 +227,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
             total=total,
             flt=flt,
             facets=facets,
-            page_size=queries.PAGE_SIZE,
+            page_sizes=queries.PAGE_SIZES,
             menu=menu_tools(),
         )
 
@@ -242,7 +242,22 @@ def create_app(start_queue: bool = True) -> FastAPI:
             rows=rows,
             total=total,
             flt=flt,
-            page_size=queries.PAGE_SIZE,
+        )
+
+    @app.get("/files/more", response_class=HTMLResponse)
+    def files_more(request: Request, last_folder: str = "", stripe: int = 0):
+        """The next batch of rows, appended to the table by the Load more button."""
+        flt = queries.FileFilter.from_params(request.query_params)
+        with session_scope() as session:
+            rows, total = queries.list_files(session, flt)
+        return render(
+            request,
+            "_file_more.html",
+            rows=rows,
+            total=total,
+            flt=flt,
+            last_folder=last_folder,
+            stripe=stripe,
         )
 
     @app.post("/actions")

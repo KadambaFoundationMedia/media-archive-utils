@@ -1,0 +1,7 @@
+{# Response of Load more: the new rows are appended to the table and the footer is replaced (both out-of-band). #}
+{% set ns = namespace(folder=last_folder or None, stripe=stripe) %}
+<tbody hx-swap-oob="beforeend:#file-body">
+{% include "_file_row_items.html" %}
+</tbody>
+{% set oob = true %}
+{% include "_load_more.html" %}

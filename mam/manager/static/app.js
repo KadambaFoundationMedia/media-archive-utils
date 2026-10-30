@@ -150,3 +150,10 @@ document.body.addEventListener("htmx:oobAfterSwap", (event) => {
   window.addEventListener("resize", set);
   if (window.ResizeObserver) new ResizeObserver(set).observe(nav);
 })();
+
+// Rows added by Load more follow the "select all shown" checkbox.
+document.body.addEventListener("htmx:oobAfterSwap", (event) => {
+  if (event.detail.target?.id === "file-body" && document.getElementById("select-page")?.checked) {
+    document.querySelectorAll(".row-select").forEach((box) => { box.checked = true; });
+  }
+});

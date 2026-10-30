@@ -1,8 +1,8 @@
-<div {% if active %}hx-get="/files/rows?{{ request.url.query }}" hx-trigger="every 3s" hx-target="#file-table" hx-swap="innerHTML"{% endif %}>
+<div {% if active %}hx-get="/files/rows?{{ request.url.query }}" hx-trigger="every 3s" hx-target="#file-table" hx-swap="innerHTML" hx-vals='js:{limit: document.querySelectorAll("#file-body .file-row").length}'{% endif %}>
 <table class="table table-sm table-hover align-middle file-table{% if flt.sort != 'path' %} table-striped{% endif %}">
   <thead>
     <tr>
-      <th style="width:2rem"><input class="form-check-input" type="checkbox" id="select-page" aria-label="Select all on this page"></th>
+      <th style="width:2rem"><input class="form-check-input" type="checkbox" id="select-page" aria-label="Select all shown"></th>
       <th>Original</th>
       <th>New name</th>
       <th>Status</th>
@@ -12,64 +12,17 @@
       <th>Location</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody id="file-body">
   {% set ns = namespace(folder=None, stripe=0) %}
-  {% for f in rows %}
-    {% set proposal = (f.meta or {}).get('proposal') %}
-    {% set folder = f.original_path | dirname %}
-    {% if flt.sort == 'path' and folder != ns.folder %}
-      {% set ns.folder = folder %}{% set ns.stripe = 0 %}
-    <tr class="folder-row">
-      <td colspan="8">
-        <i class="fa-regular fa-folder-open me-2"></i><span class="fw-semibold">{{ f.original_path | rel_folder }}</span>
-        <a class="small ms-2" href="/?{{ flt.query_args(folder=folder, page=1) | urlencode }}" title="Show only this folder">only this folder</a>
-      </td>
-    </tr>
-    {% endif %}
-    {% set ns.stripe = ns.stripe + 1 %}
-    <tr class="file-row{% if flt.sort == 'path' and ns.stripe is even %} stripe{% endif %}">
-      <td><input class="form-check-input row-select" type="checkbox" name="ids" value="{{ f.id }}" aria-label="Select"></td>
-      <td class="text-break">
-        <a href="/files/{{ f.id }}" class="fw-medium file-link">{{ f.original_path | basename }}</a>
-        {% if flt.sort != 'path' %}<div class="small text-body-secondary text-break">{{ f.original_path | rel_folder }}</div>{% endif %}
-      </td>
-      <td class="text-break small">
-        {% if f.current_name %}<span class="font-monospace">{{ f.current_name }}</span>
-        {% elif proposal %}<span class="font-monospace text-body-secondary" title="Proposed by a dry run">{{ proposal.new_name }}</span>
-          <span class="badge text-bg-light border">dry run</span>
-        {% else %}<span class="text-body-secondary">–</span>{% endif %}
-      </td>
-      <td>{% with s=f.status %}{% include "_status.html" %}{% endwith %}</td>
-      <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>
-      {% set what = f.title or (proposal.what if proposal else '') %}
-      {% set category = f.category or (proposal.category if proposal else '') %}
-      <td class="small">{{ what }}</td>
-      <td class="small">
-        {% if category %}<span class="badge cat-pill" style="{{ category_style(category) }}">{{ category }}</span>{% endif %}
-      </td>
-      <td class="small">{{ f.location or (proposal.where if proposal else '') or '' }}</td>
-    </tr>
-  {% else %}
+  {% include "_file_row_items.html" %}
+  {% if not rows %}
     <tr><td colspan="8" class="text-center text-body-secondary py-4">
       {% if flt.status == '__attention' %}Nothing needs your attention.
-        <a href="/?{{ flt.query_args(status='__all', page=1) | urlencode }}">Show all files</a>
+        <a href="/?{{ flt.query_args(status='__all') | urlencode }}">Show all files</a>
       {% else %}No files match. <a href="/import">Import a folder</a> or <a href="/?status=__all">show all files</a>.{% endif %}
     </td></tr>
-  {% endfor %}
+  {% endif %}
   </tbody>
+{% include "_load_more.html" %}
 </table>
-{% set pages = ((total + page_size - 1) // page_size) %}
-{% if pages > 1 %}
-<nav aria-label="Pages">
-  <ul class="pagination pagination-sm flex-wrap">
-    {% for p in range(1, pages + 1) %}
-      {% if p == 1 or p == pages or (p - flt.page)|abs <= 2 %}
-      <li class="page-item {% if p == flt.page %}active{% endif %}">
-        <a class="page-link" href="/?{{ flt.query_args(page=p) | urlencode }}">{{ p }}</a>
-      </li>
-      {% elif (p - flt.page)|abs == 3 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
-    {% endfor %}
-  </ul>
-</nav>
-{% endif %}
 </div>
