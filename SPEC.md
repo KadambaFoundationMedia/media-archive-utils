@@ -92,7 +92,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **The Renamer flags a file for review when:**
   - the filename is non-descriptive
   - the date format cannot be determined, even with the travel schedule and the media table
-  - a new place or country is needed. The review page says to add the place as a `place_location` option in Baserow; saving the file with that place and its country adds it to `place_country`.
+  - a new place or country is needed. The flag reads "New place 'X' is not in Baserow. Add it as a place_location option in Baserow, or correct it" (never the travel schedule, which is not written); saving the file with that place and its country adds it to `place_country`.
 - **The Renamer also flags a file when:**
   - the filename names another speaker (e.g. `SNS`, `BVS`) and not KKS, since WHO is always KKS
   - the country code contradicts a known place (`Oslo_fi`) and cannot be corrected safely

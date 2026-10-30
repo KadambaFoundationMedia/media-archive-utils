@@ -99,6 +99,8 @@ def test_other_speaker_is_flagged(propose):
     )
     assert any("Another speaker" in f for f in p.flags)
     assert any("New place 'Serbia-Summercamp'" in f for f in p.flags)
+    assert any("place_location option in Baserow" in f for f in p.flags)
+    assert not any("travel schedule" in f.lower() for f in p.flags if f.startswith("New place"))
 
 
 def test_new_place_suggests_closest_known_place(reference, settings, tree):
