@@ -155,3 +155,23 @@ def test_sync_plan_one_row_per_place():
     assert "Sumercamp" in plan.skipped and "WUSA-house" in plan.skipped
     fixes = {f.row_id: (f.old, f.new) for f in plan.media}
     assert fixes == {5: (None, "Czech-Republic"), 6: ("Czech-republic", "Czech-Republic")}
+
+
+def test_place_country_aliases_resolve_to_the_canonical_place():
+    raw = reference_raw()
+    for row in raw["place_country"]:
+        if row["place"] == "Radhadesh":
+            row["aliases"] = "New-Radhadesh; RDH ;"
+    ref = build_reference(raw)
+    for text in ("New-Radhadesh", "rdh", "Radhadesh"):
+        place = ref.find_place(text)
+        assert place.name == "Radhadesh" and place.cc == "be"
+    assert ref.find_place("Brno").name == "Brno"  # rows without aliases are unaffected
+
+
+def test_an_alias_never_beats_a_real_place():
+    raw = reference_raw()
+    for row in raw["place_country"]:
+        if row["place"] == "Oslo":
+            row["aliases"] = "Berlin"
+    assert build_reference(raw).find_place("Berlin").name == "Berlin"

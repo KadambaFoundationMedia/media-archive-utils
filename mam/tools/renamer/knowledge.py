@@ -178,6 +178,7 @@ def _place_country_rows(client) -> list[dict[str, Any]]:
             "place": (r.get("place_location") or "").strip(),
             "country": (r.get("country") or "").strip(),
             "cc": (r.get("ccTLD") or "").strip().lower(),
+            "aliases": (r.get("aliases") or "").strip(),
         }
         for r in rows
     ]
@@ -241,6 +242,14 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
         target_place = places.get(norm_key(target))
         if target_place:
             places[key] = target_place
+    # Other spellings of a place, kept by hand in the place_country `aliases` column
+    # (semicolon-separated). A real Baserow place or an earlier alias beats a later alias.
+    for key, row in place_rows.items():
+        target_place = exact.get(key)
+        for alias in str(row.get("aliases") or "").split(";"):
+            alias_key = norm_key(alias)
+            if target_place and alias_key and alias_key not in exact:
+                places.setdefault(alias_key, target_place)
     max_words = max((len(k.split()) for k in places), default=3)
 
     return Reference(

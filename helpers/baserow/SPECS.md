@@ -97,6 +97,7 @@ column country: Country of recording.
 Column place_location (text, primary): exactly a media `place_location` option, e.g. `Brno`
 Column country (text): a media `country` option, e.g. `Czech-Republic`; empty for general places used in many countries (Zoom-livestream, Home-program, Summercamp, Govindas)
 Column ccTLD (text): the country code used in filenames, e.g. `cz`
+Column aliases (text, optional, filled by hand): other spellings of the place separated by semicolons, e.g. `New-Radhakunda-Dham;NRK` on `ISKCON-Korsnäs-Gård`. The Renamer maps an alias to the place; tools never write this column.
 
 The table id is `BASEROW_PLACE_COUNTRY_TABLE_ID` in `.env`. It was filled once with `uv run mam place-country sync` (dry run first, `--apply` to write). Afterwards the portal adds a row (or fills an empty country) when a person saves a file with a place and a country; a row with another country is never changed.
 
