@@ -175,3 +175,27 @@ def test_an_alias_never_beats_a_real_place():
         if row["place"] == "Oslo":
             row["aliases"] = "Berlin"
     assert build_reference(raw).find_place("Berlin").name == "Berlin"
+
+
+def test_aliases_column_is_read_whatever_its_case(monkeypatch):
+    """The live Baserow column is `Aliases` (capital A); the row also has Baserow's own keys."""
+    from mam.tools.renamer import knowledge
+
+    class Client:
+        def place_country(self):
+            return [
+                {
+                    "id": 136,
+                    "order": "115.0",
+                    "place_location": "Radhadesh",
+                    "country": "Belgium",
+                    "ccTLD": "be",
+                    "Aliases": "NRK;New-Radhakunda-Dham",
+                }
+            ]
+
+    rows = knowledge._place_country_rows(Client())
+    assert rows[0]["aliases"] == "NRK;New-Radhakunda-Dham" and rows[0]["cc"] == "be"
+    raw = reference_raw()
+    raw["place_country"] = [r for r in raw["place_country"] if r["place"] != "Radhadesh"] + rows
+    assert build_reference(raw).find_place("NRK").name == "Radhadesh"

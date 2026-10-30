@@ -172,16 +172,20 @@ def _place_country_rows(client) -> list[dict[str, Any]]:
     except BaserowError as exc:  # table id not set yet: places have no country
         log.warning("place_country table not read: %s", exc)
         return []
-    return [
-        {
-            "id": r["id"],
-            "place": (r.get("place_location") or "").strip(),
-            "country": (r.get("country") or "").strip(),
-            "cc": (r.get("ccTLD") or "").strip().lower(),
-            "aliases": (r.get("aliases") or "").strip(),
-        }
-        for r in rows
-    ]
+    out = []
+    for r in rows:
+        # column names are matched ignoring case: Baserow has `Aliases`
+        low = {str(k).lower(): v for k, v in r.items()}
+        out.append(
+            {
+                "id": r["id"],
+                "place": (low.get("place_location") or "").strip(),
+                "country": (low.get("country") or "").strip(),
+                "cc": (low.get("cctld") or "").strip().lower(),
+                "aliases": (low.get("aliases") or "").strip(),
+            }
+        )
+    return out
 
 
 def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) -> Reference:

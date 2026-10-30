@@ -60,6 +60,7 @@ PLACE_ROWS[100] = {
     "place_location": "ISKCON-Amsterdam",
     "country": "Netherlands",
     "ccTLD": "nl",
+    "Aliases": "ATC;Amsterdam-temple-test",  # the live column is spelled `Aliases`
 }
 BY_ID = {o["id"]: o["value"] for f in FIELDS for o in f["select_options"]}
 SELECTS = {f["name"]: f["type"] for f in FIELDS if f["type"].endswith("select")}
