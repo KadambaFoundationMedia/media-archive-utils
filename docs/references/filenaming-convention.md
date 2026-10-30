@@ -54,7 +54,7 @@ WHERE has one of three forms:
 
 The ccTLD must be a valid country code (`no` for Norway, `se` for Sweden, `in` for India).
 
-The country of a known place comes from the Baserow `place_country` table (e.g. `Brno` → `Czech-Republic` → `cz`); general places such as `Zoom-livestream` or `Home-program` have no country there, so the file's own evidence decides. The travel schedule only says where KKS possibly was on a date.
+The country of a known place comes from the Baserow `place_country` table (e.g. `Brno` → `Czech-Republic` → `cz`); general places such as `Zoom-livestream` or `Home-program` have no country there, so the file's own evidence decides. The travel schedule only says where KKS possibly was on a date; it is not where a new place is added. The "New place" flag tells you to add the place as a `place_location` option in Baserow.
 
 When a file names no place or country, the Renamer may take the country from the other files in the same folder: if the places they name are all in one country, that country is used (e.g. `cz` for the files next to `03 BRNO LEKCE.mp3`). The city is left out until it is known.
 
