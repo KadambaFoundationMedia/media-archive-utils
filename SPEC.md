@@ -163,6 +163,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Schema:**
   - Only existing columns and select options are used. The schema is refreshed at runtime.
 - **Place and country:** the `place_country` table (one row per media `place_location` option: `place_location`, `country`, `ccTLD`) is the only source of a place's country. General places (Zoom-livestream, Home-program, Summercamp, Govindas; `no_country` in `mam/tools/renamer/aliases.yaml`) have no country: the file's own evidence decides. It was filled once with `uv run mam place-country sync`, which also gave media rows with a place but no country that place's country and unified the `Czech-republic`/`Czech-Republic` spelling. A person's save adds a missing row or fills an empty country, live; a row with another country is never changed (the file page warns at the Country field).
+  - The `place_country` table also has an `aliases` column, filled by hand: other spellings of the place separated by semicolons (`ISKCON-Korsnäs-Gård` has `New-Radhakunda-Dham;NRK`). The Renamer reads them with the table and treats an alias like the place itself, so the filename gets the canonical place and its country. A real Baserow place, or an alias listed earlier, beats a later alias; the portal never writes `aliases`.
   - The `users` and `media_review_tasks` tables are ignored.
 
 ## 7. File statuses

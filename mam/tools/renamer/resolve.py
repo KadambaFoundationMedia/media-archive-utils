@@ -257,8 +257,9 @@ class Resolver:
         if place_text and not place:
             suggestion = self._closest_place(place_text)
             flags.append(
-                f"New place '{place_text}' is not in Baserow. Add it as a place_location option in Baserow, "
-                "or correct it" + (f" (did you mean {suggestion}?)." if suggestion else ".")
+                f"New place '{place_text}' is not in Baserow. "
+                "Add it as a place_location option in Baserow, or correct it"
+                + (f" (did you mean {suggestion}?)." if suggestion else ".")
             )
             new_place = {"place": place_text, "country": country_name(cc) if cc else ""}
         if cc and is_valid_cctld(cc) and cc not in self.ref.country_options:
