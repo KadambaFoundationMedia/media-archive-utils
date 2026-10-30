@@ -1,4 +1,4 @@
-"""File list filtering, sorting and paging."""
+"""File list filtering, sorting and batch loading."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 
 from mam.helpers.local_db import models as m
 
-PAGE_SIZE = 50
+PAGE_SIZES = (50, 100, 200, 500)  # the "Show" choices; Load more adds this many each time
+PAGE_SIZE = PAGE_SIZES[0]
+MAX_SHOWN = 20000  # upper bound for re-rendering the already loaded rows
 DEFAULT_STATUS = "__attention"  # the file list opens on the files that need a person
 ATTENTION_LIKE = ("% Review", "% Failed")
 SORTS = {
@@ -32,7 +34,9 @@ class FileFilter:
     folder: str = ""
     sort: str = "path"
     desc: bool = False
-    page: int = 1
+    size: int = PAGE_SIZE
+    offset: int = 0  # rows already shown; Load more continues here
+    limit: int = 0  # re-render this many rows from the top (used while polling)
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -40,10 +44,13 @@ class FileFilter:
         def get(name: str, default: str = "") -> str:
             return (params.get(name) or default).strip()
 
-        try:
-            page = max(1, int(get("page", "1")))
-        except ValueError:
-            page = 1
+        def number(name: str) -> int:
+            try:
+                return max(0, min(int(get(name, "0")), MAX_SHOWN))
+            except ValueError:
+                return 0
+
+        size = number("size")
         sort = get("sort", "path")
         return cls(
             q=get("q"),
@@ -53,7 +60,9 @@ class FileFilter:
             folder=get("folder"),
             sort=sort if sort in SORTS else "path",
             desc=get("desc") in ("1", "true", "on"),
-            page=page,
+            size=size if size in PAGE_SIZES else PAGE_SIZE,
+            offset=number("offset"),
+            limit=number("limit"),
         )
 
     def query_args(self, **overrides: Any) -> dict[str, Any]:
@@ -65,7 +74,7 @@ class FileFilter:
             "folder": self.folder,
             "sort": self.sort,
             "desc": "1" if self.desc else "",
-            "page": self.page,
+            "size": self.size,
         }
         args.update(overrides)
         return {k: v for k, v in args.items() if v not in ("", None)}
@@ -111,7 +120,7 @@ def list_files(session: Session, flt: FileFilter) -> tuple[list[m.MediaFile], in
     column = SORTS[flt.sort]
     order = [column.desc() if flt.desc else column.asc(), m.MediaFile.id]
     rows = session.scalars(
-        base.order_by(*order).offset((flt.page - 1) * PAGE_SIZE).limit(PAGE_SIZE)
+        base.order_by(*order).offset(flt.offset).limit(flt.limit or flt.size)
     ).all()
     return list(rows), total
 

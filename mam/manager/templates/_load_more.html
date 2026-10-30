@@ -1,0 +1,15 @@
+{# Table footer: how many files are shown and the Load more button. Needs ns, rows, total, flt. #}
+{# A tfoot (not a div) so the swap-oob copy survives htmx parsing next to the appended <tr> rows. #}
+{% set shown = flt.offset + rows | length %}
+<tfoot id="load-more"{% if oob %} hx-swap-oob="outerHTML:#load-more"{% endif %}>
+  <tr><td colspan="8" class="text-center py-3">
+    <div class="small text-body-secondary mb-2">Showing {{ shown }} of {{ total }} files</div>
+    {% if shown < total %}
+    <button type="button" class="btn btn-outline-primary btn-sm" id="load-more-btn"
+            hx-get="/files/more?{{ flt.query_args(offset=shown, last_folder=ns.folder or '', stripe=ns.stripe) | urlencode }}"
+            hx-swap="none" hx-indicator="#list-loading">
+      <i class="fa-solid fa-angles-down me-1"></i>Load {{ [flt.size, total - shown] | min }} more
+    </button>
+    {% endif %}
+  </td></tr>
+</tfoot>

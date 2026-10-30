@@ -34,7 +34,7 @@
     <button type="button" class="btn btn-outline-secondary clear-filter" {% if not flt.category %}disabled{% endif %} data-target="category" data-default="" title="Clear category" aria-label="Clear category"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
-  <div class="col-6 col-md-4 col-lg-2">
+  <div class="col-6 col-md-4 col-lg-1">
     <label class="form-label small mb-0" for="kind">Type</label>
     <div class="input-group input-group-sm">
     <select class="form-select" id="kind" name="kind">
@@ -58,13 +58,19 @@
       <button type="button" class="btn btn-outline-secondary clear-filter" {% if flt.sort == 'path' and not flt.desc %}disabled{% endif %} data-target="sort" data-default="path" title="Clear sort (back to Path)" aria-label="Clear sort (back to Path)"><i class="fa-solid fa-xmark"></i></button>
     </div>
   </div>
+  <div class="col-6 col-md-4 col-lg-1">
+    <label class="form-label small mb-0" for="size">Show</label>
+    <select class="form-select form-select-sm" id="size" name="size" title="How many files to load at first and with each Load more">
+      {% for n in page_sizes %}<option value="{{ n }}" {% if flt.size == n %}selected{% endif %}>{{ n }}</option>{% endfor %}
+    </select>
+  </div>
   {% if flt.folder %}<input type="hidden" name="folder" value="{{ flt.folder }}">{% endif %}
   <div class="col-6 col-md-6 col-lg-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/" title="Clear all filters">Reset all</a></div>
   {% if flt.folder %}
   <div class="col-12">
     <span class="badge rounded-pill text-bg-secondary fs-6 fw-normal">
       <i class="fa-regular fa-folder-open me-1"></i>Folder: {{ (flt.folder ~ '/x') | rel_folder }}
-      <a class="text-reset ms-1" href="/?{{ flt.query_args(folder='', page=1) | urlencode }}" title="Clear folder" aria-label="Clear folder"><i class="fa-solid fa-xmark"></i></a>
+      <a class="text-reset ms-1" href="/?{{ flt.query_args(folder='') | urlencode }}" title="Clear folder" aria-label="Clear folder"><i class="fa-solid fa-xmark"></i></a>
     </span>
   </div>
   {% endif %}
