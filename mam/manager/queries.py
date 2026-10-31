@@ -13,22 +13,32 @@ from mam.helpers.local_db import models as m
 PAGE_SIZES = (50, 100, 200, 500)  # the "Show" choices; Load more adds this many each time
 PAGE_SIZE = PAGE_SIZES[0]
 MAX_SHOWN = 20000  # upper bound for re-rendering the already loaded rows
-DEFAULT_STATUS = "__attention"  # the file list opens on the files that need a person
-ATTENTION_LIKE = ("% Review", "% Failed")
+DEFAULT_STATUS = "__all"  # the file list opens on this unless Settings chooses another
+LEGACY_STATUS = {"__attention": "__review"}  # old bookmarks of the removed view
+VIEWS = ("__all", "__review", "__failed")  # the views above the single statuses
+
+
+def _proposal(field: str):
+    """A field of the last Renamer proposal (a dry run stores it before anything is renamed)."""
+    return m.MediaFile.meta["proposal"][field].as_string()
+
+
+# The category shown in the list: the saved one, else the one a dry run suggested.
+category_expr = func.coalesce(func.nullif(m.MediaFile.category, ""), _proposal("category"))
 SORTS = {
     "path": m.MediaFile.original_path,
     "name": m.MediaFile.current_name,
     "date": m.MediaFile.rec_date,
     "status": m.MediaFile.status,
     "updated": m.MediaFile.updated_at,
-    "category": m.MediaFile.category,
+    "category": category_expr,
 }
 
 
 @dataclass
 class FileFilter:
     q: str = ""
-    status: str = "__attention"
+    status: str = DEFAULT_STATUS
     kind: str = ""
     category: str = ""
     folder: str = ""
@@ -54,7 +64,7 @@ class FileFilter:
         sort = get("sort", "path")
         return cls(
             q=get("q"),
-            status=get("status", default_status),
+            status=LEGACY_STATUS.get(get("status", default_status), get("status", default_status)),
             kind=get("kind"),
             category=get("category"),
             folder=get("folder"),
@@ -88,16 +98,12 @@ class FileFilter:
                     m.MediaFile.current_name.ilike(like),
                     m.MediaFile.title.ilike(like),
                     m.MediaFile.location.ilike(like),
+                    _proposal("new_name").ilike(like),
+                    _proposal("what").ilike(like),
+                    _proposal("where").ilike(like),
                 )
             )
-        if self.status == "__attention":
-            stmt = stmt.where(
-                or_(
-                    *(m.MediaFile.status.like(p) for p in ATTENTION_LIKE),
-                    m.MediaFile.status == "Corrupted",
-                )
-            )
-        elif self.status == "__all":
+        if self.status == "__all":
             pass
         elif self.status == "__review":
             stmt = stmt.where(m.MediaFile.status.like("% Review"))
@@ -108,7 +114,7 @@ class FileFilter:
         if self.kind:
             stmt = stmt.where(m.MediaFile.kind == self.kind)
         if self.category:
-            stmt = stmt.where(m.MediaFile.category == self.category)
+            stmt = stmt.where(category_expr == self.category)
         if self.folder:
             stmt = stmt.where(m.MediaFile.original_path.like(f"{self.folder.rstrip('/')}/%"))
         return stmt
@@ -156,19 +162,15 @@ def facet_values(session: Session) -> dict[str, Any]:
         .order_by(m.MediaFile.status)
     ).all()
     categories = session.scalars(
-        select(m.MediaFile.category)
-        .where(m.MediaFile.category.is_not(None))
+        select(category_expr)
+        .where(m.MediaFile.parent_id.is_(None), category_expr.is_not(None))
         .distinct()
-        .order_by(m.MediaFile.category)
+        .order_by(category_expr)
     )
     counts = dict(statuses)
-    attention = sum(
-        n for s, n in counts.items() if s.endswith((" Review", " Failed")) or s == "Corrupted"
-    )
     return {
         "statuses": [(s, counts.get(s, 0)) for s in all_statuses(counts)],
         "categories": list(categories),
-        "attention": attention,
         "review": sum(n for s, n in counts.items() if s.endswith(" Review")),
         "failed": sum(n for s, n in counts.items() if s.endswith(" Failed")),
         "all": sum(counts.values()),
@@ -188,3 +190,16 @@ def counts(session: Session) -> dict[str, int]:
         "failed": count(m.MediaFile.status.like("% Failed")),
         "jobs": active or 0,
     }
+
+
+VIEW_LABELS = {"__all": "All files", "__review": "Review", "__failed": "Failed"}
+
+
+def status_choices(counts: dict[str, int] | None = None) -> list[tuple[str, str, str]]:
+    """The Status choices as (value, label, group): the views, then every single status.
+
+    Used by the file list filter and by the default status on the Settings page.
+    """
+    return [(v, VIEW_LABELS[v], "") for v in VIEWS] + [
+        (s, s, "One status") for s in all_statuses(counts)
+    ]

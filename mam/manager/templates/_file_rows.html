@@ -17,7 +17,7 @@
   {% include "_file_row_items.html" %}
   {% if not rows %}
     <tr><td colspan="8" class="text-center text-body-secondary py-4">
-      {% if flt.status == '__attention' %}Nothing needs your attention.
+      {% if flt.status == '__review' %}Nothing to review.
         <a href="/?{{ flt.query_args(status='__all') | urlencode }}">Show all files</a>
       {% else %}No files match. <a href="/import">Import a folder</a> or <a href="/?status=__all">show all files</a>.{% endif %}
     </td></tr>

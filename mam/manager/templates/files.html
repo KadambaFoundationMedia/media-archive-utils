@@ -14,7 +14,7 @@
     <label class="form-label small mb-0" for="status">Status</label>
     <div class="input-group input-group-sm">
     <select class="form-select" id="status" name="status">
-      {% for value, label, n in [('__attention', 'Needs attention', facets.attention), ('__all', 'All files', facets.all), ('__review', 'Needs review', facets.review), ('__failed', 'Failed', facets.failed)] %}
+      {% for value, label, n in [('__all', 'All files', facets.all), ('__review', 'Review', facets.review), ('__failed', 'Failed', facets.failed)] %}
       <option value="{{ value }}" {% if flt.status == value %}selected{% endif %}>{{ label }} ({{ n }})</option>
       {% endfor %}
       <optgroup label="One status">
@@ -29,7 +29,7 @@
     <div class="input-group input-group-sm">
     <select class="form-select" id="category" name="category">
       <option value="">All</option>
-      {% for c in facets.categories %}<option {% if flt.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+      {% for c in facets.categories %}<option value="{{ c }}" {% if flt.category == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
     </select>
     <button type="button" class="btn btn-outline-secondary clear-filter" {% if not flt.category %}disabled{% endif %} data-target="category" data-default="" title="Clear category" aria-label="Clear category"><i class="fa-solid fa-xmark"></i></button>
     </div>

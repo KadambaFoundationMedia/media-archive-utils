@@ -34,3 +34,16 @@ def baserow_writes_enabled() -> bool:
 
 def set_baserow_writes(enabled: bool) -> None:
     set_setting(BASEROW_WRITES, bool(enabled))
+
+
+DEFAULT_STATUS = "default_status"
+
+
+def default_status_setting() -> str:
+    """The status filter the file list opens on; "__all" (All files) until chosen."""
+    value = get_setting(DEFAULT_STATUS, "__all")
+    return value if isinstance(value, str) and value else "__all"
+
+
+def set_default_status(value: str) -> None:
+    set_setting(DEFAULT_STATUS, value)

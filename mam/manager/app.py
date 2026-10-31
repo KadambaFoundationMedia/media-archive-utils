@@ -19,6 +19,7 @@ from sqlalchemy import select
 from mam.config import get_settings
 from mam.helpers.local_db import migrate, session_scope
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import default_status_setting, set_default_status
 from mam.helpers.local_db.repo import media_kind
 from mam.manager import queries
 from mam.manager.queue import JobQueue, enqueue
@@ -66,10 +67,8 @@ FIELD_LABELS = {"when": "WHEN", "what": "WHAT", "where": "WHERE", "who": "WHO"}
 
 # The views at the top of the Status filter, in the same order (file list status guide).
 VIEW_HELP = {
-    "Needs attention": "Files waiting for a review, failed files and corrupted files. The list "
-    "opens on this view.",
     "All files": "Every file, whatever its status; choose it, for example, to start a tool.",
-    "Needs review": "Files with a <Tool> Review status.",
+    "Review": "Files with a <Tool> Review status: a tool needs your decision.",
     "Failed": "Files with a <Tool> Failed status.",
 }
 
@@ -216,7 +215,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
     # ------------------------------------------------------------- file list
     @app.get("/", response_class=HTMLResponse)
     def files_page(request: Request):
-        flt = queries.FileFilter.from_params(request.query_params)
+        flt = queries.FileFilter.from_params(request.query_params, default_status_setting())
         with session_scope() as session:
             rows, total = queries.list_files(session, flt)
             facets = queries.facet_values(session)
@@ -233,7 +232,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
 
     @app.get("/files/rows", response_class=HTMLResponse)
     def files_rows(request: Request):
-        flt = queries.FileFilter.from_params(request.query_params)
+        flt = queries.FileFilter.from_params(request.query_params, default_status_setting())
         with session_scope() as session:
             rows, total = queries.list_files(session, flt)
         return render(
@@ -247,7 +246,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
     @app.get("/files/more", response_class=HTMLResponse)
     def files_more(request: Request, last_folder: str = "", stripe: int = 0):
         """The next batch of rows, appended to the table by the Load more button."""
-        flt = queries.FileFilter.from_params(request.query_params)
+        flt = queries.FileFilter.from_params(request.query_params, default_status_setting())
         with session_scope() as session:
             rows, total = queries.list_files(session, flt)
         return render(
@@ -555,8 +554,22 @@ def create_app(start_queue: bool = True) -> FastAPI:
         from mam.manager.maintenance import summary
 
         return render(
-            request, "settings.html", info=summary(settings), places=place_country_status()
+            request,
+            "settings.html",
+            info=summary(settings),
+            places=place_country_status(),
+            status_choices=queries.status_choices(),
+            default_status=default_status_setting(),
         )
+
+    @app.post("/settings/default-status")
+    async def settings_default_status(request: Request):
+        form = await request.form()
+        value = str(form.get("default_status") or "")
+        if value not in {v for v, _, _ in queries.status_choices()}:
+            return RedirectResponse("/settings?error=Unknown status", status_code=303)
+        set_default_status(value)
+        return RedirectResponse("/settings?msg=Default status saved", status_code=303)
 
     @app.post("/settings/baserow-writes")
     async def toggle_baserow_writes(request: Request):
