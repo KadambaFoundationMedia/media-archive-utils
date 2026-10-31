@@ -227,14 +227,16 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
     no_country = {norm_key(p) for p in aliases.get("no_country") or []}
     places: dict[str, Place] = {}
     built: list[Place] = []
+    targets: dict[str, Place] = {}  # every place option, also the ones `not_places` hides by name
     for name in sorted(place_names):
         key = norm_key(name)
-        if key in not_places:
-            continue
         row = place_rows.get(key)
         cc = row["cc"] if row and key not in no_country else None
         country = country_options.get(cc) if cc else None
         place = Place(name, country, cc if country else None)
+        targets[key] = place
+        if key in not_places:
+            continue
         places.setdefault(key, place)  # exact names first ...
         built.append(place)
     for place in built:  # ... then the name without the ISKCON- prefix
@@ -247,13 +249,17 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
         if target_place:
             places[key] = target_place
     # Other spellings of a place, kept by hand in the place_country `aliases` column
-    # (semicolon-separated). A real Baserow place or an earlier alias beats a later alias.
+    # (semicolon-separated). A person wrote them for exactly this place, so they win over
+    # the seed aliases and over a real place of the same name; the first row that lists an
+    # alias keeps it. They can point at a place `not_places` hides by name (Summercamp).
+    claimed: set[str] = set()
     for key, row in place_rows.items():
-        target_place = exact.get(key)
+        target_place = targets.get(key)
         for alias in str(row.get("aliases") or "").split(";"):
             alias_key = norm_key(alias)
-            if target_place and alias_key and alias_key not in exact:
-                places.setdefault(alias_key, target_place)
+            if target_place and alias_key and alias_key not in claimed:
+                claimed.add(alias_key)
+                places[alias_key] = target_place
     max_words = max((len(k.split()) for k in places), default=3)
 
     return Reference(

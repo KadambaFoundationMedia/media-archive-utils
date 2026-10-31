@@ -20,7 +20,7 @@ from tests.renamer_fixtures import reference_raw
 RAW = reference_raw()
 OPTIONS = RAW["options"]
 # Like the live table: the temple and the new city place both exist.
-OPTIONS["place_location"] += ["ISKCON-Amsterdam", "Amsterdam"]
+OPTIONS["place_location"] += ["ISKCON-Amsterdam", "Amsterdam", "Summercamp"]
 OPTIONS["country"] += ["Netherlands"]
 MEDIA_FIELDS = [
     {"name": "title", "type": "text"},
@@ -61,6 +61,14 @@ PLACE_ROWS[100] = {
     "country": "Netherlands",
     "ccTLD": "nl",
     "Aliases": "ATC;Amsterdam-temple-test",  # the live column is spelled `Aliases`
+}
+# Like the live row: a general place (no country) whose aliases include a real place.
+PLACE_ROWS[101] = {
+    "id": 101,
+    "place_location": "Summercamp",
+    "country": "",
+    "ccTLD": "",
+    "Aliases": "Serbia-Summercamp;Fruska-Gora;Fruska-Goranga;Swiss-summercamp",
 }
 BY_ID = {o["id"]: o["value"] for f in FIELDS for o in f["select_options"]}
 SELECTS = {f["name"]: f["type"] for f in FIELDS if f["type"].endswith("select")}

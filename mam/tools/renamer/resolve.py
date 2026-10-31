@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from functools import lru_cache
@@ -206,6 +207,9 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
     return context
 
 
+SUMMERCAMP_RE = re.compile(r"\bsumm?er ?camp")
+
+
 # ------------------------------------------------------------------- resolver
 def cc_for_name_safe(token: str) -> str | None:
     try:
@@ -241,7 +245,7 @@ class Resolver:
                 "Non-descriptive filename: it gives no WHAT (scripture, verse or title)."
                 + (" It looks like a recorder file name." if name.recorder else "")
             )
-        category = self._category(what, name, ctx, media_row, ev)
+        category = self._category(what, name, ctx, media_row, ev, path.stem, place)
         languages = self._languages(name, ctx)
         speakers = list(dict.fromkeys(name.speakers))
         if speakers and not name.has_kks:
@@ -592,10 +596,34 @@ class Resolver:
         parts += name.what_words
         return "-".join(parts) or None
 
-    def _category(self, what, name, ctx, media_row, ev) -> str | None:
+    def _summercamp(
+        self, name, ctx, stem: str, place: Place | None = None
+    ) -> tuple[str, str, str] | None:
+        """The Summercamp category for a name with 'summercamp' in it (Serbia-Summercamp,
+        Swiss summercamp, Summer-camp), unless a book and verse is present as well."""
+        option = next(
+            (o for o in sorted(self.ref.category_options) if norm_key(o) == "summercamp"), None
+        )
+        if not option or name.verse:
+            return None
+        if SUMMERCAMP_RE.search(norm_key(stem)):
+            return option, "filename", '"summercamp" in the filename'
+        if place and norm_key(place.name) == "summercamp":  # e.g. Fruska-Gora, by its alias
+            return option, "filename", "the place is Summercamp (a place_country alias)"
+        for folder in ctx.folders:
+            if SUMMERCAMP_RE.search(norm_key(folder.text)):
+                return option, "folder", f'"summercamp" in folder "{folder.text}"'
+        return None
+
+    def _category(
+        self, what, name, ctx, media_row, ev, stem: str = "", place: Place | None = None
+    ) -> str | None:
         found = origin = None
         match = self.ref.matcher.match(what)
-        if match:
+        summercamp = self._summercamp(name, ctx, stem, place)
+        if summercamp:  # only without a verse; with one the book's category below wins
+            found, source, origin = summercamp
+        elif match:
             found, source = match.category.name, "filename"
             origin = f'"{match.term}" in the WHAT (Baserow category terms)'
         elif name.categories:
