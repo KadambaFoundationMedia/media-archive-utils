@@ -6,6 +6,23 @@
 
 <div class="row g-3">
   <div class="col-12 col-lg-6">
+    <form method="post" action="/settings/default-status" class="card mb-3">
+      <div class="card-header">File list</div>
+      <div class="card-body">
+        <label class="form-label small mb-1" for="default_status">Default Status filter</label>
+        <div class="d-flex gap-2">
+          <select class="form-select form-select-sm w-auto" id="default_status" name="default_status">
+            {% for value, label, group in status_choices %}
+            {% if group and loop.previtem[2] != group %}<optgroup label="{{ group }}">{% endif %}
+            <option value="{{ value }}" {% if default_status == value %}selected{% endif %}>{{ label }}</option>
+            {% if group and (loop.last or loop.nextitem[2] != group) %}</optgroup>{% endif %}
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-primary" type="submit">Save</button>
+        </div>
+        <div class="small text-body-secondary mt-1">The file list opens on this status, and <strong>Reset all</strong> returns to it. Default: All files.</div>
+      </div>
+    </form>
     <div class="card mb-3">
       <div class="card-header">Current settings <span class="small text-body-secondary">(folders and pools come from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
       <div class="card-body">

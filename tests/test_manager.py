@@ -332,22 +332,60 @@ def test_recordings_never_share_a_proposed_name(
     assert again == names
 
 
-def test_file_list_opens_on_files_needing_attention(
+def test_file_list_opens_on_all_files_until_settings_choose_a_default(
     client, archive, reference, no_baserow, settings
 ):
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
-    assert "Nothing needs your attention" in client.get("/").text
+    assert "All files (2)" in client.get("/").text and "R09_0004.MP3" in client.get("/").text
     client.post("/actions", data={"tool": "renamer", "scope": "all"})
     run_queue()
     page = client.get("/").text
+    assert "Needs attention" not in page and "Needs review" not in page
+    assert "Review (1)" in page and "All files (2)" in page
+    # the default comes from Settings; Reset all (a plain /) uses it
+    assert 'name="default_status"' in client.get("/settings").text
+    client.post("/settings/default-status", data={"default_status": "__review"})
+    page = client.get("/").text
     assert "R09_0004.MP3" in page  # flagged for review
     assert "S.B. 1.19.30" not in page  # renamed cleanly; nothing to do
-    assert "Needs attention (1)" in page and "All files (2)" in page
+    assert '<option value="__review" selected>' in page
+    assert "S.B. 1.19.30" in client.get("/?status=__all").text  # the URL still wins
+    assert (
+        "Unknown status"
+        in client.post(
+            "/settings/default-status", data={"default_status": "nope"}, follow_redirects=True
+        ).text
+    )
+    client.post("/settings/default-status", data={"default_status": "__all"})
     # grouped by folder, relative to the import root
     assert "Sample files / Serbia-summercamp-6-13-jul-2012" in page
     everything = client.get("/?status=__all").text
     assert "S.B. 1.19.30" in everything and "What do the statuses mean?" in everything
+
+
+def test_filters_use_dry_run_suggestions(client, archive, reference, no_baserow, settings):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    assert 'name="category"' in client.get("/").text
+    client.post("/actions", data={"tool": "renamer", "scope": "all", "dry_run": "on"})
+    run_queue()
+    with session_scope() as s:
+        suggested = {
+            f.meta["proposal"]["category"]
+            for f in s.scalars(select(m.MediaFile))
+            if f.meta["proposal"].get("category")
+        }
+        assert all(f.category is None for f in s.scalars(select(m.MediaFile)))  # nothing saved
+    assert suggested
+    page = client.get("/").text
+    for category in suggested:
+        assert f'<option value="{category}"' in page  # offered, though only a dry run
+    category = sorted(suggested)[0]
+    filtered = client.get("/", params={"category": category}).text
+    assert "file-row" in filtered
+    other = client.get("/", params={"category": "No-such-category"}).text
+    assert "file-row" not in other.split("<tbody")[1]
 
 
 def test_evidence_shows_where_it_came_from(client, archive, reference, no_baserow):
@@ -558,7 +596,9 @@ def test_filters_have_clear_buttons(client):
         assert f'data-target="{target}"' in page  # always visible
     # dimmed (disabled) while there is nothing to clear; status clears to All files
     assert 'clear-filter" disabled data-target="q"' in page
-    assert 'clear-filter"  data-target="status" data-default="__all"' in page  # Needs attention
+    assert 'clear-filter" disabled data-target="status"' in page  # default is All files
+    page = client.get("/", params={"status": "__review"}).text
+    assert 'clear-filter"  data-target="status" data-default="__all"' in page
     page = client.get("/", params={"status": "__all", "q": "SB", "folder": "/x/sample/2008"}).text
     assert 'clear-filter" disabled data-target="status"' in page
     assert 'clear-filter"  data-target="q"' in page
@@ -576,8 +616,13 @@ def test_category_is_shown_in_its_color_not_the_title(client, archive, reference
         'style="background-color:#edaba8;color:#1f2328;border-color:#edaba8">'
         "Srimad-bhagavatam</span>" in page
     )
-    assert 'cat-pill" style="background-color:#edaba8;color:#1f2328;border-color:#edaba8">SB' not in page
-    assert "<th>Category</th>" in page and "table-responsive" not in page  # sticky header needs this
+    assert (
+        'cat-pill" style="background-color:#edaba8;color:#1f2328;border-color:#edaba8">SB'
+        not in page
+    )
+    assert (
+        "<th>Category</th>" in page and "table-responsive" not in page
+    )  # sticky header needs this
 
 
 def test_filter_reload_keeps_a_real_page_url(client):
