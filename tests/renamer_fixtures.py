@@ -87,7 +87,7 @@ def reference_raw() -> dict:
                 "Sweden",
                 "Finland",
             ],
-            "category": [c["category"] for c in categories],
+            "category": [c["category"] for c in categories] + ["Summercamp"],
             "language": ["English", "German", "Dutch", "Czech"],
         },
         # Baserow place_country: the only source of a place's country.

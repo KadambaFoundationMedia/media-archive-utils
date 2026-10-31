@@ -169,12 +169,12 @@ def test_place_country_aliases_resolve_to_the_canonical_place():
     assert ref.find_place("Brno").name == "Brno"  # rows without aliases are unaffected
 
 
-def test_an_alias_never_beats_a_real_place():
+def test_an_alias_written_by_hand_beats_a_real_place_of_the_same_name():
     raw = reference_raw()
     for row in raw["place_country"]:
         if row["place"] == "Oslo":
             row["aliases"] = "Berlin"
-    assert build_reference(raw).find_place("Berlin").name == "Berlin"
+    assert build_reference(raw).find_place("Berlin").name == "Oslo"
 
 
 def test_aliases_column_is_read_whatever_its_case(monkeypatch):
@@ -199,3 +199,35 @@ def test_aliases_column_is_read_whatever_its_case(monkeypatch):
     raw = reference_raw()
     raw["place_country"] = [r for r in raw["place_country"] if r["place"] != "Radhadesh"] + rows
     assert build_reference(raw).find_place("NRK").name == "Radhadesh"
+
+
+def test_aliases_can_point_at_a_general_place_and_beat_a_real_place():
+    """Edwin's live row: Summercamp (no country) lists Fruska-Gora, which is also a place."""
+    raw = reference_raw()
+    raw["options"]["place_location"] = [*raw["options"]["place_location"], "Summercamp"]
+    raw["place_country"] = [
+        *raw["place_country"],
+        {
+            "id": 97,
+            "place": "Summercamp",
+            "country": "",
+            "cc": "",
+            "aliases": "Serbia-Summercamp;Fruska-Gora;Fruska-Goranga;Swiss-summercamp",
+        },
+    ]
+    ref = build_reference(raw)
+    for text in ("Serbia-Summercamp", "Fruska-Gora", "Fruska-Goranga", "swiss summercamp"):
+        place = ref.find_place(text)
+        assert place.name == "Summercamp" and place.cc is None, text
+    # the bare word is still not a place by itself (aliases.yaml not_places)
+    assert ref.find_place("Summercamp") is None
+
+
+def test_the_first_row_that_lists_an_alias_keeps_it():
+    raw = reference_raw()
+    for row in raw["place_country"]:
+        if row["place"] == "Oslo":
+            row["aliases"] = "Hovedstad"
+        if row["place"] == "Berlin":
+            row["aliases"] = "Hovedstad"
+    assert build_reference(raw).find_place("Hovedstad").name == "Oslo"

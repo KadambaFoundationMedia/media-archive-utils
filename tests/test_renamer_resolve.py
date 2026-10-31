@@ -292,3 +292,36 @@ def test_country_from_places_named_by_other_files_in_the_folder(propose):
     assert any("not proof" in n for n in proposal.notes)
     # places in two countries: no country is guessed
     assert propose("two-countries/KKS SB 1.1.1.mp3").cc is None
+
+
+def test_summercamp_in_the_name_gives_the_summercamp_category(propose):
+    for stem in (
+        "2012-07-12_KKS_Kirtan_Serbia-Summercamp_rs",
+        "2012-07-12_KKS_Swiss-summercamp_ch",
+        "2012-07-12_KKS_Summer-camp-class_rs",
+        "2012-07-12_KKS_SummerCamp-evening_rs",
+    ):
+        assert propose(f"{stem}.mp3").category == "Summercamp", stem
+
+
+def test_a_verse_beats_summercamp_for_the_category(propose):
+    p = propose("2012-07-12_KKS_SB-1-2-3_Serbia-Summercamp_rs.mp3")
+    assert p.category == "Srimad-bhagavatam"
+
+
+def test_a_place_that_is_summercamp_by_alias_gives_the_summercamp_category(
+    reference, settings, tree
+):
+    from mam.tools.renamer.knowledge import build_reference
+    from tests.renamer_fixtures import reference_raw
+
+    raw = reference_raw()
+    raw["options"]["place_location"] = [*raw["options"]["place_location"], "Summercamp"]
+    raw["place_country"] = [
+        *raw["place_country"],
+        {"id": 97, "place": "Summercamp", "country": "", "cc": "", "aliases": "Fruska-Goranga"},
+    ]
+    path = tree / "2012-07-12_KKS_Fruska-Goranga_rs.mp3"
+    path.write_bytes(b"")
+    p = Resolver(build_reference(raw), [tree]).propose(path)
+    assert p.place == "Summercamp" and p.category == "Summercamp"

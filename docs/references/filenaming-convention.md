@@ -56,9 +56,12 @@ The ccTLD must be a valid country code (`no` for Norway, `se` for Sweden, `in` f
 
 The country of a known place comes from the Baserow `place_country` table (e.g. `Brno` → `Czech-Republic` → `cz`); general places such as `Zoom-livestream` or `Home-program` have no country there, so the file's own evidence decides. The travel schedule only says where KKS possibly was on a date; it is not where a new place is added. The "New place" flag tells you to add the place as a `place_location` option in Baserow.
 
-Other spellings of a place are kept in the `aliases` column of `place_country` (column `Aliases` in Baserow, semicolon-separated, e.g. `New-Radhakunda-Dham;NRK` on `ISKCON-Korsnäs-Gård`); the Renamer maps an alias to its place.
+Other spellings of a place are kept in the `aliases` column of `place_country` (column `Aliases` in Baserow, semicolon-separated, e.g. `New-Radhakunda-Dham;NRK` on `ISKCON-Korsnäs-Gård`); the Renamer maps an alias to its place. A hand-written alias wins over a real place of the same name.
 
 When a file names no place or country, the Renamer may take the country from the other files in the same folder: if the places they name are all in one country, that country is used (e.g. `cz` for the files next to `03 BRNO LEKCE.mp3`). The city is left out until it is known.
+
+### Summercamp
+A name or folder with `summercamp` in it (`Serbia-Summercamp`, `Swiss summercamp`, `Summer-camp`) is in the `Summercamp` category, unless the filename has a book and verse; the book's category then wins.
 
 ## Partial information
 A file is always renamed with whatever is known. A WHO, WHAT or WHERE that is not known is left out, never replaced by a placeholder; only the date uses placeholders.
