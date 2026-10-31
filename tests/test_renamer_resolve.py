@@ -292,3 +292,24 @@ def test_country_from_places_named_by_other_files_in_the_folder(propose):
     assert any("not proof" in n for n in proposal.notes)
     # places in two countries: no country is guessed
     assert propose("two-countries/KKS SB 1.1.1.mp3").cc is None
+
+
+def test_alias_of_a_not_places_word_maps_to_it():
+    from mam.tools.renamer.knowledge import build_reference, norm_key
+    from tests.renamer_fixtures import reference_raw
+
+    raw = reference_raw()
+    raw["options"]["place_location"].append("Summercamp")
+    raw["place_country"].append(
+        {
+            "id": 900,
+            "place": "Summercamp",
+            "country": "",
+            "cc": "",
+            "aliases": "Serbia-Summercamp;Fruska-Goranga",
+        }
+    )
+    ref = build_reference(raw)
+    assert ref.places[norm_key("Fruska-Goranga")].name == "Summercamp"
+    assert ref.places[norm_key("Serbia-Summercamp")].name == "Summercamp"
+    assert norm_key("Summercamp") not in ref.places

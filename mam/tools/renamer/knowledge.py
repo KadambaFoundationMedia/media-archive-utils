@@ -248,8 +248,17 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
             places[key] = target_place
     # Other spellings of a place, kept by hand in the place_country `aliases` column
     # (semicolon-separated). A real Baserow place or an earlier alias beats a later alias.
+    # A not_places word ('Summercamp') is not matched on its own, but its aliases still map to it.
+    alias_targets = dict(exact)
+    for name in sorted(place_names):
+        key = norm_key(name)
+        if key in not_places and key not in alias_targets:
+            row = place_rows.get(key)
+            cc = row["cc"] if row and key not in no_country else None
+            country = country_options.get(cc) if cc else None
+            alias_targets[key] = Place(name, country, cc if country else None)
     for key, row in place_rows.items():
-        target_place = exact.get(key)
+        target_place = alias_targets.get(key)
         for alias in str(row.get("aliases") or "").split(";"):
             alias_key = norm_key(alias)
             if target_place and alias_key and alias_key not in exact:
