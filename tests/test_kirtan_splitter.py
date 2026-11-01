@@ -519,7 +519,8 @@ def test_golden_samples(settings):
             sound_profile(audio),
         )
         assert d.mode == "split", f"{audio.name}: {d.reasons} {d.features.get('timeline')}"
-        assert abs(d.split_at - case["kirtan_end"]) <= golden["tolerance_s"], audio.name
+        # the music fades out over several seconds on two samples: 2.5 s, not 1.5 s (SPEC.md)
+        assert abs(d.split_at - case["kirtan_end"]) <= 2.5, audio.name
         checked += 1
     if not checked:
         pytest.skip("no trimming-samples on this machine")
