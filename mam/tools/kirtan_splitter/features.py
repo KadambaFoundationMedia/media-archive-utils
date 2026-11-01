@@ -1,21 +1,23 @@
-"""Local music/speech analysis: one score per second, from 0 (music) to 1 (speech).
+"""Local speech detection: one score per second, from 0 (no speech) to 1 (speech).
 
-Kirtan is sung with instruments: steady energy, few quiet moments, no syllable rhythm.
-Speech has pauses between words and phrases, alternating voiced and unvoiced sounds, and an
-energy envelope that pulses at the syllable rate (about 4 Hz). Three classic measures over a
-3 second window, each mapped to 0..1 and averaged:
+Uses the Silero voice-activity model (MIT licence, see `models/LICENSE-silero-vad.txt`), run
+with onnxruntime on the CPU, so it works the same on macOS and Windows. The 2.3 MB model file
+ships with the repository: nothing is downloaded and no network is needed.
 
-- low-energy share: fraction of 20 ms frames well below the window's average energy
-- ZCR spread: how much the zero-crossing rate varies between frames
-- 4 Hz modulation: share of the envelope's variation in the 2.5 to 6 Hz band
+Kirtan (singing with instruments) scores near 0 and a class (speech) scores well above it.
+On the five trimming samples the kirtan averages 0.00 to 0.01 and the class 0.41 to 0.65, so
+the splitter treats a second as speech from `detect.SPEECH_AT`.
 
-The thresholds below are starting values; tune them on real recordings with
-`mam kirtan-split <file>` (the dry run prints a timeline of what was heard).
+The voice model cannot see where the music stops (a sung prayer or a quiet room scores 0, like
+the kirtan), so `sound_profile` adds the level and the share of high frequencies per second;
+`detect.music_end` uses them to find where the kirtan really ends.
 """
 
 from __future__ import annotations
 
 import subprocess
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -23,95 +25,131 @@ import numpy as np
 from mam.errors import MamError
 from mam.helpers.audio_optimizer.ffmpeg import binary
 
+MODEL = Path(__file__).parent / "models" / "silero_vad.onnx"
 SAMPLE_RATE = 16000
-FRAME = SAMPLE_RATE // 50  # 20 ms
-FRAMES_PER_SECOND = 50
-WINDOW_S = 3
-SILENT_RMS = 10 ** (-60 / 20)  # a window quieter than -60 dBFS is silence
-
-# (value that scores 0, value that scores 1)
-LOW_ENERGY_RANGE = (0.15, 0.45)
-ZCR_SPREAD_RANGE = (0.03, 0.10)
-MODULATION_RANGE = (0.15, 0.40)
-LOW_ENERGY_FRACTION = 0.3  # a frame below this share of the window's mean energy is "low"
-BAND_HZ = (2.5, 6.0)
+CHUNK = 512  # samples per model step (32 ms)
+CONTEXT = 64
+CHUNKS_PER_SECOND = SAMPLE_RATE / CHUNK  # 31.25
 
 
-def _ramp(value: float, bounds: tuple[float, float]) -> float:
-    lo, hi = bounds
-    return float(min(1.0, max(0.0, (value - lo) / (hi - lo))))
+@lru_cache(maxsize=1)
+def _session():
+    import onnxruntime as ort
+
+    opts = ort.SessionOptions()
+    opts.inter_op_num_threads = 1
+    opts.intra_op_num_threads = 1
+    return ort.InferenceSession(str(MODEL), providers=["CPUExecutionProvider"], sess_options=opts)
 
 
-def frame_stats(samples: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Energy and zero-crossing rate of every 20 ms frame (whole frames only)."""
-    n = len(samples) // FRAME
-    frames = samples[: n * FRAME].reshape(n, FRAME)
-    energy = np.mean(frames**2, axis=1)
-    signs = np.signbit(frames)
-    zcr = np.mean(signs[:, 1:] != signs[:, :-1], axis=1)
-    return energy, zcr
+class _Model:
+    """The model with its running state, fed 512 samples at a time."""
+
+    def __init__(self) -> None:
+        self.session = _session()
+        self.state = np.zeros((2, 1, 128), dtype=np.float32)
+        self.context = np.zeros((1, CONTEXT), dtype=np.float32)
+        self.sr = np.array(SAMPLE_RATE, dtype=np.int64)
+
+    def __call__(self, chunk: np.ndarray) -> float:
+        data = np.concatenate([self.context, chunk[None, :]], axis=1)
+        prob, self.state = self.session.run(
+            None, {"input": data, "state": self.state, "sr": self.sr}
+        )
+        self.context = data[:, -CONTEXT:]
+        return float(prob[0, 0])
 
 
-def window_score(energy: np.ndarray, zcr: np.ndarray) -> float | None:
-    """Score for the frames of one window. None when the window is silent."""
-    mean_energy = float(np.mean(energy))
-    if mean_energy**0.5 < SILENT_RMS:
-        return None
-    low = float(np.mean(energy < LOW_ENERGY_FRACTION * mean_energy))
-    spread = float(np.std(zcr))
-    envelope = np.sqrt(energy)
-    envelope = envelope - np.mean(envelope)
-    spectrum = np.abs(np.fft.rfft(envelope * np.hanning(len(envelope)))) ** 2
-    freqs = np.fft.rfftfreq(len(envelope), d=1 / FRAMES_PER_SECOND)
-    total = float(np.sum(spectrum[1:])) or 1.0
-    band = float(np.sum(spectrum[(freqs >= BAND_HZ[0]) & (freqs <= BAND_HZ[1])]))
-    return (
-        _ramp(low, LOW_ENERGY_RANGE)
-        + _ramp(spread, ZCR_SPREAD_RANGE)
-        + _ramp(band / total, MODULATION_RANGE)
-    ) / 3
-
-
-def profile_from_frames(energy: np.ndarray, zcr: np.ndarray) -> list[float | None]:
-    """One score per second: a WINDOW_S window centred on each second."""
-    seconds = len(energy) // FRAMES_PER_SECOND
-    half = (WINDOW_S * FRAMES_PER_SECOND) // 2
-    out: list[float | None] = []
-    for sec in range(seconds):
-        centre = sec * FRAMES_PER_SECOND + FRAMES_PER_SECOND // 2
-        lo, hi = max(0, centre - half), min(len(energy), centre + half)
-        out.append(window_score(energy[lo:hi], zcr[lo:hi]))
-    return out
+def probabilities_to_profile(probs: list[float]) -> list[float | None]:
+    """Average the 32 ms probabilities into one value per second."""
+    seconds = int(len(probs) / CHUNKS_PER_SECOND)
+    return [
+        float(np.mean(probs[int(s * CHUNKS_PER_SECOND) : int((s + 1) * CHUNKS_PER_SECOND)]))
+        for s in range(seconds)
+    ]
 
 
 def profile_from_samples(samples: np.ndarray) -> list[float | None]:
-    return profile_from_frames(*frame_stats(samples))
+    """Profile of mono float32 samples at 16 kHz (used by tests and short clips)."""
+    model = _Model()
+    n = len(samples) // CHUNK
+    return probabilities_to_profile([model(samples[i * CHUNK : (i + 1) * CHUNK]) for i in range(n)])
 
 
 def speech_profile(path: Path) -> list[float | None]:
-    """Decode `path` (mono, 16 kHz) as a stream and score it. Only the small per-frame
-    statistics are kept, so a two-hour recording needs almost no memory."""
+    """Decode `path` (mono, 16 kHz) as a stream and score it second by second."""
     cmd = [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-i", str(path)]
     cmd += ["-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     assert proc.stdout is not None
-    chunk = SAMPLE_RATE * 60 * 4  # one minute of float32; a multiple of FRAME samples
-    energies: list[np.ndarray] = []
-    zcrs: list[np.ndarray] = []
+    model = _Model()
+    probs: list[float] = []
+    step = CHUNK * 4  # bytes of float32
     pending = b""
     while True:
-        raw = proc.stdout.read(chunk)
+        raw = proc.stdout.read(step * 2000)  # about a minute at a time
         if not raw:
             break
         pending += raw
-        usable = len(pending) - len(pending) % (FRAME * 4)
-        energy, zcr = frame_stats(np.frombuffer(pending[:usable], dtype=np.float32))
-        energies.append(energy)
-        zcrs.append(zcr)
+        usable = len(pending) - len(pending) % step
+        samples = np.frombuffer(pending[:usable], dtype=np.float32)
+        probs.extend(model(samples[i : i + CHUNK]) for i in range(0, len(samples), CHUNK))
         pending = pending[usable:]
     err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
     if proc.wait() != 0:
         raise MamError(f"ffmpeg could not decode {path.name}: {err[-500:]}")
-    if not energies:
-        return []
-    return profile_from_frames(np.concatenate(energies), np.concatenate(zcrs))
+    return probabilities_to_profile(probs)
+
+
+HIGH_BAND_HZ = 2000  # cymbals, kartals and drums live above this; a speaking voice mostly below
+SILENCE_DB = -120.0
+
+
+@dataclass
+class Sound:
+    """Per second: loudness in dBFS (RMS) and the share of the energy above HIGH_BAND_HZ."""
+
+    level: list[float]
+    high: list[float]
+
+
+def sound_from_samples(samples: np.ndarray) -> Sound:
+    """Level and high-band share per whole second of mono 16 kHz float32 samples."""
+    seconds = len(samples) // SAMPLE_RATE
+    if seconds == 0:
+        return Sound([], [])
+    frames = samples[: seconds * SAMPLE_RATE].reshape(seconds, SAMPLE_RATE)
+    rms = np.sqrt(np.mean(frames.astype(np.float64) ** 2, axis=1))
+    level = 20 * np.log10(np.maximum(rms, 1e-6))
+    power = np.abs(np.fft.rfft(frames, axis=1)) ** 2  # one bin per hertz
+    total = power.sum(axis=1)
+    high = np.divide(
+        power[:, HIGH_BAND_HZ:].sum(axis=1), total, out=np.zeros(seconds), where=total > 0
+    )
+    return Sound([float(v) for v in level], [float(v) for v in high])
+
+
+def sound_profile(path: Path) -> Sound:
+    """Decode `path` (mono, 16 kHz) as a stream and measure it second by second."""
+    cmd = [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-i", str(path)]
+    cmd += ["-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.stdout is not None
+    level: list[float] = []
+    high: list[float] = []
+    step = SAMPLE_RATE * 4  # bytes in one second
+    pending = b""
+    while True:
+        raw = proc.stdout.read(step * 120)
+        if not raw:
+            break
+        pending += raw
+        usable = len(pending) - len(pending) % step
+        part = sound_from_samples(np.frombuffer(pending[:usable], dtype=np.float32))
+        level.extend(part.level)
+        high.extend(part.high)
+        pending = pending[usable:]
+    err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
+    if proc.wait() != 0:
+        raise MamError(f"ffmpeg could not decode {path.name}: {err[-500:]}")
+    return Sound(level, high)
