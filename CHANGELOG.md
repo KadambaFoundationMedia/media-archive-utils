@@ -8,12 +8,10 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Kirtan splitter
-- New tool: finds where the kirtan ends in a recording that is kirtan followed by a class, and splits it into a kirtan file (named by mantra type) and the class. Runs after the Renamer; in the Action menu and as `mam kirtan-split <file>` (dry run by default).
-- Singing throughout or no kirtan: not split. Unsure cuts open a review with a page to edit the time; sure ones are cut automatically (score 0.9 or more, 5% spot checks).
+- New tool: finds where the kirtan ends in a recording that is kirtan followed by a class, from the audio alone (music versus speech, silences; no transcription), and splits it into a kirtan file (named by mantra type) and the class. Runs after the Renamer; in the Action menu and as `mam kirtan-split <file>` (dry run by default, prints a timeline).
+- Music throughout or no kirtan: not split. Unsure cuts open a review with a page to edit the time; sure ones are cut automatically (score 0.9 or more, 5% spot checks).
 - Video recordings: the audio is extracted as mp3 first.
-
-### Helpers
-- New transcriber (`mam/helpers/transcriber`): mlx-whisper on Apple Silicon (installed by `uv sync`), whisper.cpp on Windows (`WHISPER_MODEL_PATH`). One transcript per content hash, reused by later tools.
+- Common phrases are ignored for now (they need a transcript).
 
 ### Project
 - Versioning and this changelog started.

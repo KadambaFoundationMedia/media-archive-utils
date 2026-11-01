@@ -1,10 +1,8 @@
 """Find where the kirtan ends and the class begins (tools/kirtan-splitter/SPECS.md).
 
-Evidence (SPEC.md sections 4 and 10): the shared transcript, common phrases, and the silence at
-the boundary. Segments are labelled *speech* or *singing* from their text: singing is sparse,
-repetitive and made of mantra words; speech has many different words at a normal pace. No audio
-classifier is used yet; the labeled examples that review outcomes produce decide later whether
-one is needed.
+Works on a profile of the audio made locally (see `features.py`): for every second a score from
+0 (music: singing with instruments) to 1 (speech), or `None` where the recording is silent. No
+transcript is used; transcription belongs to the class-discoverer.
 
 Pure functions: no files, no database. The tool wraps them.
 """
@@ -14,26 +12,15 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from mam.helpers.transcriber import Segment
-from mam.tools.kirtan_splitter import phrases
-
 MIN_KIRTAN_S = 90.0  # a shorter lead-in is announcements, not a kirtan
 PLAUSIBLE_KIRTAN_S = (180.0, 2100.0)  # 3 to 35 minutes
+CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this long to start a class
+SPEECH_AT = 0.5  # profile score from which a second counts as speech
+MUSIC_SHARE_MIN = 0.7  # a kirtan is at least this much music (blips of speech are allowed)
 SNAP_S = 3.0  # move the cut to a silence this close to it
-SPEECH_MIN_WORDS = 6
-SPEECH_MIN_UNIQUE = 0.55
-SPEECH_MIN_RATE = 1.0  # words per second
-SPEECH_GAP_S = 8.0  # speech segments closer than this belong to one run
-CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this much speech, or a marker, to start a class
 LEAD_PAD_S = 0.3  # kept before the first sound
 MAX_LEAD_S = 60.0  # a longer 'silence' at the start is a quiet recording, not a lead-in
-
-
-@dataclass
-class Labelled:
-    seg: Segment
-    kind: str  # speech | singing
-    marker: str | None = None
+TIMELINE_STEP_S = 10
 
 
 @dataclass
@@ -44,7 +31,6 @@ class Decision:
     split_at: float | None = None
     class_start: float | None = None
     mantra: str | None = None
-    marker: str | None = None
     snapped_to_silence: bool = False
     reasons: list[str] = field(default_factory=list)
     features: dict[str, Any] = field(default_factory=dict)
@@ -53,51 +39,39 @@ class Decision:
         return asdict(self)
 
 
-def label(seg: Segment) -> Labelled:
-    ws = phrases.words(seg.text)
-    marker = phrases.end_marker(seg.text)
-    if marker:
-        return Labelled(seg, "speech", marker)
-    if len(ws) < SPEECH_MIN_WORDS:
-        return Labelled(seg, "singing")
-    unique = len(set(ws)) / len(ws)
-    rate = len(ws) / max(seg.end - seg.start, 0.1)
-    if (
-        unique >= SPEECH_MIN_UNIQUE
-        and rate >= SPEECH_MIN_RATE
-        and phrases.mantra_share(seg.text) < 0.5
-    ):
-        return Labelled(seg, "speech")
-    return Labelled(seg, "singing")
-
-
-def speech_runs(items: list[Labelled]) -> list[list[Labelled]]:
-    runs: list[list[Labelled]] = []
-    for item in items:
-        if item.kind != "speech":
+def smooth(profile: list[float | None], width: int = 5) -> list[float | None]:
+    """Median over `width` seconds, so a clap or a shout does not flip the label."""
+    half = width // 2
+    out: list[float | None] = []
+    for i, value in enumerate(profile):
+        if value is None:
+            out.append(None)
             continue
-        if runs and item.seg.start - runs[-1][-1].seg.end <= SPEECH_GAP_S:
-            runs[-1].append(item)
+        near = sorted(v for v in profile[max(0, i - half) : i + half + 1] if v is not None)
+        out.append(near[len(near) // 2])
+    return out
+
+
+def timeline(profile: list[float | None]) -> str:
+    """One character per 10 s: m music, s speech, . silence. For reviews and tuning."""
+    chars = []
+    for i in range(0, len(profile), TIMELINE_STEP_S):
+        chunk = [v for v in profile[i : i + TIMELINE_STEP_S] if v is not None]
+        if not chunk:
+            chars.append(".")
         else:
-            runs.append([item])
-    return runs
+            chars.append("s" if sum(chunk) / len(chunk) >= SPEECH_AT else "m")
+    return "".join(chars)
 
 
-def _run_speech_s(run: list[Labelled]) -> float:
-    return sum(i.seg.end - i.seg.start for i in run)
-
-
-def snap_to_silence(
-    t: float, silences: list[tuple[float, float]], limit: float
-) -> tuple[float, bool]:
-    """Silence start nearest to `t` (within SNAP_S); the cut is made inside the silence."""
+def snap_to_silence(t: float, silences: list[tuple[float, float]], limit: float):
+    """Move `t` into a silence within SNAP_S (cut just inside its start)."""
     best = None
     for start, end in silences:
         if start > limit:
             continue
         if start - SNAP_S <= t <= end + SNAP_S:
-            # inside or next to a silence: cut a little into it
-            point = min(max(t, start), end) if start <= t <= end else (start if t < start else end)
+            point = min(max(t, start), end)
             cut = min(point, start + 0.5)
             if best is None or abs(cut - t) < abs(best - t):
                 best = cut
@@ -111,89 +85,112 @@ def lead_in(silences: list[tuple[float, float]]) -> float:
     return 0.0
 
 
+def _runs(labels: list[str | None], kind: str) -> list[tuple[int, int]]:
+    """(start, end) second ranges of `kind`; silence does not break a run."""
+    runs: list[tuple[int, int]] = []
+    start = last = None
+    for i, label in enumerate(labels):
+        if label == kind:
+            if start is None:
+                start = i
+            last = i
+        elif label is not None and start is not None:  # the other kind ends the run
+            runs.append((start, last + 1))
+            start = last = None
+    if start is not None:
+        runs.append((start, last + 1))
+    return runs
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
 def detect(
-    segments: list[Segment],
+    profile: list[float | None],
     duration: float,
     silences: list[tuple[float, float]] | None = None,
+    mantra: str | None = None,
 ) -> Decision:
     silences = silences or []
     start = lead_in(silences)
-    items = [label(s) for s in segments if s.text.strip()]
-    if not items:
+    smoothed = smooth(profile)
+    labels = [None if v is None else ("speech" if v >= SPEECH_AT else "music") for v in smoothed]
+    sounding = [v for v in smoothed if v is not None]
+    features: dict[str, Any] = {"timeline": timeline(smoothed), "seconds": len(profile)}
+    if len(sounding) < 30:
         return Decision(
             "unclear",
             0.2,
             kirtan_start=start,
-            reasons=["The transcript is empty (no speech or singing recognised)."],
-        )
-    runs = speech_runs(items)
-
-    class_run = None
-    for run in runs:
-        if any(i.marker for i in run) or _run_speech_s(run) >= CLASS_MIN_SPEECH_S:
-            class_run = run
-            break
-    features: dict[str, Any] = {"segments": len(items), "speech_runs": len(runs)}
-
-    if class_run is None:
-        sung = sum(i.seg.end - i.seg.start for i in items if i.kind == "singing")
-        share = sung / max(sum(i.seg.end - i.seg.start for i in items), 1.0)
-        score = round(min(0.95, 0.5 + 0.45 * share) if not runs else 0.55, 3)
-        return Decision(
-            "kirtan_only",
-            score,
-            kirtan_start=start,
-            mantra=phrases.mantra_type(" ".join(i.seg.text for i in items)),
-            reasons=["No sustained speech: the singing continues through the recording."],
-            features={**features, "singing_share": round(share, 3)},
-        )
-
-    first = class_run[0]
-    marker_item = next((i for i in class_run if i.marker), None)
-    class_start = (marker_item or first).seg.start
-    before = [i for i in items if i.seg.end <= first.seg.start + 0.5 and i is not first]
-    sung_before = [i for i in before if i.kind == "singing"]
-    last_sung_end = max((i.seg.end for i in sung_before), default=0.0)
-    kirtan_seconds = last_sung_end - start
-    features.update(
-        class_run_start=round(first.seg.start, 2),
-        class_run_speech_s=round(_run_speech_s(class_run), 1),
-        sung_segments_before=len(sung_before),
-    )
-
-    if not sung_before or kirtan_seconds < MIN_KIRTAN_S:
-        has_marker = bool(marker_item)
-        return Decision(
-            "class_only",
-            0.9 if has_marker or first.seg.start < 60 else 0.7,
-            kirtan_start=start,
-            class_start=first.seg.start,
-            marker=marker_item.marker if marker_item else None,
-            reasons=[
-                "The recording starts with speech; there is no kirtan of at least "
-                f"{int(MIN_KIRTAN_S)} seconds before it."
-            ],
+            reasons=["There is hardly any sound to analyse."],
             features=features,
         )
 
-    split_at, snapped = snap_to_silence(last_sung_end, silences, class_start)
-    split_at = max(start + 1.0, min(split_at, first.seg.start))
-    all_sung_text = " ".join(i.seg.text for i in sung_before)
-    mantra = phrases.mantra_type(all_sung_text)
-    sing_time = sum(i.seg.end - i.seg.start for i in before if i.kind == "singing")
-    all_time = sum(i.seg.end - i.seg.start for i in before) or 1.0
-    sing_share = sing_time / all_time
+    class_run = None
+    first_speech = None  # the first speech run long enough to be a class
+    for run_start, run_end in _runs(labels, "speech"):
+        if run_end - run_start < CLASS_MIN_SPEECH_S:
+            continue
+        music_before = sum(1 for lab in labels[int(start) : run_start] if lab == "music")
+        if first_speech is None:
+            first_speech = (run_start, music_before)
+        if music_before >= MIN_KIRTAN_S:
+            class_run = (run_start, run_end)
+            break
+
+    if class_run is None and first_speech is not None:
+        run_start, music_before = first_speech
+        return Decision(
+            "class_only",
+            0.9 if music_before == 0 and run_start < 60 else 0.7,
+            kirtan_start=start,
+            class_start=float(run_start),
+            mantra=mantra,
+            reasons=[
+                f"The recording starts with speech; there is no kirtan of at least "
+                f"{int(MIN_KIRTAN_S)} seconds before it."
+            ],
+            features={**features, "first_speech_at": run_start},
+        )
+
+    if class_run is None:
+        music_share = _mean([1.0 if lab == "music" else 0.0 for lab in labels if lab])
+        features["music_share"] = round(music_share, 3)
+        if music_share >= MUSIC_SHARE_MIN:
+            return Decision(
+                "kirtan_only",
+                round(min(0.95, 0.5 + 0.45 * music_share), 3),
+                kirtan_start=start,
+                mantra=mantra,
+                reasons=["No sustained speech: the music continues through the recording."],
+                features=features,
+            )
+        return Decision(
+            "unclear",
+            0.3,
+            kirtan_start=start,
+            reasons=["Neither a clear kirtan nor a clear class: speech and music alternate."],
+            features=features,
+        )
+
+    run_start, run_end = class_run
+    last_music = max(i for i in range(int(start), run_start) if labels[i] == "music") + 1
+    split_at, snapped = snap_to_silence(float(last_music), silences, float(run_start))
+    split_at = max(start + 1.0, min(split_at, float(run_start)))
+    kirtan_seconds = last_music - start
+    before = [v for v in smoothed[int(start) : last_music] if v is not None]
+    after = [v for v in smoothed[run_start:run_end] if v is not None]
+    music_share = _mean([1.0 if v < SPEECH_AT else 0.0 for v in before])
+    margin = _mean(after) - _mean(before)
 
     score = 0.35
-    reasons = [f"Singing until {last_sung_end:.1f}s, speech from {first.seg.start:.1f}s."]
-    if marker_item:
-        score += 0.25
-        reasons.append(f'The class starts with the phrase "{marker_item.marker}".')
+    reasons = [f"Music until {last_music}s, speech from {run_start}s."]
+    score += 0.25 * max(0.0, min(1.0, margin / 0.6))
     if snapped:
         score += 0.15
         reasons.append("The cut is inside a silence.")
-    score += 0.15 * sing_share
-    score += 0.10 * min(1.0, _run_speech_s(class_run) / 60.0)
+    score += 0.10 * max(0.0, min(1.0, (music_share - 0.5) / 0.4))
     lo, hi = PLAUSIBLE_KIRTAN_S
     if lo <= kirtan_seconds <= hi:
         score += 0.10
@@ -202,18 +199,22 @@ def detect(
         reasons.append(f"The kirtan is {kirtan_seconds / 60:.1f} minutes, which is unusual.")
     if mantra:
         score += 0.05
-        reasons.append(f"The mantra is {mantra}.")
+        reasons.append(f"The mantra is {mantra} (from the class).")
     else:
-        reasons.append("The mantra type was not recognised; the kirtan is named Kirtan.")
-    features.update(singing_share=round(sing_share, 3), kirtan_seconds=round(kirtan_seconds, 1))
+        reasons.append("The class does not tell the mantra; the kirtan is named Kirtan.")
+    features.update(
+        music_share=round(music_share, 3),
+        contrast=round(margin, 3),
+        kirtan_seconds=round(kirtan_seconds, 1),
+        class_run_seconds=run_end - run_start,
+    )
     return Decision(
         "split",
         round(max(0.0, min(1.0, score)), 3),
         kirtan_start=start,
         split_at=round(split_at, 3),
-        class_start=round(class_start, 3),
-        mantra=mantra or phrases.MAHA_MANTRA,
-        marker=marker_item.marker if marker_item else None,
+        class_start=float(run_start),
+        mantra=mantra or "Kirtan",
         snapped_to_silence=snapped,
         reasons=reasons,
         features=features,

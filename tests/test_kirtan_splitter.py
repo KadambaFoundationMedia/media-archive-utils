@@ -4,6 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pytest
 from sqlalchemy import select
 
@@ -12,46 +13,31 @@ from mam.helpers.audio_optimizer import probe
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db import session_scope
 from mam.helpers.local_db.repo import register_original
-from mam.helpers.transcriber import Segment
 from mam.manager.tools import JobContext
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter import tool as splitter
 from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
 from mam.tools.kirtan_splitter.detect import detect
+from mam.tools.kirtan_splitter.features import (
+    SAMPLE_RATE,
+    profile_from_samples,
+    speech_profile,
+)
 from tests.conftest import make_tone
 
-SING = "hare krsna hare krsna krsna krsna hare hare"
-TALK = "so we are all here to understand the nature of the soul and how it is different from matter"
 
-
-def kirtan(until: float, step: float = 12.0, text: str = SING) -> list[Segment]:
-    out, t = [], 0.0
-    while t + step <= until:
-        out.append(Segment(t, t + step - 1, text))
-        t += step
-    return out
-
-
-def talk(
-    start: float, seconds: float, step: float = 9.0, first: str | None = None
-) -> list[Segment]:
-    out, t = [], start
-    while t + step <= start + seconds:
-        out.append(Segment(t, t + step - 1, first if first and not out else TALK))
-        t += step
-    return out
+def profile(music: int, speech: int, music_value=0.1, speech_value=0.9):
+    """A per-second profile: `music` seconds of music, then `speech` seconds of speech."""
+    return [music_value] * music + [speech_value] * speech
 
 
 # ------------------------------------------------------------------- phrases
-def test_end_marker_and_mantra_types():
-    assert phrases.end_marker("Om namo bhagavate vasudeva ajam") == "om namo bhagavate vasudeva"
-    assert phrases.end_marker("Reading from Srimad Bhagavatam, canto three") is not None
-    assert phrases.end_marker("it was a lovely evening") is None
-    assert phrases.mantra_type("Jaya Radha Madhava, Jaya Kunja Bihari") == phrases.RADHA_MADHAVA
-    assert phrases.mantra_type("Jaya jaya Sri Chaitanya, jaya Nityananda") == phrases.PANCA_TATTVA
-    assert phrases.mantra_type("Namaste Narasimha, Prahladahladadayine") == phrases.NRSIMHA
-    assert phrases.mantra_type("Hare Krishna Hare Krishna Krishna Krishna Hare Hare") == "Kirtan"
-    assert phrases.mantra_type("so we were talking") is None
+def test_mantra_from_the_class():
+    assert phrases.mantra_for_what("SB-3-6-6") == phrases.RADHA_MADHAVA
+    assert phrases.mantra_for_what("BG-2-51") == phrases.RADHA_MADHAVA
+    assert phrases.mantra_for_what("CC-Madhya-20-154") == phrases.PANCA_TATTVA
+    assert phrases.mantra_for_what("Janmastami-evening-lecture") is None
+    assert phrases.mantra_for_what(None) is None
 
 
 def test_time_round_trip():
@@ -64,66 +50,129 @@ def test_time_round_trip():
 
 
 # ------------------------------------------------------------------- detection
-def test_split_with_marker_is_confident():
-    segs = kirtan(450) + talk(452, 120, first="Om namo bhagavate vasudeva ajam")
-    d = detect(segs, 700, [(442, 452)])  # the last singing ends at 443
+def test_split_in_a_silence_is_confident():
+    d = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA)
     assert d.mode == "split"
-    assert d.snapped_to_silence
-    assert 442 <= d.split_at <= 443
-    assert d.marker == "om namo bhagavate vasudeva"
+    assert d.snapped_to_silence and 448 <= d.split_at <= 449
+    assert d.class_start == 450
     assert d.score >= 0.9
 
 
-def test_split_without_marker_or_silence_is_less_sure():
-    d = detect(kirtan(450) + talk(480, 120), 700)
-    assert d.mode == "split"
-    assert d.marker is None
+def test_split_without_silence_is_less_sure():
+    d = detect(profile(450, 150), 600, [], phrases.RADHA_MADHAVA)
+    assert d.mode == "split" and not d.snapped_to_silence
     assert d.score < 0.9
-    assert abs(d.split_at - 443) <= 1.5
+    assert d.split_at == pytest.approx(450, abs=1.5)
 
 
-def test_mantra_is_named_in_the_decision():
-    segs = kirtan(300, text="jaya radha madhava jaya kunja bihari jaya radha madhava") + talk(
-        302, 120, first="reading from srimad bhagavatam"
+def test_mantra_defaults_to_kirtan_when_the_class_does_not_say():
+    d = detect(profile(450, 150), 600, [(448, 452)])
+    assert (
+        d.mantra == "Kirtan"
+        and d.score < detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA).score
     )
-    assert detect(segs, 600).mantra == phrases.RADHA_MADHAVA
 
 
-def test_singing_throughout_is_not_split():
-    d = detect(kirtan(1800), 1800)
-    assert d.mode == "kirtan_only"
-    assert d.score >= 0.9
+def test_music_throughout_is_not_split():
+    d = detect([0.1] * 1800, 1800)
+    assert d.mode == "kirtan_only" and d.score >= 0.9
 
 
 def test_class_without_kirtan_is_not_split():
-    d = detect(talk(5, 300, first="Om namo bhagavate vasudeva ajam"), 400)
-    assert d.mode == "class_only"
-    assert d.score >= 0.9
+    d = detect(profile(0, 400), 400)
+    assert d.mode == "class_only" and d.score >= 0.9
 
 
 def test_short_announcement_is_not_a_kirtan():
-    d = detect(kirtan(40) + talk(42, 200), 400)
+    d = detect(profile(40, 400), 440)
     assert d.mode == "class_only"
 
 
-def test_empty_transcript_is_unclear():
-    assert detect([], 600).mode == "unclear"
+def test_an_announcement_before_the_kirtan_does_not_hide_it():
+    p = profile(0, 30) + profile(400, 200)
+    d = detect(p, 630, [(0.0, 0.0)])
+    assert d.mode == "split" and d.split_at == pytest.approx(430, abs=1.5)
+
+
+def test_speech_blips_inside_the_kirtan_are_ignored():
+    p = [0.1] * 200 + [0.9] * 8 + [0.1] * 200 + [0.9] * 150
+    d = detect(p, 558)
+    assert d.mode == "split" and d.split_at == pytest.approx(408, abs=1.5)
+
+
+def test_alternating_music_and_speech_is_unclear():
+    p = ([0.1] * 25 + [0.9] * 15) * 20
+    assert detect(p, 800).mode in ("unclear", "split", "class_only")  # never a confident cut
+    assert detect(p, 800).score < 0.9
+
+
+def test_almost_no_sound_is_unclear():
+    assert detect([None] * 600, 600).mode == "unclear"
 
 
 def test_unusually_long_kirtan_lowers_the_score():
-    normal = detect(kirtan(450) + talk(452, 120, first="reading from srimad bhagavatam"), 700)
-    long = detect(kirtan(3000) + talk(3002, 120, first="reading from srimad bhagavatam"), 3300)
+    normal = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA)
+    long = detect(profile(3000, 150), 3150, [(2998, 3002)], phrases.RADHA_MADHAVA)
     assert long.score < normal.score
 
 
 def test_a_silent_looking_recording_keeps_its_start():
-    d = detect(kirtan(450) + talk(452, 120), 700, [(0.0, 700.0)])
-    assert d.kirtan_start == 0.0
+    assert detect(profile(450, 150), 600, [(0.0, 600.0)]).kirtan_start == 0.0
 
 
 def test_leading_silence_is_trimmed():
-    d = detect(kirtan(450) + talk(452, 120), 700, [(0.0, 6.0)])
+    d = detect(profile(450, 150), 600, [(0.0, 6.0)])
     assert 5.5 <= d.kirtan_start <= 6.0
+
+
+def test_timeline_shows_music_and_speech():
+    d = detect(profile(100, 50), 150)
+    assert d.features["timeline"] == "m" * 10 + "s" * 5
+
+
+# ------------------------------------------------------------ the audio features
+def synth_music(seconds, rng):
+    t = np.arange(SAMPLE_RATE * seconds) / SAMPLE_RATE
+    tone = sum(a * np.sin(2 * np.pi * f * t) for a, f in ((1, 220), (0.5, 440), (0.3, 660)))
+    return (
+        0.3 * tone * (1 + 0.1 * np.sin(2 * np.pi * 1.5 * t)) + 0.05 * rng.standard_normal(len(t))
+    ).astype(np.float32)
+
+
+def synth_speech(seconds, rng):
+    t = np.arange(SAMPLE_RATE * seconds) / SAMPLE_RATE
+    env = np.clip(np.sin(2 * np.pi * 4 * t), 0, None) ** 2 * (np.sin(2 * np.pi * 0.7 * t) > -0.3)
+    voiced = np.sin(2 * np.pi * (120 + 30 * np.sin(2 * np.pi * 0.5 * t)) * t)
+    voiced += 0.5 * np.sin(2 * np.pi * 360 * t)
+    hiss = rng.standard_normal(len(t)) * 0.4 * (np.sin(2 * np.pi * 1.3 * t) > 0.6)
+    return (0.3 * env * (voiced + hiss)).astype(np.float32)
+
+
+def test_features_tell_steady_music_from_pulsing_speech():
+    rng = np.random.default_rng(1)
+    music = [v for v in profile_from_samples(synth_music(40, rng)) if v is not None]
+    speech = [v for v in profile_from_samples(synth_speech(40, rng)) if v is not None]
+    assert sum(music) / len(music) < 0.25
+    assert sum(speech) / len(speech) > 0.75
+
+
+def test_features_find_the_change_in_a_stream(tmp_path):
+    """Music for 130 s, then speech for 60 s, through ffmpeg and the whole detector."""
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    rng = np.random.default_rng(2)
+    samples = np.concatenate([synth_music(130, rng), synth_speech(60, rng)])
+    raw = tmp_path / "mix.f32"
+    samples.tofile(raw)
+    wav = tmp_path / "mix.wav"
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "f32le", "-ar", "16000"]
+        + ["-ac", "1", "-i", str(raw), str(wav)],
+        check=True,
+    )
+    d = detect(speech_profile(wav), 190, find_silences(wav, 190))
+    assert d.mode == "split"
+    assert d.split_at == pytest.approx(130, abs=4)
 
 
 # ------------------------------------------------------------------- ffmpeg
@@ -160,27 +209,13 @@ def test_extract_audio_from_video(tmp_path):
 
 
 # ----------------------------------------------------------- the whole job
-class FakeTranscriber:
-    def __init__(self, segments):
-        self.segments, self.calls = segments, 0
-
-    def info(self):
-        from mam.helpers.transcriber import TranscriptInfo
-
-        return TranscriptInfo("fake", "1", "test", None, "cpu")
-
-    def transcribe(self, audio):
-        self.calls += 1
-        return self.segments
-
-
 @pytest.fixture
 def prepared(settings, monkeypatch, reference, no_baserow):
     monkeypatch.setenv("SPOT_CHECK_RATE", "0")
     get_settings.cache_clear()
     settings = get_settings()
 
-    def make(segments, name="2015-08-27_KKS_SB-3-6-6_se.mp3", seconds=300, ext="mp3"):
+    def make(scripted, name="2015-08-27_KKS_SB-3-6-6_se.mp3", seconds=300, ext="mp3"):
         original = make_tone(
             settings.media_sample_files_path / f"orig.{ext}",
             seconds=seconds,
@@ -191,14 +226,14 @@ def prepared(settings, monkeypatch, reference, no_baserow):
         folder.mkdir(parents=True)
         copy = folder / name
         shutil.copy2(original, copy)
-        fake = FakeTranscriber(segments)
-        monkeypatch.setattr(splitter, "get_transcriber", lambda s=None: fake)
+        monkeypatch.setattr(splitter, "speech_profile", lambda audio: scripted)
         with session_scope() as s:
             record = register_original(s, original)
             record.processed_path, record.current_name = str(copy), name
             record.meta = {
                 "proposal": {
                     "when": "2015-08-27",
+                    "what": "SB-3-6-6",
                     "where": "se",
                     "place": "Sweden",
                     "cc": "se",
@@ -208,7 +243,7 @@ def prepared(settings, monkeypatch, reference, no_baserow):
             }
             record.status = "Renamer Done"
             rid = record.id
-        return rid, copy, fake
+        return rid, copy
 
     return make
 
@@ -220,13 +255,18 @@ def run(record_id, *, dry_run=False):
         return splitter.run_kirtan_splitter(ctx)
 
 
-SEGS = kirtan(200, text="jaya radha madhava jaya kunja bihari") + talk(
-    201, 90, first="om namo bhagavate vasudeva ajam"
-)
+# 190 s of music, then speech; no silence in the synthetic file, so the score is below 0.9
+SURE = profile(190, 100)
 
 
-def test_confident_split_writes_both_files(prepared):
-    rid, copy, _ = prepared(SEGS)
+@pytest.fixture
+def sure_silence(monkeypatch):
+    """Put a silence at the boundary, as a recording would have."""
+    monkeypatch.setattr(splitter, "find_silences", lambda audio, duration=None: [(189.0, 192.0)])
+
+
+def test_confident_split_writes_both_files(prepared, sure_silence):
+    rid, copy = prepared(SURE)
     outcome = run(rid)
     assert outcome.state == "done", outcome.summary
     with session_scope() as s:
@@ -240,35 +280,37 @@ def test_confident_split_writes_both_files(prepared):
         assert record.current_name == "2015-08-27_KKS_SB-3-6-6_se.mp3"
         assert Path(record.processed_path) == copy
         cut = record.meta["split"]["split_at"]
+    assert cut == pytest.approx(189, abs=1)
     assert probe(kirtan_path).duration == pytest.approx(cut, abs=0.5)
     assert probe(copy).duration == pytest.approx(300 - cut, abs=0.5)
     # the original is untouched
-    assert probe(get_settings().media_sample_files_path / "orig.mp3").duration == pytest.approx(
-        300, abs=0.5
-    )
+    original = get_settings().media_sample_files_path / "orig.mp3"
+    assert probe(original).duration == pytest.approx(300, abs=0.5)
 
 
-def test_dry_run_changes_nothing(prepared):
-    rid, copy, _ = prepared(SEGS)
+def test_dry_run_changes_nothing(prepared, sure_silence):
+    rid, copy = prepared(SURE)
     before = copy.stat().st_size
     outcome = run(rid, dry_run=True)
     assert outcome.state == "info" and "Jaya-radha-madhava" in outcome.summary
+    assert outcome.data["features"]["timeline"].startswith("mmmm")
     assert copy.stat().st_size == before
     assert list(copy.parent.iterdir()) == [copy]
     with session_scope() as s:
         assert s.scalar(select(m.Review.id)) is None
 
 
-def test_transcript_is_made_once(prepared):
-    rid, _, fake = prepared(SEGS)
-    run(rid, dry_run=True)
-    run(rid, dry_run=True)
-    assert fake.calls == 1
+def test_the_splitter_does_not_transcribe():
+    """Transcription belongs to the class-discoverer (Edwin, 2026-11-01)."""
+    import mam.tools.kirtan_splitter as package
+
+    for source in Path(package.__file__).parent.glob("*.py"):
+        text = source.read_text().lower()
+        assert "whisper" not in text and "get_transcriber" not in text, source.name
 
 
 def test_unsure_split_opens_a_review_and_cuts_nothing(prepared):
-    plain = kirtan(200) + talk(215, 90)  # no marker, no silence
-    rid, copy, _ = prepared(plain)
+    rid, copy = prepared(SURE)  # no silence at the cut: score under 0.9
     size = copy.stat().st_size
     outcome = run(rid)
     assert outcome.state == "review"
@@ -280,7 +322,7 @@ def test_unsure_split_opens_a_review_and_cuts_nothing(prepared):
 
 
 def test_approving_a_review_with_an_edited_cut(prepared):
-    rid, copy, _ = prepared(kirtan(200) + talk(215, 90))
+    rid, copy = prepared(SURE)
     run(rid)
     with session_scope() as s:
         review = s.scalars(select(m.Review)).one()
@@ -301,7 +343,7 @@ def test_approving_a_review_with_an_edited_cut(prepared):
 
 
 def test_do_not_split_decision(prepared):
-    rid, copy, _ = prepared(kirtan(200) + talk(215, 90))
+    rid, copy = prepared(SURE)
     run(rid)
     with session_scope() as s:
         review = s.scalars(select(m.Review)).one()
@@ -312,15 +354,15 @@ def test_do_not_split_decision(prepared):
         assert review.outcome == "edited"  # the tool proposed a split
 
 
-def test_singing_throughout_is_skipped(prepared):
-    rid, copy, _ = prepared(kirtan(290))
+def test_music_throughout_is_skipped(prepared):
+    rid, copy = prepared([0.1] * 290)
     outcome = run(rid)
     assert outcome.state == "skipped"
     assert copy.exists()
 
 
 def test_real_run_needs_the_renamed_copy(prepared):
-    rid, copy, _ = prepared(SEGS)
+    rid, copy = prepared(SURE)
     with session_scope() as s:
         s.get(m.MediaFile, rid).processed_path = None
     with pytest.raises(Exception, match="Renamer first"):
@@ -328,8 +370,8 @@ def test_real_run_needs_the_renamed_copy(prepared):
     assert run(rid, dry_run=True).state == "info"  # a dry run may read the original
 
 
-def test_cut_outside_processed_files_is_refused(prepared, tmp_path):
-    rid, _, _ = prepared(SEGS)
+def test_cut_outside_processed_files_is_refused(prepared):
+    rid, _ = prepared(SURE)
     original = get_settings().media_sample_files_path / "orig.mp3"
     with session_scope() as s:
         record = s.get(m.MediaFile, rid)
@@ -344,12 +386,29 @@ def test_cut_outside_processed_files_is_refused(prepared, tmp_path):
             )
 
 
-def test_kirtan_gets_its_own_baserow_row(prepared, no_baserow):
-    rid, _, _ = prepared(SEGS)
+def test_kirtan_gets_its_own_baserow_row(prepared, sure_silence, no_baserow):
+    rid, _ = prepared(SURE)
     run(rid)
     assert len(no_baserow) == 1
     values = no_baserow[0]["values"]
     assert values["what"] == "Jaya-radha-madhava" and values["baserow_row_id"] is None
+
+
+def test_baserow_write_does_not_hold_the_database(prepared, sure_silence, monkeypatch):
+    """Baserow writes log through their own session; ours must be released first."""
+    from mam.helpers.local_db.repo import record_event
+
+    def write_in_own_session(record, proposal, path, settings, dry_run, live=False):
+        with session_scope() as other:  # would raise 'database is locked' if we held a write
+            record_event(other, action="probe", tool="test", dry_run=True)
+        return {"action": "create", "row_id": 7, "dry_run": True}
+
+    monkeypatch.setattr("mam.tools.renamer.tool.write_baserow", write_in_own_session)
+    rid, _ = prepared(SURE)
+    assert run(rid).state == "done"
+    with session_scope() as s:
+        kid = s.get(m.MediaFile, rid).meta["split"]["kirtan_id"]
+        assert s.get(m.MediaFile, kid).baserow_row_id == 7
 
 
 def test_the_splitter_follows_the_renamer_in_the_pipeline():
@@ -365,14 +424,14 @@ def test_review_page_and_approval_through_the_portal(prepared):
 
     from mam.manager.app import create_app
 
-    rid, copy, _ = prepared(kirtan(200) + talk(215, 90))
+    rid, copy = prepared(SURE)
     run(rid)
     with session_scope() as s:
         review_id = s.scalars(select(m.Review)).one().id
     with TestClient(create_app(start_queue=False)) as client:
         page = client.get(f"/review/{review_id}")
         assert page.status_code == 200
-        assert "Kirtan splitter review" in page.text and "3:11.000" in page.text
+        assert "Kirtan splitter review" in page.text and "3:10.000" in page.text
         assert client.get("/reviews").status_code == 200
         bad = client.post(
             f"/review/{review_id}/decide",
@@ -382,14 +441,14 @@ def test_review_page_and_approval_through_the_portal(prepared):
         assert "not a time" in bad.headers["location"].replace("%20", " ")
         done = client.post(
             f"/review/{review_id}/decide",
-            data={"action": "approve", "split_at": "3:11", "mantra": "Kirtan"},
+            data={"action": "approve", "split_at": "3:10", "mantra": "Jaya-radha-madhava"},
             follow_redirects=False,
         )
         assert done.status_code == 303
     with session_scope() as s:
         review = s.get(m.Review, review_id)
-        assert review.outcome == "approved" and review.final["split_at"] == 191
-    assert probe(copy).duration == pytest.approx(300 - 191, abs=0.5)
+        assert review.outcome == "approved" and review.final["split_at"] == 190
+    assert probe(copy).duration == pytest.approx(300 - 190, abs=0.5)
 
 
 def test_menu_lists_the_splitter(prepared):
@@ -404,44 +463,20 @@ def test_menu_lists_the_splitter(prepared):
 # ------------------------------------------------------- real samples (slow)
 @pytest.mark.slow
 def test_golden_samples(settings):
-    """Needs trimming-samples/ and a transcription backend (run on the Mac, `pytest -m slow`)."""
+    """Needs trimming-samples/ (run on the Mac with `pytest -m slow`)."""
     import yaml
-
-    from mam.helpers.transcriber import get_transcriber
-    from mam.tools.kirtan_splitter.audio import find_silences
 
     golden = yaml.safe_load((Path(__file__).parent / "fixtures" / "golden.yaml").read_text())
     root = Path(__file__).resolve().parent.parent
-    try:
-        transcriber = get_transcriber(settings)
-    except Exception as exc:
-        pytest.skip(str(exc))
     checked = 0
     for case in golden["kirtan_splitter"]:
         audio = root / case["file"]
         if not audio.exists():
             continue
-        segments = transcriber.transcribe(audio)
-        d = detect(segments, probe(audio).duration, find_silences(audio))
-        assert d.mode == "split", f"{audio.name}: {d.reasons}"
+        duration = probe(audio).duration
+        d = detect(speech_profile(audio), duration, find_silences(audio, duration))
+        assert d.mode == "split", f"{audio.name}: {d.reasons} {d.features.get('timeline')}"
         assert abs(d.split_at - case["kirtan_end"]) <= golden["tolerance_s"], audio.name
         checked += 1
     if not checked:
         pytest.skip("no trimming-samples on this machine")
-
-
-def test_baserow_write_does_not_hold_the_database(prepared, monkeypatch):
-    """Baserow writes log through their own session; ours must be released first."""
-    from mam.helpers.local_db.repo import record_event
-
-    def write_in_own_session(record, proposal, path, settings, dry_run, live=False):
-        with session_scope() as other:  # would raise 'database is locked' if we held a write
-            record_event(other, action="probe", tool="test", dry_run=True)
-        return {"action": "create", "row_id": 7, "dry_run": True}
-
-    monkeypatch.setattr("mam.tools.renamer.tool.write_baserow", write_in_own_session)
-    rid, _, _ = prepared(SEGS)
-    assert run(rid).state == "done"
-    with session_scope() as s:
-        kid = s.get(m.MediaFile, rid).meta["split"]["kirtan_id"]
-        assert s.get(m.MediaFile, kid).baserow_row_id == 7

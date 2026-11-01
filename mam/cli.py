@@ -318,6 +318,11 @@ def _run_tool_cli(tool: str, path: Path, dry_run: bool) -> None:
                 console.print(f"   [yellow]⚑ {flag}[/yellow]")
             for reason in (job.result or {}).get("reasons", []):
                 console.print(f"   {reason}")
+            line = ((job.result or {}).get("features") or {}).get("timeline")
+            if line:
+                console.print(
+                    f"   every 10 s (m music, s speech, . silence): {line}", soft_wrap=True
+                )
 
 
 @app.command()
