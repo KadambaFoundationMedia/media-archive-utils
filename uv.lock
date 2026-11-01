@@ -237,7 +237,6 @@ wheels = [
 
 [[package]]
 name = "media-archive-utils"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },

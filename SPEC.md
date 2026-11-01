@@ -20,6 +20,7 @@ Items under "Open decisions" are not decided: ask instead of guessing.
 ## 1. Stack and runtime
 - **Language:** Python, managed with `uv`.
 - **Media manager:** FastAPI backend, Jinja2 templates, Bootstrap 5, HTMX for live updates, Alpine.js for small interactions, Font Awesome Free icons, wavesurfer.js (regions plugin) for the waveform editor. No JavaScript build step.
+- **Versioning:** one project version (`mam/__init__.py`, semver), shown by `mam --version` and in the portal footer. CHANGELOG.md lists changes per component. Versioning started on 2026-11-01, when the media manager and Renamer were approved (1.0.0).
 - **CLI:** a single entry point `mam`:
   - `mam serve`: start the media manager
   - `mam <tool> [--dry-run] <path>`: run one tool on a file or folder
