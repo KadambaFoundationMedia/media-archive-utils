@@ -20,7 +20,9 @@ from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
 from mam.tools.kirtan_splitter.detect import detect
 from mam.tools.kirtan_splitter.features import (
     SAMPLE_RATE,
+    Sound,
     profile_from_samples,
+    sound_profile,
     speech_profile,
 )
 from tests.conftest import make_tone
@@ -29,6 +31,14 @@ from tests.conftest import make_tone
 def profile(music: int, speech: int, music_value=0.01, speech_value=0.6):
     """A per-second profile: `music` seconds of music, then `speech` seconds of speech."""
     return [music_value] * music + [speech_value] * speech
+
+
+def sound(music: int, quiet: int, music_db=-10.0, quiet_db=-45.0, high=0.1) -> Sound:
+    """Loudness per second: `music` loud seconds, then `quiet` quiet ones (a stop in the music)."""
+    return Sound(
+        [music_db] * music + [quiet_db] * quiet,
+        [high] * music + [0.01] * quiet,
+    )
 
 
 # ------------------------------------------------------------------- phrases
@@ -51,11 +61,52 @@ def test_time_round_trip():
 
 # ------------------------------------------------------------------- detection
 def test_split_in_a_silence_is_confident():
-    d = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA)
+    d = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA, sound(446, 154))
     assert d.mode == "split"
     assert d.snapped_to_silence and 448 <= d.split_at <= 449
     assert d.class_start == 450
     assert d.score >= 0.9
+
+
+def test_cut_is_where_the_music_stops_not_where_the_speech_starts():
+    # music to 300 s, 60 s of a sung prayer (quiet, no treble, no speech), then the class
+    snd = Sound([-10.0] * 300 + [-30.0] * 60 + [-18.0] * 120, [0.1] * 300 + [0.0] * 180)
+    d = detect(profile(360, 120), 480, [], None, snd)
+    assert d.mode == "split" and d.features["music_end"] == 300
+    assert d.split_at == 300 and d.class_start == 360
+
+
+def test_a_pause_in_the_singing_is_not_the_end():
+    # a 6 s pause at 200 s, then 250 s more music
+    snd = Sound([-10.0] * 200 + [-60.0] * 6 + [-10.0] * 250 + [-60.0] * 10, [0.1] * 466)
+    d = detect(profile(466, 100), 566, [], None, snd)
+    assert d.features["music_end"] == 456
+
+
+def test_a_short_dip_is_ignored():
+    snd = Sound([-10.0] * 200 + [-60.0] * 2 + [-10.0] * 200 + [-60.0] * 10, [0.1] * 412)
+    d = detect(profile(412, 100), 512, [], None, snd)
+    assert d.features["music_end"] == 402
+
+
+def test_music_that_stays_loud_but_loses_its_treble_has_ended():
+    # a voice or drone at the kirtan's level, without cymbals and kartals
+    snd = Sound([-12.0] * 400, [0.15] * 300 + [0.01] * 100)
+    d = detect(profile(380, 100), 480, [], None, snd)
+    assert d.features["music_end"] == 300 and d.features["treble_used"]
+
+
+def test_a_kirtan_without_treble_is_judged_on_level_only():
+    snd = Sound([-10.0] * 300 + [-45.0] * 100, [0.01] * 400)
+    d = detect(profile(380, 100), 480, [], None, snd)
+    assert d.features["music_end"] == 300 and not d.features["treble_used"]
+
+
+def test_without_a_found_end_of_music_the_cut_is_at_the_speech_and_not_confident():
+    steady = Sound([-10.0] * 450, [0.1] * 450)  # nothing stops before the speech
+    d = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA, steady)
+    assert d.features["music_end"] is None and d.split_at <= 450
+    assert d.score < 0.9 and any("no clear end of the music" in r for r in d.reasons)
 
 
 def test_split_without_silence_is_less_sure():
@@ -208,6 +259,11 @@ def prepared(settings, monkeypatch, reference, no_baserow):
         copy = folder / name
         shutil.copy2(original, copy)
         monkeypatch.setattr(splitter, "speech_profile", lambda audio: scripted)
+        first = next((i for i, v in enumerate(scripted) if v >= 0.1), len(scripted))
+        stop = max(0, first - 4)  # the music stops 4 s before the first speech
+        monkeypatch.setattr(
+            splitter, "sound_profile", lambda audio: sound(stop, len(scripted) - stop)
+        )
         with session_scope() as s:
             record = register_original(s, original)
             record.processed_path, record.current_name = str(copy), name
@@ -412,7 +468,7 @@ def test_review_page_and_approval_through_the_portal(prepared):
     with TestClient(create_app(start_queue=False)) as client:
         page = client.get(f"/review/{review_id}")
         assert page.status_code == 200
-        assert "Kirtan splitter review" in page.text and "3:10.000" in page.text
+        assert "Kirtan splitter review" in page.text and "3:06.000" in page.text
         assert client.get("/reviews").status_code == 200
         bad = client.post(
             f"/review/{review_id}/decide",
@@ -422,14 +478,14 @@ def test_review_page_and_approval_through_the_portal(prepared):
         assert "not a time" in bad.headers["location"].replace("%20", " ")
         done = client.post(
             f"/review/{review_id}/decide",
-            data={"action": "approve", "split_at": "3:10", "mantra": "Jaya-radha-madhava"},
+            data={"action": "approve", "split_at": "3:06", "mantra": "Jaya-radha-madhava"},
             follow_redirects=False,
         )
         assert done.status_code == 303
     with session_scope() as s:
         review = s.get(m.Review, review_id)
-        assert review.outcome == "approved" and review.final["split_at"] == 190
-    assert probe(copy).duration == pytest.approx(300 - 190, abs=0.5)
+        assert review.outcome == "approved" and review.final["split_at"] == 186
+    assert probe(copy).duration == pytest.approx(300 - 186, abs=0.5)
 
 
 def test_menu_lists_the_splitter(prepared):
@@ -455,7 +511,13 @@ def test_golden_samples(settings):
         if not audio.exists():
             continue
         duration = probe(audio).duration
-        d = detect(speech_profile(audio), duration, find_silences(audio, duration))
+        d = detect(
+            speech_profile(audio),
+            duration,
+            find_silences(audio, duration),
+            None,
+            sound_profile(audio),
+        )
         assert d.mode == "split", f"{audio.name}: {d.reasons} {d.features.get('timeline')}"
         assert abs(d.split_at - case["kirtan_end"]) <= golden["tolerance_s"], audio.name
         checked += 1

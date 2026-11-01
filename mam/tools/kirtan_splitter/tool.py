@@ -24,7 +24,7 @@ from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
 from mam.tools.kirtan_splitter.detect import Decision, detect
-from mam.tools.kirtan_splitter.features import speech_profile
+from mam.tools.kirtan_splitter.features import sound_profile, speech_profile
 
 log = logging.getLogger(__name__)
 TOOL = "kirtan-splitter"
@@ -95,7 +95,11 @@ def analyse(record: m.MediaFile, audio: Path) -> tuple[Decision, float]:
     proposal = (record.meta or {}).get("proposal") or {}
     mantra = phrases.mantra_for_what(proposal.get("what"))
     decision = detect(
-        speech_profile(audio), info.duration, find_silences(audio, info.duration), mantra
+        speech_profile(audio),
+        info.duration,
+        find_silences(audio, info.duration),
+        mantra,
+        sound_profile(audio),
     )
     return decision, info.duration
 
