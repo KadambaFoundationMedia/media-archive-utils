@@ -71,10 +71,9 @@
     </div>
     <div class="card mb-3"><div class="card-header">Evidence</div>
       <ul class="list-group list-group-flush small">
-        {% if p.marker %}<li class="list-group-item">Class-start phrase: “{{ p.marker }}”</li>{% endif %}
         <li class="list-group-item">Cut inside a silence: {{ 'yes' if p.snapped_to_silence else 'no' }}</li>
         {% for k, v in (p.features or {}).items() %}<li class="list-group-item">{{ k | replace('_', ' ') }}: {{ v }}</li>{% endfor %}
-        <li class="list-group-item">Recording length: {{ p.duration | round(1) }} s{% if p.transcript_cached %} · transcript reused{% endif %}</li>
+        <li class="list-group-item">Recording length: {{ p.duration | round(1) }} s</li>
       </ul>
     </div>
   </div>

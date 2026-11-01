@@ -61,7 +61,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Run the Renamer from the command line: `uv run mam rename <file-or-folder>` (dry run; add `--no-dry-run` to copy)
 - Environment check: `mam doctor`
 - Show version: `uv run mam --version` (also in the portal footer)
-- Run tests: `uv run pytest` (add `-m slow` for transcription integration tests)
+- Run tests: `uv run pytest` (add `-m slow` for the tests on `trimming-samples/`)
 - Lint/format: `uv run ruff check .` and `uv run ruff format .`
 
 ## Rules (always follow)

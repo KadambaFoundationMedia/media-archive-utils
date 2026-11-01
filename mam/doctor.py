@@ -25,31 +25,6 @@ def run_checks(settings: Settings) -> list[Check]:
         path = shutil.which(tool)
         checks.append(Check(tool, path is not None, path or "not found on PATH"))
 
-    is_apple_silicon = sys.platform == "darwin" and platform.machine() == "arm64"
-    if is_apple_silicon:
-        try:
-            import mlx_whisper  # noqa: F401
-
-            checks.append(Check("mlx-whisper", True, "installed"))
-        except ImportError:
-            checks.append(
-                Check(
-                    "mlx-whisper",
-                    False,
-                    "not installed: run `uv sync` (needed by the kirtan splitter)",
-                    False,
-                )
-            )
-    whisper_cli = shutil.which("whisper-cli")
-    checks.append(
-        Check(
-            "whisper-cli",
-            whisper_cli is not None,
-            whisper_cli or "not found (needed on Windows by the kirtan splitter)",
-            required=not is_apple_silicon,
-        )
-    )
-
     try:
         settings.ensure_dirs()
         probe_file = settings.local_db_path.parent / ".write-test"

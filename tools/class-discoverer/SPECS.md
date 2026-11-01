@@ -25,7 +25,7 @@ All recordings are from ISKCON temples, (the International Society for Krishna c
 - Transcribe the full recording using a local whisper model that is optimised for MacOS (MLX)
   - Always use Whisper Large Turbo, latest version, optmised for MacOS (MLX) or similar models. The goal is to transcribe the class as fast and accurate as possible, but we dont want to sacrife transcribing speed compared to 100% quality.  
   - On Windows use whisper.cpp `whisper-cli` with the GGML large-v3-turbo model (see @ARCHITECTURE.md)
-  - Reuse the shared transcript when the kirtan-splitter already transcribed this content (cached by content hash)
+  - Cache the transcript by content hash so later tools (content-discoverer, class-trimmer) reuse it. The kirtan-splitter does not transcribe.
 - The audio-optimizer is only used here for the whole-recording gain. Audience-question gain is done by the class-trimmer.
 - When the transcript shows a different verse than the filename, keep the filename and flag the file for review (see @SPEC.md)
 - Use common phrases to determine timestamps @docs/references/recording-common-phrases.md
