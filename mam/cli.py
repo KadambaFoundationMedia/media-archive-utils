@@ -30,8 +30,22 @@ DryRun = Annotated[
 ]
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        from mam import __version__
+
+        typer.echo(f"mam {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def main(verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False) -> None:
+def main(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+    version: Annotated[
+        bool,
+        typer.Option("--version", callback=_version_callback, is_eager=True, help="Show version."),
+    ] = False,
+) -> None:
     setup_logging(verbose)
 
 

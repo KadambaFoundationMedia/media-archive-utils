@@ -59,6 +59,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Run media manager: `uv run mam serve` (http://127.0.0.1:8000)
 - Run the Renamer from the command line: `uv run mam rename <file-or-folder>` (dry run; add `--no-dry-run` to copy)
 - Environment check: `mam doctor`
+- Show version: `uv run mam --version` (also in the portal footer)
 - Run tests: `uv run pytest` (add `-m slow` for transcription integration tests)
 - Lint/format: `uv run ruff check .` and `uv run ruff format .`
 
@@ -70,6 +71,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - If a spec is unclear or marked undecided, ask instead of guessing.
 
 ## Conventions
+- Versioning: one project version in `mam/__init__.py` (semver). Every change users notice adds a line under `[Unreleased]` in CHANGELOG.md in the same commit; a release moves those lines under a new version heading and bumps `__version__`.
 - Python 3.12, ruff (line length 100), type hints everywhere.
 - Settings only through `mam.config.get_settings()`; never read `.env` directly.
 - File-changing functions take `dry_run` (default True) and record a `file_event` in the local DB.

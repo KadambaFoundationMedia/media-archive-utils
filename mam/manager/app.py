@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
+from mam import __version__
 from mam.config import get_settings
 from mam.helpers.local_db import migrate, session_scope
 from mam.helpers.local_db import models as m
@@ -104,6 +105,7 @@ templates.env.globals.update(
     status_guide=STATUS_HELP,
     view_guide=VIEW_HELP,
     tools=TOOLS,
+    app_version=__version__,
     source_labels=SOURCE_LABELS,
     field_labels=FIELD_LABELS,
 )

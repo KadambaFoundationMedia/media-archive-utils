@@ -40,6 +40,7 @@ uv run mam audio measure <file>                  # loudness (LUFS) and true peak
 uv run mam audio normalize <file> <out>          # whole-file loudness to -18 LUFS / -1 dBTP
 uv run mam baserow schema media                  # live column schema and select options
 uv run mam db export ./exports                   # backup of the local DB
+uv run mam --version                             # installed version (see CHANGELOG.md)
 uv run pytest                                    # fast tests
 uv run pytest -m slow                            # tests on real samples in trimming-samples/
 uv run ruff check . && uv run ruff format .      # lint and format
