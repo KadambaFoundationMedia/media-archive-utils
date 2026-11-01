@@ -20,11 +20,11 @@ from mam.helpers.file_organizer.organizer import assert_writable
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import fingerprint, sha256
 from mam.helpers.local_db.repo import record_event, register_derived, set_status
-from mam.helpers.transcriber import get_or_transcribe, get_transcriber
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
 from mam.tools.kirtan_splitter.detect import Decision, detect
+from mam.tools.kirtan_splitter.features import speech_profile
 
 log = logging.getLogger(__name__)
 TOOL = "kirtan-splitter"
@@ -89,16 +89,15 @@ def combined_source(record: m.MediaFile, *, dry_run: bool = False) -> Path:
     raise MamError("Run the Renamer first: the splitter works on the renamed copy")
 
 
-def analyse(
-    session: Session, record: m.MediaFile, audio: Path, settings: Settings
-) -> tuple[Decision, bool, float]:
-    """Transcribe (or reuse the transcript) and detect. Returns (decision, cached, duration)."""
+def analyse(record: m.MediaFile, audio: Path) -> tuple[Decision, float]:
+    """Local audio analysis (no transcript). Returns (decision, duration)."""
     info = probe(audio)
-    segments, cached = get_or_transcribe(
-        session, audio, get_transcriber(settings), settings, content_sha=sha256(audio)
+    proposal = (record.meta or {}).get("proposal") or {}
+    mantra = phrases.mantra_for_what(proposal.get("what"))
+    decision = detect(
+        speech_profile(audio), info.duration, find_silences(audio, info.duration), mantra
     )
-    decision = detect(segments, info.duration, find_silences(audio, info.duration))
-    return decision, cached, info.duration
+    return decision, info.duration
 
 
 def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
@@ -111,13 +110,13 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
         # Video first (SPECS.md): the audio is saved as mp3 in its original quality.
         stem = (settings.work_dir / "split" if ctx.dry_run else src.parent) / src.stem
         work_audio = extract_audio(src, stem, dry_run=False)
-    ctx.session.commit()  # transcription is slow; do not hold the database
+    ctx.session.commit()  # the analysis takes a while; do not hold the database
     try:
-        decision, cached, duration = analyse(ctx.session, record, work_audio, settings)
+        decision, duration = analyse(record, work_audio)
     finally:
         if ctx.dry_run and work_audio != src:
             work_audio.unlink(missing_ok=True)
-    data = {**decision.to_dict(), "duration": duration, "transcript_cached": cached}
+    data = {**decision.to_dict(), "duration": duration}
     summary = describe(decision)
 
     if ctx.dry_run:

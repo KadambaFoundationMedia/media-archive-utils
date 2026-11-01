@@ -36,7 +36,7 @@ def run_checks(settings: Settings) -> list[Check]:
                 Check(
                     "mlx-whisper",
                     False,
-                    "not installed: run `uv sync` (needed by the kirtan splitter)",
+                    "not installed yet (needed from class-discoverer)",
                     False,
                 )
             )
@@ -45,7 +45,7 @@ def run_checks(settings: Settings) -> list[Check]:
         Check(
             "whisper-cli",
             whisper_cli is not None,
-            whisper_cli or "not found (needed on Windows by the kirtan splitter)",
+            whisper_cli or "not found (needed on Windows from class-discoverer)",
             required=not is_apple_silicon,
         )
     )
