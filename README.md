@@ -25,7 +25,7 @@ uv run mam serve          # http://127.0.0.1:8000
 ```
 
 1. **Import**: browse to a folder (sample files, trimming samples, inbox or the NAS) and import it. Files are only indexed; originals are never changed.
-2. **Files**: filter and select files, pick an action (each built tool, currently the Renamer, and Run full pipeline), then **Preview (dry run)** to see the proposed names, or **Run** to copy and rename into processed-files and open reviews. The list and the file page update by themselves while jobs run.
+2. **Files**: filter and select files, pick an action (each built tool, currently the Renamer and the Kirtan splitter, and Run full pipeline), then **Preview (dry run)** to see the proposed names, or **Run** to copy and rename into processed-files and open reviews. The list and the file page update by themselves while jobs run.
 3. **Review**: files the Renamer could not settle on its own wait here (a preview never opens a review). Edit the date, WHAT and place with a live filename preview, then approve, reject the result or exclude the file.
 4. **Jobs**: the queue, with errors and a retry button.
 5. **Settings**: the current settings, and **Reset** to start from scratch (clears the local database and processed copies after making a backup; originals and Baserow are not touched). Also `uv run mam reset`.
@@ -34,6 +34,7 @@ uv run mam serve          # http://127.0.0.1:8000
 
 ```bash
 uv run mam rename <file-or-folder>               # Renamer proposals (dry run)
+uv run mam kirtan-split <file>                   # where the kirtan ends (dry run; needs the Renamer first to cut)
 uv run mam organize <file> --what SB-1-19-31     # where the file organizer would put a file
 uv run mam audio probe <file>                    # codec, bitrate, sample rate, duration
 uv run mam audio measure <file>                  # loudness (LUFS) and true peak

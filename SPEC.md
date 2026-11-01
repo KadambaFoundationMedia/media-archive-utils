@@ -113,14 +113,19 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Dry run:** shows the proposed name in the file list without copying files, changing the status or writing to Baserow. It never opens a review; the file page says so and offers to run the Renamer for real.
 
 ### Kirtan-splitter
-- **Video first:** extracts the audio as mp3 in its original quality, with a name that matches the video.
+- **Video first:** extracts the audio as mp3 in its original quality (an mp3 stream is copied, other codecs are encoded once at their own bitrate), with a name that matches the video. The video copy stays as it is; the class audio becomes its own row, a child of the video.
+- **Needs the Renamer first:** a real run cuts the renamed copy in processed-files. A dry run (`mam kirtan-split <file>`) may read any file and writes nothing.
 - **Boundary detection:** finds where the kirtan starts and ends using:
-  - the shared transcript (transcribed once per content hash and reused by the class-discoverer)
-  - music/speech classification
-  - common phrases
-- **No split:** a recording that is singing throughout is not split.
-- **Cutting:** by stream copy. Kirtan files are named by mantra type, as in its SPECS.md.
-- **Automation:** cuts automatically when every boundary scores above the learned threshold (see section 10). Otherwise the file goes to `Kirtan-splitter Review`.
+  - the shared transcript (transcribed once per content hash and reused; the transcriber is `mam/helpers/transcriber`, mlx-whisper on macOS and whisper.cpp on Windows)
+  - common phrases (`docs/references/recording-common-phrases.md`)
+  - silences found with ffmpeg `silencedetect` (-40 dB, 0.8 s): the cut is moved into a silence within 3 s, and silence at the very start is trimmed
+  - **Singing or speech is decided from the transcript text**, not by an audio classifier: a segment is speech when it has at least 6 words at 1 word/s or faster, at least 55% different words and under half mantra words, or contains a class-start phrase; everything else is singing. An audio classifier is added only if the review outcomes show the text is not enough.
+  - The class starts at the first run of speech with a class-start phrase or at least 20 s of speech. The kirtan ends at the last singing before it.
+- **No split:** singing throughout (no sustained speech) is a kirtan recording; speech with no kirtan of at least 90 s before it is a class. Both are `Skipped` when sure, and go to review when not.
+- **Cutting:** by stream copy, one cut at the end of the kirtan (the stretch between the kirtan and the first speech stays at the start of the class, for the class-trimmer). The kirtan keeps the recording's date and place and takes the mantra as its WHAT: `Jaya-radha-madhava`, `Jaya-Jaya-Sri-Caitanya`, `Nrsimha-pranama`, or `Kirtan` (maha-mantra or not recognised). It goes to the folder of that WHAT. The class keeps the combined copy's name, place and row (the combined copy is replaced by the class; the original on the NAS is never touched). The source extension is kept (`.wma` stays `.wma`).
+- **Names are built by the splitter**, from the Renamer's saved proposal, because the derived kirtan has no original path for the Renamer to read. The kirtan has its own local record (`derivation = kirtan`, `parent_id` = the recording, status `Processing complete`) and a new Baserow media row written with the Renamer's switch rules; the class keeps its row.
+- **Automation:** cuts automatically when the score is at or above the threshold (0.9 until calibrated, then the learned one; section 10). Below it, or for a 5% spot check (`SPOT_CHECK_RATE`), nothing is cut and the file goes to `Kirtan-splitter Review`. The score adds: 0.35 for a found boundary, 0.25 for a class-start phrase, 0.15 for a cut in a silence, up to 0.15 for the share of singing before the cut, up to 0.10 for the amount of speech after it, 0.10 for a kirtan of 3 to 35 minutes (minus 0.20 outside that), 0.05 for a recognised mantra.
+- **Review page:** shows the reasons and evidence, plays the recording from 3 s before the cut, and takes the cut as `minutes:seconds` and the kirtan type. Buttons: **Approve and split**, **Do not split**, **Reject result**, **Exclude file**. The cut is made only on approval. An approved cut within 1.5 s of the proposal counts as approved, otherwise as edited; both are labeled examples for the threshold. The waveform editor (section 8) replaces the text field in a later release.
 
 ### Class-discoverer
 - **Whole-recording gain:** runs the audio-optimizer and writes the result to the processed copy (encode #1). The kirtan-splitter has already separated any kirtan, so the gain is measured on the class alone and loud singing cannot skew it.
@@ -193,7 +198,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - Columns: original path and name, new name, status, date, title, location.
   - Search, filter and sort; select files one by one or all shown at once (the select-all box also ticks files added by Load more).
   - **No page numbers.** A **Show** select next to the filters (50, 100, 200 or 500; default 50, kept in the URL as `size`) sets how many files load at first. When more files match, the table ends with "Showing X of Y files" and a **Load more** button that appends the next batch of that size (the last batch may be smaller) below the rows already shown. Filters, sort and the sticky header keep working; changing a filter or the Show size starts again from the top. The folder header rows continue across batches (no repeated header). The self-refresh while jobs run keeps all loaded rows.
-  - The action menu lists only the pipeline tools that are built (currently the Renamer) plus "Run full pipeline"; helper functions such as the audio-optimizer's verify and measure are not menu actions (they stay available as `mam audio ...` commands), with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
+  - The action menu lists only the pipeline tools that are built (currently the Renamer and the Kirtan splitter) plus "Run full pipeline"; helper functions such as the audio-optimizer's verify and measure are not menu actions (they stay available as `mam audio ...` commands), with two buttons: **Preview (dry run)** and **Run**. The result line of a run says what happened in Baserow (row written, logged only, or waiting for the review).
   - The list refreshes itself while any job is queued or running.
 - **File page:**
   - One form for the file's **filename** and its **media table fields** (Date, Title, Category, Tag, Place, Country, Language, Notes, and which Baserow row to link; the note is kept with the file and added to the Baserow `notes` column with the person's name). They stay in step: editing the filename fills the fields from it; changing Date, Place or Country rewrites that part of the filename. Problems (e.g. a date that is not YYYY-MM-DD) block saving.
@@ -262,4 +267,5 @@ The kirtan-splitter examples (`oslo-noi`, a kept `-2` index, `ZOOM0004` as a WHA
 - **Refreshed:** it is rebuilt when new approved recordings add coverage, such as other years or other microphones.
 
 ## 11. Open decisions
-- None at the moment. Add new ones here instead of inventing an answer.
+- **Video in the pipeline after the kirtan-splitter:** the splitter extracts the audio of a video and splits it into two audio rows (kirtan, class) under the video. How the class-discoverer, content-discoverer and class-trimmer continue for the class audio (and how the video row ends) is not decided; decide it before building the class-discoverer.
+- **Calibration:** the threshold is read from the `calibration` table (0.9 when empty), but `mam calibrate` and the automatic recalculation every 25 outcomes are not built yet. Review outcomes are already stored as labeled examples.

@@ -49,6 +49,24 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                 .where(m.Review.outcome == "pending", m.Review.id != review_id)
                 .order_by(m.Review.id)
             )
+        if review.tool == "kirtan-splitter":
+            from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES, format_time
+
+            p = review.proposal
+            return render(
+                request,
+                "splitter_review.html",
+                review=review,
+                f=record,
+                p=p,
+                next_id=next_id,
+                error=error,
+                mantras=MANTRA_CHOICES,
+                split_text=format_time(p["split_at"]) if p.get("split_at") is not None else "",
+                class_text=format_time(p["class_start"])
+                if p.get("class_start") is not None
+                else "",
+            )
         from mam.manager.edit_routes import form_context
         from mam.tools.renamer.editing import initial_values
 
@@ -87,7 +105,40 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                 review = session.get(m.Review, review_id)
                 if review is None or review.outcome != "pending":
                     raise HTTPException(409, "This review is already decided")
-                if action == "approve":
+                if review.tool == "kirtan-splitter" and action in ("approve", "no_split"):
+                    from mam.tools.kirtan_splitter import tool as splitter
+
+                    record = session.get(m.MediaFile, review.media_file_id)
+                    result_msg = splitter.decide_review(
+                        session,
+                        review,
+                        action=action,
+                        split_at=form.get("split_at"),
+                        mantra=form.get("mantra"),
+                        operator=operator,
+                        note=note,
+                    )
+                    if session.scalar(
+                        select(m.Job.id).where(
+                            m.Job.media_file_id == record.id,
+                            m.Job.tool == review.tool,
+                            m.Job.pipeline.is_(True),
+                        )
+                    ):
+                        resume_after_review(session, record, review.tool)
+                elif review.tool == "kirtan-splitter" and action == "reject":
+                    from datetime import UTC, datetime
+
+                    from mam.helpers.local_db.repo import set_status
+
+                    record = session.get(m.MediaFile, review.media_file_id)
+                    review.outcome, review.operator, review.note = "rejected", operator, note
+                    review.decided_at = datetime.now(UTC)
+                    set_status(
+                        session, record, "Renamer Done", "kirtan-splitter", "result rejected"
+                    )
+                    result_msg = "Result rejected: nothing was cut; the file can be run again"
+                elif action == "approve":
                     from mam.manager.edit_routes import form_values
                     from mam.tools.renamer.editing import save
 

@@ -82,3 +82,6 @@ Class starts: 7:30:397
 Common marker: "Reading from Srimad Bhagavatam"
 - Kirtan filename: 2015-MM-DD_KKS_Jaya-radha-madhava.mp3
 - Class filename: 2015-MM-DD_KKS_ZOOM0004.mp3
+
+## Implementation notes
+The decisions made while building the tool are in SPEC.md ("Kirtan-splitter"). Where the examples above disagree with tests/fixtures/golden.yaml (the 2012 sample lists the 2008 filenames, `oslo-noi` should be `Oslo-no`, `ZOOM0004` is dropped, `.wma` stays `.wma`), the golden fixtures are the reference.

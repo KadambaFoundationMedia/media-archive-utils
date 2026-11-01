@@ -34,7 +34,10 @@ def run_checks(settings: Settings) -> list[Check]:
         except ImportError:
             checks.append(
                 Check(
-                    "mlx-whisper", False, "not installed yet (needed from class-discoverer)", False
+                    "mlx-whisper",
+                    False,
+                    "not installed: run `uv sync` (needed by the kirtan splitter)",
+                    False,
                 )
             )
     whisper_cli = shutil.which("whisper-cli")
@@ -42,7 +45,7 @@ def run_checks(settings: Settings) -> list[Check]:
         Check(
             "whisper-cli",
             whisper_cli is not None,
-            whisper_cli or "not found (needed on Windows from class-discoverer)",
+            whisper_cli or "not found (needed on Windows by the kirtan splitter)",
             required=not is_apple_silicon,
         )
     )

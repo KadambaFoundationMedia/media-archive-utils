@@ -71,6 +71,12 @@ def _renamer(ctx: JobContext) -> ToolOutcome:
     return run_renamer(ctx)
 
 
+def _kirtan_splitter(ctx: JobContext) -> ToolOutcome:
+    from mam.tools.kirtan_splitter.tool import run_kirtan_splitter
+
+    return run_kirtan_splitter(ctx)
+
+
 TOOLS: dict[str, ToolSpec] = {
     "renamer": ToolSpec(
         "renamer",
@@ -78,6 +84,13 @@ TOOLS: dict[str, ToolSpec] = {
         "io",
         _renamer,
         "Find the date, WHAT and WHERE, rename and copy to processed-files",
+    ),
+    "kirtan-splitter": ToolSpec(
+        "kirtan-splitter",
+        "Kirtan splitter",
+        "ml",
+        _kirtan_splitter,
+        "Find where the kirtan ends and split a combined recording into kirtan and class",
     ),
     "scan": ToolSpec(
         "scan",
