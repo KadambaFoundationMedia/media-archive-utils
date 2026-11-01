@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Kirtan splitter review · {{ f.current_name or f.original_path | basename }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-start gap-2 mb-3">
+  <div class="me-auto">
+    <div class="small text-body-secondary">Kirtan splitter review</div>
+    <h1 class="h5 mb-1 text-break">{{ f.current_name or (f.original_path | basename) }}</h1>
+    <div class="small text-body-secondary text-break">{{ f.processed_path or f.original_path }}</div>
+  </div>
+  <a class="btn btn-sm btn-outline-secondary" href="/files/{{ f.id }}">File details</a>
+  {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/review/{{ next_id }}">Next <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+</div>
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+{% if review.outcome != 'pending' %}<div class="alert alert-secondary">This review is {{ review.outcome }}{% if review.operator %} by {{ review.operator }}{% endif %}.</div>{% endif %}
+
+<div class="row g-3" x-data="{ t: null, cut: {{ p.split_at if p.split_at is not none else 'null' }} }">
+  <div class="col-12 col-lg-7">
+    <div class="card mb-3 border-warning">
+      <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Why this needs review
+        <span class="float-end small">score {{ '%.2f' % review.score if review.score is not none else '–' }}{% if review.spot_check %} · spot check{% endif %}</span></div>
+      <ul class="list-group list-group-flush small">
+        {% for line in review.reason.split('\n') %}<li class="list-group-item">{{ line }}</li>{% endfor %}
+        {% if p.mode != 'split' %}<li class="list-group-item">Proposed: <strong>{{ p.mode | replace('_', ' ') }}</strong> (not split).</li>{% endif %}
+      </ul>
+    </div>
+
+    {% if review.outcome == 'pending' %}
+    <form method="post" action="/review/{{ review.id }}/decide" class="card mb-3">
+      <div class="card-header">The cut</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <label class="form-label" for="split_at">Kirtan ends (minutes:seconds)</label>
+            <input class="form-control font-monospace" id="split_at" name="split_at" value="{{ split_text }}" placeholder="28:13.048">
+            <div class="form-text">Everything before this is the kirtan; this moment and after is the class.{% if class_text %} The speech starts at {{ class_text }}.{% endif %}</div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" for="mantra">Kirtan type (its name)</label>
+            <select class="form-select" id="mantra" name="mantra">
+              {% for mname in mantras %}<option value="{{ mname }}" {% if mname == p.mantra %}selected{% endif %}>{{ mname }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="note">Note (optional)</label>
+            <input class="form-control" id="note" name="note">
+          </div>
+        </div>
+      </div>
+      <div class="card-footer d-flex flex-wrap gap-2">
+        <button class="btn btn-success btn-sm" name="action" value="approve"><i class="fa-solid fa-scissors me-1"></i>Approve and split</button>
+        <button class="btn btn-outline-secondary btn-sm" name="action" value="no_split">Do not split</button>
+        <button class="btn btn-outline-danger btn-sm" name="action" value="reject" onclick="return confirm('Discard this result? Nothing has been cut.')">Reject result</button>
+        <button class="btn btn-outline-danger btn-sm" name="action" value="exclude" onclick="return confirm('Stop all processing of this file?')">Exclude file</button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card mb-3"><div class="card-header">Listen around the cut</div>
+      <div class="card-body">
+        {% if f.kind == 'audio' %}<audio x-ref="player" controls preload="none" class="w-100" src="/files/{{ f.id }}/audio?which=processed"></audio>
+        {% else %}<video x-ref="player" controls preload="none" class="w-100" src="/files/{{ f.id }}/audio?which=processed"></video>{% endif %}
+        {% if p.split_at is not none %}
+        <div class="btn-group btn-group-sm mt-2">
+          <button type="button" class="btn btn-outline-secondary" @click="$refs.player.currentTime = Math.max(0, cut - 3); $refs.player.play()">3 s before the cut</button>
+          <button type="button" class="btn btn-outline-secondary" @click="$refs.player.currentTime = cut; $refs.player.play()">From the cut</button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card mb-3"><div class="card-header">Evidence</div>
+      <ul class="list-group list-group-flush small">
+        {% if p.marker %}<li class="list-group-item">Class-start phrase: “{{ p.marker }}”</li>{% endif %}
+        <li class="list-group-item">Cut inside a silence: {{ 'yes' if p.snapped_to_silence else 'no' }}</li>
+        {% for k, v in (p.features or {}).items() %}<li class="list-group-item">{{ k | replace('_', ' ') }}: {{ v }}</li>{% endfor %}
+        <li class="list-group-item">Recording length: {{ p.duration | round(1) }} s{% if p.transcript_cached %} · transcript reused{% endif %}</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

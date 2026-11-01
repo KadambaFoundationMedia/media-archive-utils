@@ -269,12 +269,13 @@ def serve(
     )
 
 
-@app.command()
-def rename(
-    path: Path,
-    dry_run: DryRun = True,
-) -> None:
-    """Run the Renamer on a file or folder from the command line (dry run by default)."""
+def _run_tool_cli(tool: str, path: Path, dry_run: bool) -> None:
+    """Queue `tool` for a file or folder, run the queue until it is empty, print the results."""
+    import time
+
+    from sqlalchemy import func, select
+
+    from mam.helpers.local_db import models as m
     from mam.helpers.local_db import session_scope
     from mam.helpers.local_db.repo import register_original
     from mam.manager.queue import JobQueue, enqueue
@@ -284,10 +285,6 @@ def rename(
     with session_scope() as session:
         if path.is_dir():
             scan_folder(session, path)
-            from sqlalchemy import select
-
-            from mam.helpers.local_db import models as m
-
             ids = list(
                 session.scalars(
                     select(m.MediaFile.id).where(
@@ -298,15 +295,9 @@ def rename(
         else:
             record = register_original(session, path)
             ids = [record.id] if record else []
-        jobs = enqueue(session, "renamer", ids, dry_run=dry_run)
+        jobs = enqueue(session, tool, ids, dry_run=dry_run)
     queue = JobQueue()
     queue.start()
-    import time
-
-    from sqlalchemy import func, select
-
-    from mam.helpers.local_db import models as m
-
     while True:
         with session_scope() as session:
             left = session.scalar(
@@ -318,13 +309,37 @@ def rename(
     queue.stop()
     with session_scope() as session:
         rows = session.scalars(
-            select(m.Job).where(m.Job.tool == "renamer").order_by(m.Job.id.desc()).limit(jobs)
+            select(m.Job).where(m.Job.tool == tool).order_by(m.Job.id.desc()).limit(jobs)
         ).all()
         for job in reversed(rows):
             line = job.result["summary"] if job.result else job.error.splitlines()[0]
             console.print(f"[{'red' if job.state == 'failed' else 'green'}]{job.state}[/] {line}")
             for flag in (job.result or {}).get("flags", []):
                 console.print(f"   [yellow]⚑ {flag}[/yellow]")
+            for reason in (job.result or {}).get("reasons", []):
+                console.print(f"   {reason}")
+
+
+@app.command()
+def rename(
+    path: Path,
+    dry_run: DryRun = True,
+) -> None:
+    """Run the Renamer on a file or folder from the command line (dry run by default)."""
+    _run_tool_cli("renamer", path, dry_run)
+
+
+@app.command("kirtan-split")
+def kirtan_split(
+    path: Path,
+    dry_run: DryRun = True,
+) -> None:
+    """Find where the kirtan ends in a recording and split it (dry run by default).
+
+    A dry run reads any file. A real run needs the renamed copy in processed-files, so run
+    `mam rename --no-dry-run` first (the media manager does both in its pipeline).
+    """
+    _run_tool_cli("kirtan-splitter", path, dry_run)
 
 
 @app.command()

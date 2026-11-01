@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     work_dir: Path = DEFAULT_HOME / "work"
     log_dir: Path = DEFAULT_HOME / "logs"
 
+    # whisper.cpp (Windows): the GGML large-v3-turbo model file
+    whisper_model_path: Path | None = None
+
+    # Auto/review decisions (SPEC.md section 10)
+    spot_check_rate: float = 0.05
+    start_threshold: float = 0.9
+
     operator_name: str = Field(default_factory=getpass.getuser)
 
     # Worker pools
@@ -49,7 +56,7 @@ class Settings(BaseSettings):
     workers_cpu: int = 2
     workers_io: int = 4
 
-    @field_validator("nas_root", mode="before")
+    @field_validator("nas_root", "whisper_model_path", mode="before")
     @classmethod
     def _empty_is_unset(cls, value):
         return None if value in ("", None) else value

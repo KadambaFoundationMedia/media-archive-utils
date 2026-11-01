@@ -146,7 +146,7 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
     run_queue()
     with session_scope() as s:
         by_name = ids(s)
-    client.post("/actions", data={"tool": "__pipeline", "scope": "all"})
+    client.post("/actions", data={"tool": "renamer", "scope": "all"})
     run_queue()
     processed = settings.media_processed_files_path
     clean = processed / "Srimad-bhagavatam" / "2011-08-28_KKS_SB-1-19-30_Oslo-no.mp3"
