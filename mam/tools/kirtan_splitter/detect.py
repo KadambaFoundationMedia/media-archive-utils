@@ -1,8 +1,9 @@
 """Find where the kirtan ends and the class begins (tools/kirtan-splitter/SPECS.md).
 
-Works on a profile of the audio made locally (see `features.py`): for every second a score from
-0 (music: singing with instruments) to 1 (speech), or `None` where the recording is silent. No
-transcript is used; transcription belongs to the class-discoverer.
+Works on a profile of the audio made locally (see `features.py`): for every second the
+probability that someone is speaking, from a voice-activity model. Singing with instruments
+scores near 0 and a class well above `SPEECH_AT`. No transcript is used; transcription belongs
+to the class-discoverer.
 
 Pure functions: no files, no database. The tool wraps them.
 """
@@ -15,7 +16,8 @@ from typing import Any
 MIN_KIRTAN_S = 90.0  # a shorter lead-in is announcements, not a kirtan
 PLAUSIBLE_KIRTAN_S = (180.0, 2100.0)  # 3 to 35 minutes
 CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this long to start a class
-SPEECH_AT = 0.5  # profile score from which a second counts as speech
+SPEECH_AT = 0.10  # smoothed speech probability from which a second counts as speech
+SMOOTH_S = 9  # seconds averaged, so a clap or a shout does not flip the label
 MUSIC_SHARE_MIN = 0.7  # a kirtan is at least this much music (blips of speech are allowed)
 SNAP_S = 3.0  # move the cut to a silence this close to it
 LEAD_PAD_S = 0.3  # kept before the first sound
@@ -39,16 +41,16 @@ class Decision:
         return asdict(self)
 
 
-def smooth(profile: list[float | None], width: int = 5) -> list[float | None]:
-    """Median over `width` seconds, so a clap or a shout does not flip the label."""
+def smooth(profile: list[float | None], width: int = SMOOTH_S) -> list[float | None]:
+    """Average over `width` seconds around each second (silent seconds are skipped)."""
     half = width // 2
     out: list[float | None] = []
     for i, value in enumerate(profile):
         if value is None:
             out.append(None)
             continue
-        near = sorted(v for v in profile[max(0, i - half) : i + half + 1] if v is not None)
-        out.append(near[len(near) // 2])
+        near = [v for v in profile[max(0, i - half) : i + half + 1] if v is not None]
+        out.append(sum(near) / len(near))
     return out
 
 
@@ -118,6 +120,7 @@ def detect(
     labels = [None if v is None else ("speech" if v >= SPEECH_AT else "music") for v in smoothed]
     sounding = [v for v in smoothed if v is not None]
     features: dict[str, Any] = {"timeline": timeline(smoothed), "seconds": len(profile)}
+    raw = [None if v is None else v for v in profile]
     if len(sounding) < 30:
         return Decision(
             "unclear",
@@ -175,18 +178,23 @@ def detect(
         )
 
     run_start, run_end = class_run
-    last_music = max(i for i in range(int(start), run_start) if labels[i] == "music") + 1
-    split_at, snapped = snap_to_silence(float(last_music), silences, float(run_start))
-    split_at = max(start + 1.0, min(split_at, float(run_start)))
+    # the smoothed run starts a few seconds early: take the first second that really speaks
+    first_voice = next(
+        (i for i in range(run_start, run_end) if raw[i] is not None and raw[i] >= SPEECH_AT),
+        run_start,
+    )
+    last_music = first_voice  # the kirtan ends where the first real speech starts
+    split_at, snapped = snap_to_silence(float(last_music), silences, float(first_voice))
+    split_at = max(start + 1.0, min(split_at, float(first_voice)))
     kirtan_seconds = last_music - start
     before = [v for v in smoothed[int(start) : last_music] if v is not None]
     after = [v for v in smoothed[run_start:run_end] if v is not None]
     music_share = _mean([1.0 if v < SPEECH_AT else 0.0 for v in before])
-    margin = _mean(after) - _mean(before)
+    margin = _mean(after) - _mean(before)  # about 0.4 to 0.65 on real classes
 
     score = 0.35
-    reasons = [f"Music until {last_music}s, speech from {run_start}s."]
-    score += 0.25 * max(0.0, min(1.0, margin / 0.6))
+    reasons = [f"Music until {last_music}s, speech from {first_voice}s."]
+    score += 0.25 * max(0.0, min(1.0, margin / 0.3))
     if snapped:
         score += 0.15
         reasons.append("The cut is inside a silence.")
@@ -213,7 +221,7 @@ def detect(
         round(max(0.0, min(1.0, score)), 3),
         kirtan_start=start,
         split_at=round(split_at, 3),
-        class_start=float(run_start),
+        class_start=float(first_voice),
         mantra=mantra or "Kirtan",
         snapped_to_silence=snapped,
         reasons=reasons,

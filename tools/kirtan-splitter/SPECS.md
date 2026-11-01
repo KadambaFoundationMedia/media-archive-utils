@@ -86,4 +86,4 @@ Common marker: "Reading from Srimad Bhagavatam"
 ## Implementation notes
 The decisions made while building the tool are in SPEC.md ("Kirtan-splitter"). Where the examples above disagree with tests/fixtures/golden.yaml (the 2012 sample lists the 2008 filenames, `oslo-noi` should be `Oslo-no`, `ZOOM0004` is dropped, `.wma` stays `.wma`), the golden fixtures are the reference.
 
-> **Note (2026-11-01, Edwin):** common phrases are ignored for now. The splitter does not transcribe (transcription belongs to the class-discoverer), so there is no text to match them against. It finds the end of the kirtan from the audio alone: music versus speech, and silence. See SPEC.md, "Kirtan-splitter".
+> **Note (2026-11-01, Edwin):** common phrases are ignored for now. The splitter does not transcribe (transcription belongs to the class-discoverer), so there is no text to match them against. It finds the end of the kirtan from the audio alone: a local voice-activity model, and silence. See SPEC.md, "Kirtan-splitter".

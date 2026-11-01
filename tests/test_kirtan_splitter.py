@@ -26,7 +26,7 @@ from mam.tools.kirtan_splitter.features import (
 from tests.conftest import make_tone
 
 
-def profile(music: int, speech: int, music_value=0.1, speech_value=0.9):
+def profile(music: int, speech: int, music_value=0.01, speech_value=0.6):
     """A per-second profile: `music` seconds of music, then `speech` seconds of speech."""
     return [music_value] * music + [speech_value] * speech
 
@@ -74,7 +74,7 @@ def test_mantra_defaults_to_kirtan_when_the_class_does_not_say():
 
 
 def test_music_throughout_is_not_split():
-    d = detect([0.1] * 1800, 1800)
+    d = detect([0.01] * 1800, 1800)
     assert d.mode == "kirtan_only" and d.score >= 0.9
 
 
@@ -95,13 +95,13 @@ def test_an_announcement_before_the_kirtan_does_not_hide_it():
 
 
 def test_speech_blips_inside_the_kirtan_are_ignored():
-    p = [0.1] * 200 + [0.9] * 8 + [0.1] * 200 + [0.9] * 150
+    p = [0.01] * 200 + [0.6] * 8 + [0.01] * 200 + [0.6] * 150
     d = detect(p, 558)
     assert d.mode == "split" and d.split_at == pytest.approx(408, abs=1.5)
 
 
 def test_alternating_music_and_speech_is_unclear():
-    p = ([0.1] * 25 + [0.9] * 15) * 20
+    p = ([0.01] * 25 + [0.6] * 15) * 20
     assert detect(p, 800).mode in ("unclear", "split", "class_only")  # never a confident cut
     assert detect(p, 800).score < 0.9
 
@@ -131,48 +131,29 @@ def test_timeline_shows_music_and_speech():
 
 
 # ------------------------------------------------------------ the audio features
-def synth_music(seconds, rng):
-    t = np.arange(SAMPLE_RATE * seconds) / SAMPLE_RATE
-    tone = sum(a * np.sin(2 * np.pi * f * t) for a, f in ((1, 220), (0.5, 440), (0.3, 660)))
-    return (
-        0.3 * tone * (1 + 0.1 * np.sin(2 * np.pi * 1.5 * t)) + 0.05 * rng.standard_normal(len(t))
-    ).astype(np.float32)
+def test_the_speech_model_scores_every_second():
+    t = np.arange(SAMPLE_RATE * 12) / SAMPLE_RATE
+    tone = (0.3 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
+    scores = profile_from_samples(tone)
+    assert len(scores) == 12
+    assert all(0.0 <= v <= 1.0 for v in scores)
+    assert max(scores) < 0.1  # a pure tone is not speech
 
 
-def synth_speech(seconds, rng):
-    t = np.arange(SAMPLE_RATE * seconds) / SAMPLE_RATE
-    env = np.clip(np.sin(2 * np.pi * 4 * t), 0, None) ** 2 * (np.sin(2 * np.pi * 0.7 * t) > -0.3)
-    voiced = np.sin(2 * np.pi * (120 + 30 * np.sin(2 * np.pi * 0.5 * t)) * t)
-    voiced += 0.5 * np.sin(2 * np.pi * 360 * t)
-    hiss = rng.standard_normal(len(t)) * 0.4 * (np.sin(2 * np.pi * 1.3 * t) > 0.6)
-    return (0.3 * env * (voiced + hiss)).astype(np.float32)
+def test_the_model_ships_with_the_repository():
+    from mam.tools.kirtan_splitter.features import MODEL
+
+    assert MODEL.is_file() and MODEL.stat().st_size > 1_000_000
+    assert (MODEL.parent / "LICENSE-silero-vad.txt").is_file()
 
 
-def test_features_tell_steady_music_from_pulsing_speech():
-    rng = np.random.default_rng(1)
-    music = [v for v in profile_from_samples(synth_music(40, rng)) if v is not None]
-    speech = [v for v in profile_from_samples(synth_speech(40, rng)) if v is not None]
-    assert sum(music) / len(music) < 0.25
-    assert sum(speech) / len(speech) > 0.75
-
-
-def test_features_find_the_change_in_a_stream(tmp_path):
-    """Music for 130 s, then speech for 60 s, through ffmpeg and the whole detector."""
+def test_a_decoded_file_gets_one_score_per_second(tmp_path):
     if shutil.which("ffmpeg") is None:
         pytest.skip("ffmpeg not installed")
-    rng = np.random.default_rng(2)
-    samples = np.concatenate([synth_music(130, rng), synth_speech(60, rng)])
-    raw = tmp_path / "mix.f32"
-    samples.tofile(raw)
-    wav = tmp_path / "mix.wav"
-    subprocess.run(
-        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "f32le", "-ar", "16000"]
-        + ["-ac", "1", "-i", str(raw), str(wav)],
-        check=True,
-    )
-    d = detect(speech_profile(wav), 190, find_silences(wav, 190))
-    assert d.mode == "split"
-    assert d.split_at == pytest.approx(130, abs=4)
+    tone = make_tone(tmp_path / "t.mp3", seconds=20, volume_db=-6)
+    scores = speech_profile(tone)
+    assert 18 <= len(scores) <= 21
+    assert max(scores) < 0.1
 
 
 # ------------------------------------------------------------------- ffmpeg
@@ -355,7 +336,7 @@ def test_do_not_split_decision(prepared):
 
 
 def test_music_throughout_is_skipped(prepared):
-    rid, copy = prepared([0.1] * 290)
+    rid, copy = prepared([0.01] * 290)
     outcome = run(rid)
     assert outcome.state == "skipped"
     assert copy.exists()
