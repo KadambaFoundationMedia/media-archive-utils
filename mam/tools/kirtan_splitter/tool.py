@@ -59,17 +59,6 @@ def parse_time(text: str) -> float:
     return seconds
 
 
-# ------------------------------------------------------------------ thresholds
-def threshold(session: Session, settings: Settings) -> float:
-    """Lowest score that is applied without a review (SPEC.md section 10)."""
-    row = session.scalar(
-        select(m.Calibration)
-        .where(m.Calibration.tool == TOOL, m.Calibration.decision == "boundary")
-        .order_by(m.Calibration.id.desc())
-    )
-    return row.threshold if row else settings.start_threshold
-
-
 # --------------------------------------------------------------------- the job
 def _processed_root(settings: Settings) -> Path:
     return settings.media_processed_files_path.resolve()
@@ -129,11 +118,10 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
     meta = dict(record.meta or {})
     meta["splitter"] = {"proposal": data, "audio": str(work_audio)}
     record.meta = meta
-    limit = threshold(ctx.session, settings)
     spot = random.random() < settings.spot_check_rate
-    if decision.mode == "unclear" or decision.score < limit or spot:
+    if not decision.sure or spot:
         reason = "\n".join(decision.reasons)
-        if spot and decision.score >= limit:
+        if spot and decision.sure:
             reason = "Spot check: " + reason
         _open_review(ctx.session, record, data, reason, decision.score, spot)
         return ToolOutcome(

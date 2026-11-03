@@ -68,6 +68,40 @@ def test_split_in_a_silence_is_confident():
     assert d.score >= 0.9
 
 
+def test_a_clean_stop_without_a_silence_is_sure():
+    # the Oslo case: the music stops and the speaker starts, no silence at the cut
+    d = detect(profile(450, 150), 600, [], phrases.RADHA_MADHAVA, sound(446, 154))
+    assert d.mode == "split" and not d.snapped_to_silence
+    assert d.sure and d.features["music_end"] == 446
+
+
+def test_no_stop_found_is_not_sure():
+    d = detect(profile(450, 150), 600, [(448, 452)], None, Sound([-10.0] * 600, [0.1] * 600))
+    assert d.mode == "split" and not d.sure
+
+
+def test_a_short_kirtan_is_sure_but_a_very_long_one_is_not():
+    short = detect(
+        profile(150, 100), 250, [], None, sound(146, 104)
+    )  # the SB 3.6.6 sample: 2.5 min
+    long = detect(profile(3000, 150), 3150, [], None, sound(2996, 154))
+    assert short.mode == "split" and short.sure
+    assert long.mode == "split" and not long.sure
+
+
+def test_a_small_contrast_is_not_sure():
+    # speech so weak that it barely differs from the music
+    d = detect(profile(450, 150, speech_value=0.15), 600, [], None, sound(446, 154))
+    assert d.mode == "split" and not d.sure
+
+
+def test_sure_for_the_no_split_cases():
+    assert detect([0.01] * 1800, 1800).sure  # music throughout
+    assert detect(profile(0, 400), 400).sure  # class from the start
+    assert not detect(profile(40, 400), 440).sure  # a lead-in too short to be a kirtan
+    assert not detect([None] * 600, 600).sure
+
+
 def test_cut_is_where_the_music_stops_not_where_the_speech_starts():
     # music to 300 s, 60 s of a sung prayer (quiet, no treble, no speech), then the class
     snd = Sound([-10.0] * 300 + [-30.0] * 60 + [-18.0] * 120, [0.1] * 300 + [0.0] * 180)
@@ -247,7 +281,7 @@ def prepared(settings, monkeypatch, reference, no_baserow):
     get_settings.cache_clear()
     settings = get_settings()
 
-    def make(scripted, name="2015-08-27_KKS_SB-3-6-6_se.mp3", seconds=300, ext="mp3"):
+    def make(scripted, name="2015-08-27_KKS_SB-3-6-6_se.mp3", seconds=300, ext="mp3", steady=False):
         original = make_tone(
             settings.media_sample_files_path / f"orig.{ext}",
             seconds=seconds,
@@ -261,8 +295,9 @@ def prepared(settings, monkeypatch, reference, no_baserow):
         monkeypatch.setattr(splitter, "speech_profile", lambda audio: scripted)
         first = next((i for i, v in enumerate(scripted) if v >= 0.1), len(scripted))
         stop = max(0, first - 4)  # the music stops 4 s before the first speech
+        loud = len(scripted) if steady else stop  # steady: the music never stops
         monkeypatch.setattr(
-            splitter, "sound_profile", lambda audio: sound(stop, len(scripted) - stop)
+            splitter, "sound_profile", lambda audio: sound(loud, len(scripted) - loud)
         )
         with session_scope() as s:
             record = register_original(s, original)
@@ -292,7 +327,7 @@ def run(record_id, *, dry_run=False):
         return splitter.run_kirtan_splitter(ctx)
 
 
-# 190 s of music, then speech; no silence in the synthetic file, so the score is below 0.9
+# 190 s of music that stops, then speech; no silence in the synthetic file (none is needed)
 SURE = profile(190, 100)
 
 
@@ -347,7 +382,7 @@ def test_the_splitter_does_not_transcribe():
 
 
 def test_unsure_split_opens_a_review_and_cuts_nothing(prepared):
-    rid, copy = prepared(SURE)  # no silence at the cut: score under 0.9
+    rid, copy = prepared(SURE, steady=True)  # the music never stops: not sure
     size = copy.stat().st_size
     outcome = run(rid)
     assert outcome.state == "review"
@@ -359,7 +394,7 @@ def test_unsure_split_opens_a_review_and_cuts_nothing(prepared):
 
 
 def test_approving_a_review_with_an_edited_cut(prepared):
-    rid, copy = prepared(SURE)
+    rid, copy = prepared(SURE, steady=True)
     run(rid)
     with session_scope() as s:
         review = s.scalars(select(m.Review)).one()
@@ -380,7 +415,7 @@ def test_approving_a_review_with_an_edited_cut(prepared):
 
 
 def test_do_not_split_decision(prepared):
-    rid, copy = prepared(SURE)
+    rid, copy = prepared(SURE, steady=True)
     run(rid)
     with session_scope() as s:
         review = s.scalars(select(m.Review)).one()
@@ -461,14 +496,14 @@ def test_review_page_and_approval_through_the_portal(prepared):
 
     from mam.manager.app import create_app
 
-    rid, copy = prepared(SURE)
+    rid, copy = prepared(SURE, steady=True)
     run(rid)
     with session_scope() as s:
         review_id = s.scalars(select(m.Review)).one().id
     with TestClient(create_app(start_queue=False)) as client:
         page = client.get(f"/review/{review_id}")
         assert page.status_code == 200
-        assert "Kirtan splitter review" in page.text and "3:06.000" in page.text
+        assert "Kirtan splitter review" in page.text and "3:10.000" in page.text
         assert client.get("/reviews").status_code == 200
         bad = client.post(
             f"/review/{review_id}/decide",
@@ -478,14 +513,14 @@ def test_review_page_and_approval_through_the_portal(prepared):
         assert "not a time" in bad.headers["location"].replace("%20", " ")
         done = client.post(
             f"/review/{review_id}/decide",
-            data={"action": "approve", "split_at": "3:06", "mantra": "Jaya-radha-madhava"},
+            data={"action": "approve", "split_at": "3:10", "mantra": "Jaya-radha-madhava"},
             follow_redirects=False,
         )
         assert done.status_code == 303
     with session_scope() as s:
         review = s.get(m.Review, review_id)
-        assert review.outcome == "approved" and review.final["split_at"] == 186
-    assert probe(copy).duration == pytest.approx(300 - 186, abs=0.5)
+        assert review.outcome == "approved" and review.final["split_at"] == 190
+    assert probe(copy).duration == pytest.approx(300 - 190, abs=0.5)
 
 
 def test_menu_lists_the_splitter(prepared):
