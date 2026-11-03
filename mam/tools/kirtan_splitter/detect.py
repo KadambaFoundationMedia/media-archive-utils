@@ -13,6 +13,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+SURE_CONTRAST = 0.2  # speech after the cut is at least this much above the kirtan
+SURE_MUSIC_SHARE = 0.8  # a sure kirtan is at least this much music
+SURE_KIRTAN_ONLY_SHARE = 0.9  # a recording with no speech must be this clearly music
 MIN_KIRTAN_S = 90.0  # a shorter lead-in is announcements, not a kirtan
 PLAUSIBLE_KIRTAN_S = (180.0, 2100.0)  # 3 to 35 minutes
 CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this long to start a class
@@ -36,7 +39,8 @@ VOTE_S = 5  # each second is judged together with its neighbours (median of this
 @dataclass
 class Decision:
     mode: str  # split | kirtan_only | class_only | unclear
-    score: float
+    score: float  # shown on the review page and stored with the example; not what decides
+    sure: bool = False  # True: apply without a review (see `detect`)
     kirtan_start: float = 0.0
     split_at: float | None = None
     class_start: float | None = None
@@ -214,6 +218,7 @@ def detect(
         return Decision(
             "class_only",
             0.9 if music_before == 0 and run_start < 60 else 0.7,
+            sure=music_before == 0 and run_start < 60,
             kirtan_start=start,
             class_start=float(run_start),
             mantra=mantra,
@@ -231,6 +236,7 @@ def detect(
             return Decision(
                 "kirtan_only",
                 round(min(0.95, 0.5 + 0.45 * music_share), 3),
+                sure=music_share >= SURE_KIRTAN_ONLY_SHARE,
                 kirtan_start=start,
                 mantra=mantra,
                 reasons=["No sustained speech: the music continues through the recording."],
@@ -288,6 +294,15 @@ def detect(
         reasons.append(f"The mantra is {mantra} (from the class).")
     else:
         reasons.append("The class does not tell the mantra; the kirtan is named Kirtan.")
+    # Sure = the music clearly stops, then speech follows: apply without a review.
+    sure = (
+        stop is not None
+        and MIN_KIRTAN_S <= kirtan_seconds <= hi
+        and margin >= SURE_CONTRAST
+        and music_share >= SURE_MUSIC_SHARE
+    )
+    if stop is not None and not sure and MIN_KIRTAN_S <= kirtan_seconds <= hi:
+        reasons.append("The difference between the kirtan and the class is small: please check.")
     features.update(
         **stop_info,
         music_end=stop,
@@ -300,6 +315,7 @@ def detect(
     return Decision(
         "split",
         round(max(0.0, min(1.0, score)), 3),
+        sure=sure,
         kirtan_start=start,
         split_at=round(split_at, 3),
         class_start=float(first_voice),
