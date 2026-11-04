@@ -83,21 +83,25 @@ def combined_source(record: m.MediaFile, *, dry_run: bool = False) -> Path:
 _executor: ProcessPoolExecutor | None = None
 
 
-def run_analysis(audio: Path, duration: float, settings: Settings) -> Analysis:
+def run_analysis(
+    audio: Path, duration: float, settings: Settings, early_stop: bool | None = None
+) -> Analysis:
     """The audio analysis, in a separate process so that several files run truly in parallel.
 
     The speech model is a Python loop: threads of one process stop scaling at about 3 (2.6x
     with 8 on a 10-core Mac), separate processes reach 5.3x with 8.
     """
     global _executor
+    if early_stop is None:
+        early_stop = settings.analysis_early_stop
     if not settings.analysis_in_processes:
-        return analyse_audio(audio, duration)
+        return analyse_audio(audio, duration, early_stop)
     if _executor is None:
         # `spawn` is the same on macOS, Windows and Linux, and starts clean without our threads
         _executor = ProcessPoolExecutor(
             max_workers=max(1, settings.workers_cpu), mp_context=get_context("spawn")
         )
-    return _executor.submit(analyse_audio, audio, duration).result()
+    return _executor.submit(analyse_audio, audio, duration, early_stop).result()
 
 
 def analyse(
@@ -107,8 +111,15 @@ def analyse(
     info = probe(audio)
     proposal = (record.meta or {}).get("proposal") or {}
     mantra = phrases.mantra_for_what(proposal.get("what"))
-    found = run_analysis(audio, info.duration, settings or get_settings())
+    settings = settings or get_settings()
+    found = run_analysis(audio, info.duration, settings)
     decision = detect(found.speech, info.duration, found.silences, mantra, found.sound)
+    if not found.complete:
+        if decision.mode == "split" and decision.sure:
+            decision.features["analysed_seconds"] = len(found.speech)  # the rest cannot matter
+        else:  # not clear-cut: analyse the whole recording, so a review has all the evidence
+            found = run_analysis(audio, info.duration, settings, early_stop=False)
+            decision = detect(found.speech, info.duration, found.silences, mantra, found.sound)
     return decision, info.duration
 
 

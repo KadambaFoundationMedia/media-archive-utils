@@ -34,6 +34,10 @@ MUSIC_REF_PERCENTILE = 80  # the kirtan's 'own loud level'
 BREAK_S = 4  # a stop must last this long (a short dip is a pause in the singing)
 RESUME_S = 45  # music that comes back for this long means the stop was not the end
 VOTE_S = 5  # each second is judged together with its neighbours (median of this many)
+# The decision looks at the first CONTRAST_WINDOW_S seconds of the class and no further, so the
+# rest of a long recording cannot change it and the analysis may stop once the class is found.
+CONTRAST_WINDOW_S = 300
+CLASS_CONFIRM_S = CONTRAST_WINDOW_S + 30  # a class this long (with the smoothing margin) is enough
 
 
 @dataclass
@@ -157,6 +161,28 @@ def music_end(
     return None, info
 
 
+def class_confirmed(profile: list[float | None]) -> bool:
+    """True when the profile so far already holds the class, so nothing after it can change the cut.
+
+    Looks for the first speech run that has at least MIN_KIRTAN_S of music before it and has
+    lasted CLASS_CONFIRM_S or has ended. The lead-in silence is not known yet, so the music
+    before the run is counted from MAX_LEAD_S: the real count is never lower, so the run the real
+    detection picks is this one or an earlier one, and both lie entirely in the profile.
+    """
+    labels = [
+        None if v is None else ("speech" if v >= SPEECH_AT else "music") for v in smooth(profile)
+    ]
+    for run_start, run_end in _runs(labels, "speech"):
+        if run_end - run_start < CLASS_MIN_SPEECH_S:
+            continue
+        music_before = sum(1 for lab in labels[int(MAX_LEAD_S) : run_start] if lab == "music")
+        if music_before >= MIN_KIRTAN_S:
+            # decided once the run has lasted long enough, or has ended (a music label follows;
+            # the last seconds of the profile are not final yet because of the smoothing)
+            return run_end - run_start >= CLASS_CONFIRM_S or run_end <= len(labels) - SMOOTH_S
+    return False
+
+
 def _runs(labels: list[str | None], kind: str) -> list[tuple[int, int]]:
     """(start, end) second ranges of `kind`; silence does not break a run."""
     runs: list[tuple[int, int]] = []
@@ -265,7 +291,8 @@ def detect(
     split_at = max(start + 1.0, min(split_at, float(first_voice)))
     kirtan_seconds = last_music - start
     before = [v for v in smoothed[int(start) : last_music] if v is not None]
-    after = [v for v in smoothed[run_start:run_end] if v is not None]
+    window_end = min(run_end, run_start + CONTRAST_WINDOW_S)
+    after = [v for v in smoothed[run_start:window_end] if v is not None]
     music_share = _mean([1.0 if v < SPEECH_AT else 0.0 for v in before])
     margin = _mean(after) - _mean(before)  # about 0.4 to 0.65 on real classes
 
@@ -310,7 +337,6 @@ def detect(
         music_share=round(music_share, 3),
         contrast=round(margin, 3),
         kirtan_seconds=round(kirtan_seconds, 1),
-        class_run_seconds=run_end - run_start,
     )
     return Decision(
         "split",
