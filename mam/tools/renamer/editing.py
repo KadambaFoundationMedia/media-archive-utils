@@ -268,6 +268,9 @@ def initial_values(record: m.MediaFile) -> dict[str, Any]:
     }
 
 
+SKIP_ROW = "skip"  # value of the "Do not create row" choice on the edit form
+
+
 def save(
     session: Session,
     record: m.MediaFile,
@@ -314,6 +317,7 @@ def save(
         category=category,
     )
     row_id = _clean(values.get("baserow_row_id"))
+    skip_row = row_id == SKIP_ROW  # "Do not create row": the file is renamed, Baserow untouched
     data = {
         **old,
         "original_path": record.original_path,
@@ -337,8 +341,14 @@ def save(
         "flags": [],
         "dry_run": False,
     }
-    # A person's decision: write the media row live, also when the Baserow switch is off.
-    data["baserow"] = write_baserow(record, data, placed.dst, settings, dry_run=False, live=True)
+    # A person's decision: write the media row live, also when the Baserow switch is off,
+    # unless they chose not to create or change a row.
+    if skip_row:
+        data["baserow"] = {"action": "skip", "row_id": None, "dry_run": True, "skipped": True}
+    else:
+        data["baserow"] = write_baserow(
+            record, data, placed.dst, settings, dry_run=False, live=True
+        )
     data["place_country"] = remember_place_country(place, cc, ref)
 
     now = datetime.now(UTC)

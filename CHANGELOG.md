@@ -13,6 +13,10 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Video recordings: the audio is extracted as mp3 first.
 - Common phrases are ignored for now (they need a transcript).
 
+### Media manager
+- The file page and the Renamer review page are one page, `/details/<id>`: a file with a pending review shows the reasons and Approve / Reject / Exclude, other files show Save (so a finished file can still be corrected and updated in Baserow). Old `/files/<id>` and `/review/<id>` links redirect.
+- New "Do not create row" choice under "Baserow media row": saves or approves without writing to Baserow. Preselected while "Baserow writes" is off.
+
 ### Project
 - Versioning and this changelog started.
 

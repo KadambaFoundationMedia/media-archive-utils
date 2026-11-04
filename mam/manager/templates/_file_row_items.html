@@ -14,7 +14,7 @@
     <tr class="file-row{% if flt.sort == 'path' and ns.stripe is even %} stripe{% endif %}">
       <td><input class="form-check-input row-select" type="checkbox" name="ids" value="{{ f.id }}" aria-label="Select"></td>
       <td class="text-break">
-        <a href="/files/{{ f.id }}" class="fw-medium file-link">{{ f.original_path | basename }}</a>
+        <a href="/details/{{ f.id }}" class="fw-medium file-link">{{ f.original_path | basename }}</a>
         {% if flt.sort != 'path' %}<div class="small text-body-secondary text-break">{{ f.original_path | rel_folder }}</div>{% endif %}
       </td>
       <td class="text-break small">

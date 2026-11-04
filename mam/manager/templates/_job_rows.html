@@ -10,7 +10,7 @@
         {% if j.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}
         {% if j.pipeline %}<span class="badge text-bg-secondary">pipeline</span>{% endif %}</td>
       <td class="text-break">
-        {% if j.media_file_id %}<a href="/files/{{ j.media_file_id }}">{{ names.get(j.media_file_id, j.media_file_id) }}</a>
+        {% if j.media_file_id %}<a href="/details/{{ j.media_file_id }}">{{ names.get(j.media_file_id, j.media_file_id) }}</a>
         {% elif j.params %}{{ j.params.path }}{% endif %}
       </td>
       <td><span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'secondary' if j.state == 'cancelled' else 'info' }}">

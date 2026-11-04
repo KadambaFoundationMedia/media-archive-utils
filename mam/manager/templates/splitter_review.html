@@ -7,7 +7,7 @@
     <h1 class="h5 mb-1 text-break">{{ f.current_name or (f.original_path | basename) }}</h1>
     <div class="small text-body-secondary text-break">{{ f.processed_path or f.original_path }}</div>
   </div>
-  <a class="btn btn-sm btn-outline-secondary" href="/files/{{ f.id }}">File details</a>
+  <a class="btn btn-sm btn-outline-secondary" href="/details/{{ f.id }}">File details</a>
   {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/review/{{ next_id }}">Next <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
 </div>
 {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}

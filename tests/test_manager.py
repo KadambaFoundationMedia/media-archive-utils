@@ -1,5 +1,6 @@
 """Media manager: scan, file list, job queue, Renamer runs and reviews, through HTTP."""
 
+import re
 import shutil
 
 import pytest
@@ -459,9 +460,9 @@ def test_file_page_updates_itself_and_shows_the_last_result(client, archive, ref
     assert "waiting in the queue" in client.get(f"/files/{file_id}/activity").text
     run_queue()
     done = client.get(f"/files/{file_id}/activity")
-    assert done.headers.get("HX-Redirect") == f"/files/{file_id}"  # the page reloads by itself
+    assert done.headers.get("HX-Redirect") == f"/details/{file_id}"  # the page reloads by itself
     page = client.get(f"/files/{file_id}").text
-    assert "Last run:" in page and "Open the review" in page
+    assert "Last run:" in page and "Needs review" in page  # the page is the review
 
 
 def test_preview_button_is_a_dry_run(client, archive, reference, no_baserow, settings):
@@ -716,3 +717,71 @@ def test_files_page_size_and_rerender(client):
     )
     rows = client.get("/files/rows", params={"status": "__all", "limit": 110}).text
     assert rows.count('class="file-row') == 110
+
+
+def test_details_page_is_the_review_page_when_a_review_is_pending(
+    client, archive, reference, no_baserow
+):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
+    run_queue()
+    with session_scope() as s:
+        review_id = s.scalars(select(m.Review.id)).one()
+    page = client.get(f"/details/{file_id}").text
+    assert "Needs review" in page and "Non-descriptive filename" in page
+    assert 'value="approve"' in page and 'value="reject"' in page and 'value="exclude"' in page
+    assert "Run a tool on this file" not in page  # a run would replace the result under review
+    # the old addresses still work
+    assert client.get(f"/review/{review_id}", follow_redirects=False).headers["location"] == (
+        f"/details/{file_id}"
+    )
+    assert client.get(f"/files/{file_id}", follow_redirects=False).headers["location"] == (
+        f"/details/{file_id}"
+    )
+    # a file without a pending review shows Save and the run card
+    other = client.get(f"/details/{ids_other(file_id)}").text
+    assert 'value="approve"' not in other and "Run a tool on this file" in other
+
+
+def ids_other(file_id):
+    with session_scope() as s:
+        return s.scalars(select(m.MediaFile.id).where(m.MediaFile.id != file_id)).first()
+
+
+def test_do_not_create_row_follows_the_baserow_switch_and_skips_the_write(
+    client, archive, reference, no_baserow
+):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
+    run_queue()
+    set_baserow_writes(False)
+    page = client.get(f"/details/{file_id}").text
+    assert re.search(r'id="row-skip"[^>]*checked', page)
+    assert not re.search(r'id="row-new"[^>]*checked', page)
+    set_baserow_writes(True)
+    page = client.get(f"/details/{file_id}").text
+    assert re.search(r'id="row-new"[^>]*checked', page)
+    assert not re.search(r'id="row-skip"[^>]*checked', page)
+    with session_scope() as s:
+        review_id = s.scalars(select(m.Review.id)).one()
+    # no Baserow call is made (respx would fail on an unmocked request)
+    response = client.post(
+        f"/review/{review_id}/decide",
+        data=approve_form("2012-07-11_KKS_Kirtan_rs.mp3", baserow_row_id="skip"),
+        follow_redirects=False,
+    )
+    from urllib.parse import unquote
+
+    assert "No Baserow row was created" in unquote(response.headers["location"])
+    with session_scope() as s:
+        assert not s.scalars(select(m.BaserowWriteLog)).all()
+        assert s.get(m.MediaFile, file_id).baserow_row_id is None
+        assert s.get(m.MediaFile, file_id).current_name == "2012-07-11_KKS_Kirtan_rs.mp3"

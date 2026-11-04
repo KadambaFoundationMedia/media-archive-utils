@@ -73,19 +73,25 @@
 
     <div class="mt-3">
       <div class="small fw-semibold mb-1">Baserow media row</div>
+      {# With the Baserow writes switch off the form starts on "Do not create row"; the person can still choose a row. #}
+      {% set pick = 'skip' if not baserow_on else (ev.baserow_row_id|string) %}
       {% if f.baserow_row_id %}
       <div class="form-check small">
-        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-current" value="{{ f.baserow_row_id }}" {% if ev.baserow_row_id|string == f.baserow_row_id|string %}checked{% endif %}>
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-current" value="{{ f.baserow_row_id }}" {% if pick == f.baserow_row_id|string %}checked{% endif %}>
         <label class="form-check-label" for="row-current">Row {{ f.baserow_row_id }} (linked now)</label>
       </div>
       {% endif %}
       <div class="form-check small">
-        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-new" value="" {% if not ev.baserow_row_id %}checked{% endif %}>
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-new" value="" {% if pick == '' %}checked{% endif %}>
         <label class="form-check-label" for="row-new">Create a new row</label>
+      </div>
+      <div class="form-check small">
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-skip" value="skip" {% if pick == 'skip' %}checked{% endif %}>
+        <label class="form-check-label" for="row-skip">Do not create row <span class="text-body-secondary">(nothing is written to Baserow{% if not baserow_on %}; Baserow writes are off{% endif %})</span></label>
       </div>
       {% for c in candidates if c.id != f.baserow_row_id %}
       <div class="form-check small">
-        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-{{ c.id }}" value="{{ c.id }}" {% if ev.baserow_row_id|string == c.id|string %}checked{% endif %}>
+        <input class="form-check-input" type="radio" name="baserow_row_id" id="row-{{ c.id }}" value="{{ c.id }}" {% if pick == c.id|string %}checked{% endif %}>
         <label class="form-check-label" for="row-{{ c.id }}">Row {{ c.id }}: {{ c.title }} <span class="text-body-secondary">({{ c.category or '-' }}, {{ c.place or '-' }}{% if c.tag %}, {{ c.tag }}{% endif %})</span></label>
       </div>
       {% endfor %}
@@ -108,6 +114,6 @@
     {% else %}
       <button class="btn btn-success btn-sm edit-save" type="submit" {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-floppy-disk me-1"></i>Save</button>
     {% endif %}
-    <span class="small text-body-secondary"><i class="fa-solid fa-database me-1 text-danger"></i>{% if mode == 'review' %}Approving{% else %}Saving{% endif %} renames the copy in processed-files and writes the media row live. Originals are never changed.</span>
+    <span class="small text-body-secondary"><i class="fa-solid fa-database me-1 text-danger"></i>{% if mode == 'review' %}Approving{% else %}Saving{% endif %} renames the copy in processed-files and writes the media row live, unless you choose "Do not create row". Originals are never changed.</span>
   </div>
 </form>

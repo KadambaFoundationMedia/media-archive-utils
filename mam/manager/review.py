@@ -39,11 +39,6 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
             if review is None:
                 raise HTTPException(404)
             record = session.get(m.MediaFile, review.media_file_id)
-            evidence = session.scalars(
-                select(m.WEvidence)
-                .where(m.WEvidence.media_file_id == record.id)
-                .order_by(m.WEvidence.field, m.WEvidence.score.desc())
-            ).all()
             next_id = session.scalar(
                 select(m.Review.id)
                 .where(m.Review.outcome == "pending", m.Review.id != review_id)
@@ -67,25 +62,9 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                 if p.get("class_start") is not None
                 else "",
             )
-        from mam.manager.edit_routes import form_context
-        from mam.tools.renamer.editing import initial_values
-
-        proposal = review.proposal
-        with session_scope() as session:
-            edit_context = form_context(record, initial_values(session.get(m.MediaFile, record.id)))
-        return render(
-            request,
-            "review.html",
-            mode="review",
-            review_id=review_id,
-            **edit_context,
-            review=review,
-            f=record,
-            p=proposal,
-            evidence=evidence,
-            next_id=next_id,
-            error=error,
-        )
+        # Renamer reviews live on the merged details page.
+        suffix = f"?error={error}" if error else ""
+        return RedirectResponse(f"/details/{record.id}{suffix}", status_code=303)
 
     @app.post("/review/{review_id}/decide")
     async def review_decide(request: Request, review_id: int):
@@ -100,11 +79,13 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
             "exclude": "File excluded from further processing",
         }
         result_msg = messages.get(action, "")
+        file_id = None
         try:
             with session_scope() as session:
                 review = session.get(m.Review, review_id)
                 if review is None or review.outcome != "pending":
                     raise HTTPException(409, "This review is already decided")
+                file_id = review.media_file_id
                 if review.tool == "kirtan-splitter" and action in ("approve", "no_split"):
                     from mam.tools.kirtan_splitter import tool as splitter
 
@@ -145,7 +126,9 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                     record = session.get(m.MediaFile, review.media_file_id)
                     data = save(session, record, form_values(form), operator, review=review)
                     baserow = data.get("baserow", {})
-                    if baserow.get("dry_run"):
+                    if baserow.get("skipped"):
+                        result_msg = "Approved. No Baserow row was created or changed, as you chose"
+                    elif baserow.get("dry_run"):
                         result_msg = (
                             "Approved. Baserow is in dry-run mode, so the "
                             f"{'new row' if baserow.get('action') == 'create' else 'row update'} "
@@ -170,7 +153,8 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                 else:
                     raise HTTPException(400, "Unknown action")
         except MamError as exc:
-            return RedirectResponse(f"/review/{review_id}?error={exc}", status_code=303)
+            back = f"/details/{file_id}" if file_id else f"/review/{review_id}"
+            return RedirectResponse(f"{back}?error={exc}", status_code=303)
         notify(request)
         target = form.get("next") or "/reviews"
         return RedirectResponse(f"{target}?msg={result_msg}", status_code=303)

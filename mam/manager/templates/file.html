@@ -8,10 +8,21 @@
     <div class="small text-body-secondary text-break">{{ f.original_path }}</div>
   </div>
   {% with s=f.status %}{% include "_status.html" %}{% endwith %}
-  {% for r in reviews if r.outcome == 'pending' %}
-    <a class="btn btn-sm btn-warning" href="/review/{{ r.id }}"><i class="fa-solid fa-flag me-1"></i>Review</a>
+  {% for rid in other_review_ids %}
+    <a class="btn btn-sm btn-warning" href="/review/{{ rid }}"><i class="fa-solid fa-flag me-1"></i>Review</a>
   {% endfor %}
+  {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/details/{{ next_id }}">Next review <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
 </div>
+
+{% if mode == 'review' %}
+<div class="card mb-3 border-warning">
+  <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Needs review: {{ tools[review_tool].label if review_tool in tools else review_tool }}</div>
+  <ul class="list-group list-group-flush small">
+    {% for fl in p.flags %}<li class="list-group-item">{{ fl }}</li>{% endfor %}
+    {% for n in p.notes %}<li class="list-group-item text-body-secondary">{{ n }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
 
 {% set running = jobs | selectattr('state', 'in', ['queued', 'running']) | list %}
 {% if running %}{% with f_id=f.id %}{% include "_file_activity.html" %}{% endwith %}
@@ -22,15 +33,16 @@
     {{ (last.finished_at | localtime('%H:%M:%S')) if last.finished_at else '' }} —
     {% if last.result %}{{ last.result.summary }}{% elif last.error %}{{ last.error.split('\n')[0] }}{% endif %}
   </div>
-  {% for r in pending %}<a class="btn btn-sm btn-warning" href="/review/{{ r.id }}"><i class="fa-solid fa-flag me-1"></i>Open the review</a>{% endfor %}
+  {% if mode != 'review' %}{% for r in pending %}<a class="btn btn-sm btn-warning" href="/review/{{ r.id }}"><i class="fa-solid fa-flag me-1"></i>Open the review</a>{% endfor %}{% endif %}
 </div>
 {% endif %}
 
+{% if mode != 'review' %}
 <form method="post" action="/actions" class="card mb-3 run-card">
       <div class="card-header">Run a tool on this file</div>
       <div class="card-body d-flex flex-wrap gap-2 align-items-center">
         <input type="hidden" name="ids" value="{{ f.id }}">
-        <input type="hidden" name="back" value="/files/{{ f.id }}">
+        <input type="hidden" name="back" value="/details/{{ f.id }}">
         <select class="form-select form-select-sm w-auto" name="tool" aria-label="Tool" required>
           {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
         </select>
@@ -38,8 +50,19 @@
         <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
       </div>
 </form>
+{% endif %}
 {% if request.query_params.get('error') %}<div class="alert alert-danger">{{ request.query_params.get('error') }}</div>{% endif %}
 {% include "_edit_form.html" %}
+{% if mode == 'review' and p.new_place %}
+<div class="card mb-3">
+  <div class="card-header">New place</div>
+  <div class="card-body small">
+    <strong>{{ p.new_place.place }}</strong>{% if p.new_place.country %} ({{ p.new_place.country }}){% endif %} is not a place in Baserow yet.
+    Add it as a <code>place_location</code> option in the Baserow media table, choose it under Place and save:
+    saving also adds it with its country to the <code>place_country</code> table.
+  </div>
+</div>
+{% endif %}
 <div class="row g-3">
   <div class="col-12 col-lg-6">
     <div class="card mb-3">
@@ -84,7 +107,7 @@
           <form method="post" action="/actions" class="mt-2">
             <input type="hidden" name="ids" value="{{ f.id }}">
             <input type="hidden" name="tool" value="renamer">
-            <input type="hidden" name="back" value="/files/{{ f.id }}">
+            <input type="hidden" name="back" value="/details/{{ f.id }}">
             <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run the Renamer</button>
           </form>
         </div>

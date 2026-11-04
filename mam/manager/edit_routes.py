@@ -74,10 +74,10 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
                     raise HTTPException(404)
                 data = save(session, record, form_values(form), get_settings().operator_name)
         except MamError as exc:
-            return RedirectResponse(f"/files/{file_id}?error={exc}", status_code=303)
+            return RedirectResponse(f"/details/{file_id}?error={exc}", status_code=303)
         notify(request)
         msg = f"Saved {data['final_name']} — {baserow_summary(data.get('baserow'))}"
         added = data.get("place_country") or {}
         if added.get("action") in ("create", "update"):
             msg += f"; {added['place_location']} is now in {added['country']} (place_country)"
-        return RedirectResponse(f"/files/{file_id}?msg={msg}", status_code=303)
+        return RedirectResponse(f"/details/{file_id}?msg={msg}", status_code=303)
