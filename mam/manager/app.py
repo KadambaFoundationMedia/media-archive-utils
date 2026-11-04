@@ -348,11 +348,23 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 .where(m.Review.media_file_id == file_id, m.Review.outcome == "pending")
                 .order_by(m.Review.id)
             ).all()
-            review = next((r for r in pending if r.tool != "kirtan-splitter"), None)
-            other_reviews = [r for r in pending if r is not review]
+            review = pending[0] if pending else None
             review_id = review.id if review else None
             review_tool = review.tool if review else None
             proposal = dict(review.proposal) if review else None
+            splitter = {}
+            if review and review.tool == "kirtan-splitter":
+                from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES, format_time
+
+                splitter = {
+                    "mantras": MANTRA_CHOICES,
+                    "split_text": format_time(proposal["split_at"])
+                    if proposal.get("split_at") is not None
+                    else "",
+                    "class_text": format_time(proposal["class_start"])
+                    if proposal.get("class_start") is not None
+                    else "",
+                }
             next_id = (
                 session.scalar(
                     select(m.Review.media_file_id)
@@ -362,17 +374,17 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 if review
                 else None
             )
-            other_ids = [r.id for r in other_reviews]
         return render(
             request,
             "file.html",
             menu=menu_tools(),
-            mode="review" if review else "file",
+            mode="review" if review_tool and review_tool != "kirtan-splitter" else "file",
+            review=review,
             review_id=review_id,
             review_tool=review_tool,
             p=proposal,
             next_id=next_id,
-            other_review_ids=other_ids,
+            **splitter,
             **context,
             **edit_context,
         )

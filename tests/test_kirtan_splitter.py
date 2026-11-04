@@ -501,9 +501,11 @@ def test_review_page_and_approval_through_the_portal(prepared):
     with session_scope() as s:
         review_id = s.scalars(select(m.Review)).one().id
     with TestClient(create_app(start_queue=False)) as client:
-        page = client.get(f"/review/{review_id}")
+        page = client.get(f"/details/{rid}")
         assert page.status_code == 200
-        assert "Kirtan splitter review" in page.text and "3:10.000" in page.text
+        assert "Approve and split" in page.text and "3:10.000" in page.text
+        old = client.get(f"/review/{review_id}", follow_redirects=False)
+        assert old.headers["location"] == f"/details/{rid}"
         assert client.get("/reviews").status_code == 200
         bad = client.post(
             f"/review/{review_id}/decide",

@@ -8,20 +8,24 @@
     <div class="small text-body-secondary text-break">{{ f.original_path }}</div>
   </div>
   {% with s=f.status %}{% include "_status.html" %}{% endwith %}
-  {% for rid in other_review_ids %}
-    <a class="btn btn-sm btn-warning" href="/review/{{ rid }}"><i class="fa-solid fa-flag me-1"></i>Review</a>
-  {% endfor %}
   {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/details/{{ next_id }}">Next review <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
 </div>
 
-{% if mode == 'review' %}
+{% if review_tool %}
 <div class="card mb-3 border-warning">
-  <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Needs review: {{ tools[review_tool].label if review_tool in tools else review_tool }}</div>
+  <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Needs review: {{ tools[review_tool].label if review_tool in tools else review_tool }}
+    {% if review_tool == 'kirtan-splitter' %}<span class="float-end small">score {{ '%.2f' % review.score if review.score is not none else '–' }}{% if review.spot_check %} · spot check{% endif %}</span>{% endif %}</div>
   <ul class="list-group list-group-flush small">
+    {% if review_tool == 'kirtan-splitter' %}
+    {% for line in review.reason.split('\n') %}<li class="list-group-item">{{ line }}</li>{% endfor %}
+    {% if p.mode != 'split' %}<li class="list-group-item">Proposed: <strong>{{ p.mode | replace('_', ' ') }}</strong> (not split).</li>{% endif %}
+    {% else %}
     {% for fl in p.flags %}<li class="list-group-item">{{ fl }}</li>{% endfor %}
     {% for n in p.notes %}<li class="list-group-item text-body-secondary">{{ n }}</li>{% endfor %}
+    {% endif %}
   </ul>
 </div>
+{% if review_tool == 'kirtan-splitter' %}{% include "_splitter_form.html" %}{% endif %}
 {% endif %}
 
 {% set running = jobs | selectattr('state', 'in', ['queued', 'running']) | list %}
@@ -33,11 +37,11 @@
     {{ (last.finished_at | localtime('%H:%M:%S')) if last.finished_at else '' }} —
     {% if last.result %}{{ last.result.summary }}{% elif last.error %}{{ last.error.split('\n')[0] }}{% endif %}
   </div>
-  {% if mode != 'review' %}{% for r in pending %}<a class="btn btn-sm btn-warning" href="/review/{{ r.id }}"><i class="fa-solid fa-flag me-1"></i>Open the review</a>{% endfor %}{% endif %}
+
 </div>
 {% endif %}
 
-{% if mode != 'review' %}
+{% if not review_tool %}
 <form method="post" action="/actions" class="card mb-3 run-card">
       <div class="card-header">Run a tool on this file</div>
       <div class="card-body d-flex flex-wrap gap-2 align-items-center">

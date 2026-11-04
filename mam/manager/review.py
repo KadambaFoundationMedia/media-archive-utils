@@ -33,36 +33,12 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
 
     @app.get("/review/{review_id}", response_class=HTMLResponse)
     def review_page(request: Request, review_id: int, error: str | None = None):
-
         with session_scope() as session:
             review = session.get(m.Review, review_id)
             if review is None:
                 raise HTTPException(404)
             record = session.get(m.MediaFile, review.media_file_id)
-            next_id = session.scalar(
-                select(m.Review.id)
-                .where(m.Review.outcome == "pending", m.Review.id != review_id)
-                .order_by(m.Review.id)
-            )
-        if review.tool == "kirtan-splitter":
-            from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES, format_time
-
-            p = review.proposal
-            return render(
-                request,
-                "splitter_review.html",
-                review=review,
-                f=record,
-                p=p,
-                next_id=next_id,
-                error=error,
-                mantras=MANTRA_CHOICES,
-                split_text=format_time(p["split_at"]) if p.get("split_at") is not None else "",
-                class_text=format_time(p["class_start"])
-                if p.get("class_start") is not None
-                else "",
-            )
-        # Renamer reviews live on the merged details page.
+        # Every review lives on the details page.
         suffix = f"?error={error}" if error else ""
         return RedirectResponse(f"/details/{record.id}{suffix}", status_code=303)
 
