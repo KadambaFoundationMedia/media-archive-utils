@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     workers_cpu: int = Field(default_factory=lambda: max(2, min(8, (os.cpu_count() or 4) - 2)))
     # run the Kirtan splitter's analysis in separate processes (threads stop scaling at about 3)
     analysis_in_processes: bool = True
+    # stop analysing a recording once the class is found (the cut cannot change after that)
+    analysis_early_stop: bool = True
     workers_io: int = 4
 
     @field_validator("nas_root", mode="before")
