@@ -288,7 +288,12 @@ def create_app(start_queue: bool = True) -> FastAPI:
         return RedirectResponse(f"{back}{sep}msg={msg}&live=1", status_code=303)
 
     # ----------------------------------------------------------- file detail
-    @app.get("/files/{file_id}", response_class=HTMLResponse)
+    @app.get("/files/{file_id}")
+    def file_page_old(file_id: int, request: Request):
+        query = request.url.query
+        return RedirectResponse(f"/details/{file_id}" + (f"?{query}" if query else ""), 303)
+
+    @app.get("/details/{file_id}", response_class=HTMLResponse)
     def file_page(request: Request, file_id: int):
         with session_scope() as session:
             record = session.get(m.MediaFile, file_id)
@@ -336,12 +341,38 @@ def create_app(start_queue: bool = True) -> FastAPI:
         with session_scope() as session:
             record = session.get(m.MediaFile, file_id)
             edit_context = form_context(record, initial_values(record))
+            # A pending Renamer review turns the page into the review page: the same form with
+            # Approve / Reject / Exclude, plus the reasons. Other tools' reviews keep their page.
+            pending = session.scalars(
+                select(m.Review)
+                .where(m.Review.media_file_id == file_id, m.Review.outcome == "pending")
+                .order_by(m.Review.id)
+            ).all()
+            review = next((r for r in pending if r.tool != "kirtan-splitter"), None)
+            other_reviews = [r for r in pending if r is not review]
+            review_id = review.id if review else None
+            review_tool = review.tool if review else None
+            proposal = dict(review.proposal) if review else None
+            next_id = (
+                session.scalar(
+                    select(m.Review.media_file_id)
+                    .where(m.Review.outcome == "pending", m.Review.media_file_id != file_id)
+                    .order_by(m.Review.id)
+                )
+                if review
+                else None
+            )
+            other_ids = [r.id for r in other_reviews]
         return render(
             request,
             "file.html",
             menu=menu_tools(),
-            mode="file",
-            review_id=None,
+            mode="review" if review else "file",
+            review_id=review_id,
+            review_tool=review_tool,
+            p=proposal,
+            next_id=next_id,
+            other_review_ids=other_ids,
             **context,
             **edit_context,
         )
@@ -356,7 +387,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 .order_by(m.Job.id)
             ).all()
         if not running:
-            return HTMLResponse("", headers={"HX-Redirect": f"/files/{file_id}"})
+            return HTMLResponse("", headers={"HX-Redirect": f"/details/{file_id}"})
         return render(request, "_file_activity.html", f_id=file_id, running=running)
 
     @app.get("/files/{file_id}/audio")

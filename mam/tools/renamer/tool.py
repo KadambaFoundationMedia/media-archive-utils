@@ -227,6 +227,8 @@ def baserow_summary(baserow: dict | None, flagged: bool = False) -> str:
     """One line for the job result: what happened in Baserow."""
     if flagged or not baserow:
         return "Baserow: written when you approve the review"
+    if baserow.get("skipped"):
+        return "Baserow: no row created or changed (you chose not to)"
     what = "new row" if baserow.get("action") == "create" else "row update"
     if baserow.get("dry_run"):
         return f"Baserow: {what} logged only (Baserow writes are off)"
