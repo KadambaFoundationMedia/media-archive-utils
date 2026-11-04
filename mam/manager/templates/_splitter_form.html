@@ -1,5 +1,59 @@
-{# The Kirtan splitter's review on the details page: the cut, the player around the cut, the evidence. #}
-<div class="row g-3" x-data="{ cut: {{ p.split_at if p.split_at is not none else 'null' }} }">
+{# The Kirtan splitter's review on the details page: the waveform editor, the cut, the evidence. #}
+{% set editor_cfg = {"fileId": f.id, "cut": p.get("split_at"), "kirtanStart": p.get("kirtan_start") or 0, "mantra": p.get("mantra"), "colors": region_colors} %}
+<script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.6/dist/wavesurfer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7.8.6/dist/plugins/regions.min.js"></script>
+<script src="/static/waveform.js?v={{ asset_version() }}"></script>
+<div class="row g-3" x-data='cutEditor({{ editor_cfg | tojson }})' @keydown.window="seekKey($event)">
+  {% if review.outcome == 'pending' %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <span>Waveform: drag the edge between the kirtan and the class</span>
+        <span class="small text-body-secondary font-monospace" x-show="status === 'ready'">
+          <span x-text="formatTime(now)"></span> / <span x-text="formatTime(duration)"></span>
+        </span>
+      </div>
+      <div class="card-body">
+        <div x-show="status === 'loading'" class="text-body-secondary py-4 text-center">
+          <span class="spinner-border spinner-border-sm me-2"></span>
+          Preparing the waveform. The first time takes up to a minute for a long recording; it is kept for next time.
+        </div>
+        <div x-show="status === 'error'" x-cloak class="alert alert-danger mb-0">
+          The waveform could not be loaded (<span x-text="error"></span>). You can still type the time below.
+        </div>
+        <div x-ref="wave" x-show="status === 'ready'" class="cut-wave"></div>
+        <div x-show="status === 'ready'" x-cloak class="d-flex flex-wrap align-items-center gap-2 mt-3">
+          <button type="button" class="btn btn-primary btn-sm" @click="toggle()" title="Space">
+            <i class="fa-solid" :class="playing ? 'fa-pause' : 'fa-play'"></i>
+          </button>
+          <template x-if="cut !== null">
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary" @click="beforeCut()">3 s before the cut</button>
+              <button type="button" class="btn btn-outline-secondary" @click="audition()">Around the cut (±3 s)</button>
+              <button type="button" class="btn btn-outline-secondary" @click="fromCut()">From the cut</button>
+            </div>
+          </template>
+          <template x-if="cut !== null">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Move the cut">
+              <button type="button" class="btn btn-outline-secondary" @click="nudge(-1)">−1 s</button>
+              <button type="button" class="btn btn-outline-secondary" @click="nudge(-0.1)">−0.1</button>
+              <button type="button" class="btn btn-outline-secondary" @click="nudge(0.1)">+0.1</button>
+              <button type="button" class="btn btn-outline-secondary" @click="nudge(1)">+1 s</button>
+            </div>
+          </template>
+          <button type="button" class="btn btn-outline-secondary btn-sm" @click="cutHere()">
+            <i class="fa-solid fa-scissors me-1"></i>Cut at the playhead
+          </button>
+          <div class="d-flex align-items-center gap-2 ms-auto">
+            <label class="small text-body-secondary mb-0" for="zoom">Zoom</label>
+            <input id="zoom" type="range" class="form-range" style="width: 9rem" min="1" max="300" step="1" x-model="zoomLevel" @input="zoom()">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @click="zoomToCut()" x-show="cut !== null">Zoom to the cut</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
   <div class="col-12 col-lg-7">
     {% if review.outcome == 'pending' %}
     <form method="post" action="/review/{{ review.id }}/decide" class="card mb-3">
@@ -8,12 +62,12 @@
         <div class="row g-3">
           <div class="col-sm-6">
             <label class="form-label" for="split_at">Kirtan ends (minutes:seconds)</label>
-            <input class="form-control font-monospace" id="split_at" name="split_at" value="{{ split_text }}" placeholder="28:13.048">
+            <input class="form-control font-monospace" id="split_at" name="split_at" value="{{ split_text }}" placeholder="28:13.048" x-model="cutText" @change="typed()">
             <div class="form-text">Everything before this is the kirtan; this moment and after is the class.{% if class_text %} The speech starts at {{ class_text }}.{% endif %}</div>
           </div>
           <div class="col-sm-6">
             <label class="form-label" for="mantra">Kirtan type (its name)</label>
-            <select class="form-select" id="mantra" name="mantra">
+            <select class="form-select" id="mantra" name="mantra" @change="mantraChanged($event.target.value)">
               {% for mname in mantras %}<option value="{{ mname }}" {% if mname == p.mantra %}selected{% endif %}>{{ mname }}</option>{% endfor %}
             </select>
           </div>
@@ -33,18 +87,6 @@
     {% endif %}
   </div>
   <div class="col-12 col-lg-5">
-    <div class="card mb-3"><div class="card-header">Listen around the cut</div>
-      <div class="card-body">
-        {% if f.kind == 'audio' %}<audio x-ref="player" controls preload="none" class="w-100" src="/files/{{ f.id }}/audio?which=processed"></audio>
-        {% else %}<video x-ref="player" controls preload="none" class="w-100" src="/files/{{ f.id }}/audio?which=processed"></video>{% endif %}
-        {% if p.split_at is not none %}
-        <div class="btn-group btn-group-sm mt-2">
-          <button type="button" class="btn btn-outline-secondary" @click="$refs.player.currentTime = Math.max(0, cut - 3); $refs.player.play()">3 s before the cut</button>
-          <button type="button" class="btn btn-outline-secondary" @click="$refs.player.currentTime = cut; $refs.player.play()">From the cut</button>
-        </div>
-        {% endif %}
-      </div>
-    </div>
     <div class="card mb-3"><div class="card-header">Evidence</div>
       <ul class="list-group list-group-flush small">
         <li class="list-group-item">Cut inside a silence: {{ 'yes' if p.snapped_to_silence else 'no' }}</li>
