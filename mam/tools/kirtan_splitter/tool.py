@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 import random
 import re
+from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, datetime
+from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +26,7 @@ from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter.audio import extract_audio
 from mam.tools.kirtan_splitter.detect import Decision, detect
-from mam.tools.kirtan_splitter.features import analyse_audio
+from mam.tools.kirtan_splitter.features import Analysis, analyse_audio
 
 log = logging.getLogger(__name__)
 TOOL = "kirtan-splitter"
@@ -78,12 +80,34 @@ def combined_source(record: m.MediaFile, *, dry_run: bool = False) -> Path:
     raise MamError("Run the Renamer first: the splitter works on the renamed copy")
 
 
-def analyse(record: m.MediaFile, audio: Path) -> tuple[Decision, float]:
+_executor: ProcessPoolExecutor | None = None
+
+
+def run_analysis(audio: Path, duration: float, settings: Settings) -> Analysis:
+    """The audio analysis, in a separate process so that several files run truly in parallel.
+
+    The speech model is a Python loop: threads of one process stop scaling at about 3 (2.6x
+    with 8 on a 10-core Mac), separate processes reach 5.3x with 8.
+    """
+    global _executor
+    if not settings.analysis_in_processes:
+        return analyse_audio(audio, duration)
+    if _executor is None:
+        # `spawn` is the same on macOS, Windows and Linux, and starts clean without our threads
+        _executor = ProcessPoolExecutor(
+            max_workers=max(1, settings.workers_cpu), mp_context=get_context("spawn")
+        )
+    return _executor.submit(analyse_audio, audio, duration).result()
+
+
+def analyse(
+    record: m.MediaFile, audio: Path, settings: Settings | None = None
+) -> tuple[Decision, float]:
     """Local audio analysis (no transcript). Returns (decision, duration)."""
     info = probe(audio)
     proposal = (record.meta or {}).get("proposal") or {}
     mantra = phrases.mantra_for_what(proposal.get("what"))
-    found = analyse_audio(audio, info.duration)  # one decode for the speech, sound and silences
+    found = run_analysis(audio, info.duration, settings or get_settings())
     decision = detect(found.speech, info.duration, found.silences, mantra, found.sound)
     return decision, info.duration
 
@@ -100,7 +124,7 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
         work_audio = extract_audio(src, stem, dry_run=False)
     ctx.session.commit()  # the analysis takes a while; do not hold the database
     try:
-        decision, duration = analyse(record, work_audio)
+        decision, duration = analyse(record, work_audio, settings)
     finally:
         if ctx.dry_run and work_audio != src:
             work_audio.unlink(missing_ok=True)

@@ -10,6 +10,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ### Kirtan splitter
 - New tool: finds where the kirtan ends in a recording that is kirtan followed by a class, from the audio alone (a local voice-activity model for the speech, loudness and treble for where the music stops, and silences; no transcription), and splits it into a kirtan file (named by mantra type) and the class. Runs after the Renamer; in the Action menu and as `mam kirtan-split <file>` (dry run by default, prints a timeline).
 - Music throughout or no kirtan: not split. Unsure cuts open a review with a page to edit the time; sure ones (the music clearly stops, then speech; a kirtan of 1.5 to 35 minutes) are cut automatically, with 5% spot checks. The score is shown but no longer decides.
+- Faster: the audio is decoded once instead of three times (about 30% less time per file, same results), and several files are analysed at the same time on the CPU pool (up to 8 workers, one per core minus 2).
 - Video recordings: the audio is extracted as mp3 first.
 - Common phrases are ignored for now (they need a transcript).
 

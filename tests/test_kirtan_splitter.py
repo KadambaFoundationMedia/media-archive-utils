@@ -262,6 +262,24 @@ def test_one_pass_gives_exactly_what_three_separate_passes_give(tmp_path):
     assert len(one.silences) == 2  # also a silence that lasts until the end
 
 
+def test_the_splitter_runs_on_the_cpu_pool():
+    from mam.manager.tools import TOOLS
+
+    assert TOOLS["kirtan-splitter"].pool == "cpu"
+
+
+def test_the_analysis_in_a_separate_process_gives_the_same_result(tmp_path, settings):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    tone = make_tone(tmp_path / "t.mp3", seconds=30, volume_db=-10)
+    duration = probe(tone).duration
+    in_process = analyse_audio(tone, duration)
+    elsewhere = splitter.run_analysis(tone, duration, settings)
+    assert elsewhere.speech == in_process.speech
+    assert elsewhere.sound.level == in_process.sound.level
+    assert elsewhere.silences == in_process.silences
+
+
 # ------------------------------------------------------------------- ffmpeg
 def test_find_silences(tmp_path):
     if shutil.which("ffmpeg") is None:
@@ -300,7 +318,7 @@ def test_extract_audio_from_video(tmp_path):
 def analysis(monkeypatch):
     """What the audio analysis finds, scripted: the job tests do not decode real audio."""
     found = Analysis([], Sound([], []), [])
-    monkeypatch.setattr(splitter, "analyse_audio", lambda audio, duration=None: found)
+    monkeypatch.setattr(splitter, "run_analysis", lambda audio, duration, settings: found)
     return found
 
 
