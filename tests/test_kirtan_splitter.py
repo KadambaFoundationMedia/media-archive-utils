@@ -335,11 +335,28 @@ def test_what_comes_after_the_class_is_found_cannot_change_the_decision(kirtan, 
     assert full.mode == "split"
 
 
+def test_a_class_that_starts_with_a_short_run_is_decided_when_that_run_ends():
+    # as in the Simhachalam sample: 36 s of speech, a pause, then the long class
+    speech = [0.01] * 460 + [0.6] * 36 + [0.0] * 25 + [0.6] * 3000
+    snd = Sound([-10.0] * 456 + [-40.0] * (len(speech) - 456), [0.1] * len(speech))
+    n = first_confirmed(speech)
+    assert n < 600
+    full = detect(speech, len(speech), [], None, snd)
+    early = detect(speech[:n], n, [], None, Sound(snd.level[:n], snd.high[:n]))
+    for key in ("mode", "sure", "split_at", "class_start", "score"):
+        assert getattr(early, key) == getattr(full, key), key
+    assert early.features["contrast"] == full.features["contrast"]
+
+
 def test_the_class_is_confirmed_only_when_it_has_lasted():
     speech = profile(450, 600)
     assert not class_confirmed(speech[: 450 + 60])  # a minute of speech
     assert not class_confirmed(speech[: 450 + 300])  # five minutes: the window is not covered
     assert class_confirmed(speech[: 450 + 340])
+    # a short announcement, then music again: the run has ended, so the class is decided
+    short = profile(450, 36) + [0.01] * 30
+    assert not class_confirmed(short[: 450 + 36])  # still speaking when the profile ends
+    assert class_confirmed(short)
     assert not class_confirmed(profile(450, 0))  # music only
     assert not class_confirmed(profile(40, 600))  # a lead-in too short to be a kirtan
 

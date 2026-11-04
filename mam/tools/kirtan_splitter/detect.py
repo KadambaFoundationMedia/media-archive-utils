@@ -165,9 +165,9 @@ def class_confirmed(profile: list[float | None]) -> bool:
     """True when the profile so far already holds the class, so nothing after it can change the cut.
 
     Looks for the first speech run that has at least MIN_KIRTAN_S of music before it and has
-    lasted CLASS_CONFIRM_S. The lead-in silence is not known yet, so the music before the run is
-    counted from MAX_LEAD_S: the real count is never lower, so the run the real detection picks
-    is this one or an earlier one, and both lie entirely in the profile.
+    lasted CLASS_CONFIRM_S or has ended. The lead-in silence is not known yet, so the music
+    before the run is counted from MAX_LEAD_S: the real count is never lower, so the run the real
+    detection picks is this one or an earlier one, and both lie entirely in the profile.
     """
     labels = [
         None if v is None else ("speech" if v >= SPEECH_AT else "music") for v in smooth(profile)
@@ -177,7 +177,9 @@ def class_confirmed(profile: list[float | None]) -> bool:
             continue
         music_before = sum(1 for lab in labels[int(MAX_LEAD_S) : run_start] if lab == "music")
         if music_before >= MIN_KIRTAN_S:
-            return run_end - run_start >= CLASS_CONFIRM_S
+            # decided once the run has lasted long enough, or has ended (a music label follows;
+            # the last seconds of the profile are not final yet because of the smoothing)
+            return run_end - run_start >= CLASS_CONFIRM_S or run_end <= len(labels) - SMOOTH_S
     return False
 
 
