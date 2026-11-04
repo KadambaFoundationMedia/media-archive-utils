@@ -22,9 +22,9 @@ from mam.helpers.local_db.hashing import fingerprint, sha256
 from mam.helpers.local_db.repo import record_event, register_derived, set_status
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.kirtan_splitter import phrases
-from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
+from mam.tools.kirtan_splitter.audio import extract_audio
 from mam.tools.kirtan_splitter.detect import Decision, detect
-from mam.tools.kirtan_splitter.features import sound_profile, speech_profile
+from mam.tools.kirtan_splitter.features import analyse_audio
 
 log = logging.getLogger(__name__)
 TOOL = "kirtan-splitter"
@@ -83,13 +83,8 @@ def analyse(record: m.MediaFile, audio: Path) -> tuple[Decision, float]:
     info = probe(audio)
     proposal = (record.meta or {}).get("proposal") or {}
     mantra = phrases.mantra_for_what(proposal.get("what"))
-    decision = detect(
-        speech_profile(audio),
-        info.duration,
-        find_silences(audio, info.duration),
-        mantra,
-        sound_profile(audio),
-    )
+    found = analyse_audio(audio, info.duration)  # one decode for the speech, sound and silences
+    decision = detect(found.speech, info.duration, found.silences, mantra, found.sound)
     return decision, info.duration
 
 

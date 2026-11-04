@@ -12,24 +12,37 @@ SILENCE_DB = -40
 SILENCE_MIN_S = 0.8
 
 
-def find_silences(path: Path, duration: float | None = None) -> list[tuple[float, float]]:
-    """Silent stretches (start, end) in seconds."""
-    proc = run(
-        [binary("ffmpeg"), "-hide_banner", "-nostats", "-i", str(path), "-map", "0:a:0"]
-        + ["-af", f"silencedetect=noise={SILENCE_DB}dB:d={SILENCE_MIN_S}", "-f", "null", "-"],
-        check=False,
-    )
+def silence_filter() -> str:
+    return f"silencedetect=noise={SILENCE_DB}dB:d={SILENCE_MIN_S}"
+
+
+def parse_silences(
+    log: str, duration: float | None, fallback: Path | None = None
+) -> list[tuple[float, float]]:
+    """Silent stretches (start, end) from the ffmpeg `silencedetect` log."""
     out: list[tuple[float, float]] = []
     start: float | None = None
-    for line in proc.stderr.splitlines():
+    for line in log.splitlines():
         if m := re.search(r"silence_start: (-?[\d.]+)", line):
             start = max(0.0, float(m.group(1)))
         elif (m := re.search(r"silence_end: ([\d.]+)", line)) and start is not None:
             out.append((start, float(m.group(1))))
             start = None
     if start is not None:  # silent until the end
-        out.append((start, duration if duration is not None else probe(path).duration))
+        if duration is None and fallback is not None:
+            duration = probe(fallback).duration
+        out.append((start, duration if duration is not None else start))
     return out
+
+
+def find_silences(path: Path, duration: float | None = None) -> list[tuple[float, float]]:
+    """Silent stretches (start, end) in seconds."""
+    proc = run(
+        [binary("ffmpeg"), "-hide_banner", "-nostats", "-i", str(path), "-map", "0:a:0"]
+        + ["-af", silence_filter(), "-f", "null", "-"],
+        check=False,
+    )
+    return parse_silences(proc.stderr, duration, path)
 
 
 def extract_audio(video: Path, dst_stem: Path, *, dry_run: bool = True) -> Path:

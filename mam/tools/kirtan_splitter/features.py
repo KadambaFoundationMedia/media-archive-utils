@@ -16,6 +16,7 @@ the kirtan), so `sound_profile` adds the level and the share of high frequencies
 from __future__ import annotations
 
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -24,6 +25,7 @@ import numpy as np
 
 from mam.errors import MamError
 from mam.helpers.audio_optimizer.ffmpeg import binary
+from mam.tools.kirtan_splitter.audio import parse_silences, silence_filter
 
 MODEL = Path(__file__).parent / "models" / "silero_vad.onnx"
 SAMPLE_RATE = 16000
@@ -153,3 +155,57 @@ def sound_profile(path: Path) -> Sound:
     if proc.wait() != 0:
         raise MamError(f"ffmpeg could not decode {path.name}: {err[-500:]}")
     return Sound(level, high)
+
+
+@dataclass
+class Analysis:
+    """Everything the splitter needs from one pass over the audio."""
+
+    speech: list[float | None]
+    sound: Sound
+    silences: list[tuple[float, float]]
+
+
+def analyse_audio(path: Path, duration: float | None = None) -> Analysis:
+    """Speech profile, loudness/treble profile and silences from ONE ffmpeg decode.
+
+    Gives exactly what `speech_profile`, `sound_profile` and `find_silences` give separately
+    (the same decode settings and filters), but reads and decodes the file once instead of
+    three times.
+    """
+    cmd = [binary("ffmpeg"), "-hide_banner", "-nostats", "-i", str(path)]
+    # output 1: silences, on the stream as it is; output 2: mono 16 kHz samples for the models
+    cmd += ["-map", "0:a:0", "-af", silence_filter(), "-f", "null", "-"]
+    cmd += ["-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
+    model = _Model()
+    probs: list[float] = []
+    level: list[float] = []
+    high: list[float] = []
+    vad_step = CHUNK * 4  # the model takes 512 samples at a time, without gaps between blocks
+    sec_step = SAMPLE_RATE * 4  # the level and treble are measured per whole second
+    with tempfile.TemporaryFile() as log:  # silencedetect writes its report to stderr
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log)
+        assert proc.stdout is not None
+        vad_pending = sec_pending = b""
+        while raw := proc.stdout.read(vad_step * 2000):  # about a minute at a time
+            vad_pending += raw
+            sec_pending += raw
+            usable = len(vad_pending) - len(vad_pending) % vad_step
+            samples = np.frombuffer(vad_pending[:usable], dtype=np.float32)
+            probs.extend(model(samples[i : i + CHUNK]) for i in range(0, len(samples), CHUNK))
+            vad_pending = vad_pending[usable:]
+            usable = len(sec_pending) - len(sec_pending) % sec_step
+            part = sound_from_samples(np.frombuffer(sec_pending[:usable], dtype=np.float32))
+            level.extend(part.level)
+            high.extend(part.high)
+            sec_pending = sec_pending[usable:]
+        code = proc.wait()
+        log.seek(0)
+        text = log.read().decode(errors="replace")
+    if code != 0:
+        raise MamError(f"ffmpeg could not decode {path.name}: {text[-500:]}")
+    return Analysis(
+        probabilities_to_profile(probs),
+        Sound(level, high),
+        parse_silences(text, duration, path),
+    )
