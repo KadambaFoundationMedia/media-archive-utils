@@ -27,6 +27,8 @@ from mam.tools.kirtan_splitter.features import (
 )
 from tests.conftest import make_tone
 
+CLASS_S = 200  # a class has at least 3 minutes of speech (detect.MIN_CLASS_S)
+
 
 def profile(music: int, speech: int, music_value=0.01, speech_value=0.6):
     """A per-second profile: `music` seconds of music, then `speech` seconds of speech."""
@@ -61,7 +63,7 @@ def test_time_round_trip():
 
 # ------------------------------------------------------------------- detection
 def test_split_in_a_silence_is_confident():
-    d = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA, sound(446, 154))
+    d = detect(profile(450, CLASS_S), 600, [(448, 452)], phrases.RADHA_MADHAVA, sound(446, 154))
     assert d.mode == "split"
     assert d.snapped_to_silence and 448 <= d.split_at <= 449
     assert d.class_start == 450
@@ -70,28 +72,28 @@ def test_split_in_a_silence_is_confident():
 
 def test_a_clean_stop_without_a_silence_is_sure():
     # the Oslo case: the music stops and the speaker starts, no silence at the cut
-    d = detect(profile(450, 150), 600, [], phrases.RADHA_MADHAVA, sound(446, 154))
+    d = detect(profile(450, CLASS_S), 600, [], phrases.RADHA_MADHAVA, sound(446, 154))
     assert d.mode == "split" and not d.snapped_to_silence
     assert d.sure and d.features["music_end"] == 446
 
 
 def test_no_stop_found_is_not_sure():
-    d = detect(profile(450, 150), 600, [(448, 452)], None, Sound([-10.0] * 600, [0.1] * 600))
+    d = detect(profile(450, CLASS_S), 600, [(448, 452)], None, Sound([-10.0] * 600, [0.1] * 600))
     assert d.mode == "split" and not d.sure
 
 
 def test_a_short_kirtan_is_sure_but_a_very_long_one_is_not():
     short = detect(
-        profile(150, 100), 250, [], None, sound(146, 104)
+        profile(150, CLASS_S), 250, [], None, sound(146, 104)
     )  # the SB 3.6.6 sample: 2.5 min
-    long = detect(profile(3000, 150), 3150, [], None, sound(2996, 154))
+    long = detect(profile(3000, CLASS_S), 3150, [], None, sound(2996, 154))
     assert short.mode == "split" and short.sure
     assert long.mode == "split" and not long.sure
 
 
 def test_a_small_contrast_is_not_sure():
     # speech so weak that it barely differs from the music
-    d = detect(profile(450, 150, speech_value=0.15), 600, [], None, sound(446, 154))
+    d = detect(profile(450, CLASS_S, speech_value=0.15), 600, [], None, sound(446, 154))
     assert d.mode == "split" and not d.sure
 
 
@@ -102,10 +104,23 @@ def test_sure_for_the_no_split_cases():
     assert not detect([None] * 600, 600).sure
 
 
+def test_a_short_spoken_ending_after_a_long_kirtan_is_not_a_class():
+    # the Home program Amsterdam file: 71.5 min of kirtan, then 40 s of talk at the very end
+    d = detect(profile(4324, 40), 4364, [], None, sound(4288, 76))
+    assert d.mode == "kirtan_only" and d.sure and d.split_at is None
+    assert 40 <= d.features["spoken_ending_s"] <= 50  # the 9 s smoothing widens it
+    assert "spoken ending" in d.reasons[0]
+
+
+def test_a_class_needs_three_minutes_of_speech():
+    assert detect(profile(600, 170), 770, [], None, sound(596, 174)).mode == "kirtan_only"
+    assert detect(profile(600, 190), 790, [], None, sound(596, 194)).mode == "split"
+
+
 def test_cut_is_where_the_music_stops_not_where_the_speech_starts():
     # music to 300 s, 60 s of a sung prayer (quiet, no treble, no speech), then the class
     snd = Sound([-10.0] * 300 + [-30.0] * 60 + [-18.0] * 120, [0.1] * 300 + [0.0] * 180)
-    d = detect(profile(360, 120), 480, [], None, snd)
+    d = detect(profile(360, CLASS_S), 480, [], None, snd)
     assert d.mode == "split" and d.features["music_end"] == 300
     assert d.split_at == 300 and d.class_start == 360
 
@@ -113,48 +128,48 @@ def test_cut_is_where_the_music_stops_not_where_the_speech_starts():
 def test_a_pause_in_the_singing_is_not_the_end():
     # a 6 s pause at 200 s, then 250 s more music
     snd = Sound([-10.0] * 200 + [-60.0] * 6 + [-10.0] * 250 + [-60.0] * 10, [0.1] * 466)
-    d = detect(profile(466, 100), 566, [], None, snd)
+    d = detect(profile(466, CLASS_S), 566, [], None, snd)
     assert d.features["music_end"] == 456
 
 
 def test_a_short_dip_is_ignored():
     snd = Sound([-10.0] * 200 + [-60.0] * 2 + [-10.0] * 200 + [-60.0] * 10, [0.1] * 412)
-    d = detect(profile(412, 100), 512, [], None, snd)
+    d = detect(profile(412, CLASS_S), 512, [], None, snd)
     assert d.features["music_end"] == 402
 
 
 def test_music_that_stays_loud_but_loses_its_treble_has_ended():
     # a voice or drone at the kirtan's level, without cymbals and kartals
     snd = Sound([-12.0] * 400, [0.15] * 300 + [0.01] * 100)
-    d = detect(profile(380, 100), 480, [], None, snd)
+    d = detect(profile(380, CLASS_S), 480, [], None, snd)
     assert d.features["music_end"] == 300 and d.features["treble_used"]
 
 
 def test_a_kirtan_without_treble_is_judged_on_level_only():
     snd = Sound([-10.0] * 300 + [-45.0] * 100, [0.01] * 400)
-    d = detect(profile(380, 100), 480, [], None, snd)
+    d = detect(profile(380, CLASS_S), 480, [], None, snd)
     assert d.features["music_end"] == 300 and not d.features["treble_used"]
 
 
 def test_without_a_found_end_of_music_the_cut_is_at_the_speech_and_not_confident():
     steady = Sound([-10.0] * 450, [0.1] * 450)  # nothing stops before the speech
-    d = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA, steady)
+    d = detect(profile(450, CLASS_S), 600, [(448, 452)], phrases.RADHA_MADHAVA, steady)
     assert d.features["music_end"] is None and d.split_at <= 450
     assert d.score < 0.9 and any("no clear end of the music" in r for r in d.reasons)
 
 
 def test_split_without_silence_is_less_sure():
-    d = detect(profile(450, 150), 600, [], phrases.RADHA_MADHAVA)
+    d = detect(profile(450, CLASS_S), 600, [], phrases.RADHA_MADHAVA)
     assert d.mode == "split" and not d.snapped_to_silence
     assert d.score < 0.9
     assert d.split_at == pytest.approx(450, abs=1.5)
 
 
 def test_mantra_defaults_to_kirtan_when_the_class_does_not_say():
-    d = detect(profile(450, 150), 600, [(448, 452)])
+    d = detect(profile(450, CLASS_S), 600, [(448, 452)])
     assert (
         d.mantra == "Kirtan"
-        and d.score < detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA).score
+        and d.score < detect(profile(450, CLASS_S), 600, [(448, 452)], phrases.RADHA_MADHAVA).score
     )
 
 
@@ -180,7 +195,7 @@ def test_an_announcement_before_the_kirtan_does_not_hide_it():
 
 
 def test_speech_blips_inside_the_kirtan_are_ignored():
-    p = [0.01] * 200 + [0.6] * 8 + [0.01] * 200 + [0.6] * 150
+    p = [0.01] * 200 + [0.6] * 8 + [0.01] * 200 + [0.6] * CLASS_S
     d = detect(p, 558)
     assert d.mode == "split" and d.split_at == pytest.approx(408, abs=1.5)
 
@@ -196,17 +211,17 @@ def test_almost_no_sound_is_unclear():
 
 
 def test_unusually_long_kirtan_lowers_the_score():
-    normal = detect(profile(450, 150), 600, [(448, 452)], phrases.RADHA_MADHAVA)
-    long = detect(profile(3000, 150), 3150, [(2998, 3002)], phrases.RADHA_MADHAVA)
+    normal = detect(profile(450, CLASS_S), 600, [(448, 452)], phrases.RADHA_MADHAVA)
+    long = detect(profile(3000, CLASS_S), 3150, [(2998, 3002)], phrases.RADHA_MADHAVA)
     assert long.score < normal.score
 
 
 def test_a_silent_looking_recording_keeps_its_start():
-    assert detect(profile(450, 150), 600, [(0.0, 600.0)]).kirtan_start == 0.0
+    assert detect(profile(450, CLASS_S), 600, [(0.0, 600.0)]).kirtan_start == 0.0
 
 
 def test_leading_silence_is_trimmed():
-    d = detect(profile(450, 150), 600, [(0.0, 6.0)])
+    d = detect(profile(450, CLASS_S), 600, [(0.0, 6.0)])
     assert 5.5 <= d.kirtan_start <= 6.0
 
 
@@ -328,7 +343,7 @@ def run(record_id, *, dry_run=False):
 
 
 # 190 s of music that stops, then speech; no silence in the synthetic file (none is needed)
-SURE = profile(190, 100)
+SURE = profile(190, CLASS_S)
 
 
 @pytest.fixture

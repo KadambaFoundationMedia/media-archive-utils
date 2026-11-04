@@ -19,6 +19,7 @@ SURE_KIRTAN_ONLY_SHARE = 0.9  # a recording with no speech must be this clearly 
 MIN_KIRTAN_S = 90.0  # a shorter lead-in is announcements, not a kirtan
 PLAUSIBLE_KIRTAN_S = (180.0, 2100.0)  # 3 to 35 minutes
 CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this long to start a class
+MIN_CLASS_S = 180.0  # less speech than this after the music is a spoken ending, not a class
 SPEECH_AT = 0.10  # smoothed speech probability from which a second counts as speech
 SMOOTH_S = 9  # seconds averaged, so a clap or a shout does not flip the label
 MUSIC_SHARE_MIN = 0.7  # a kirtan is at least this much music (blips of speech are allowed)
@@ -203,15 +204,20 @@ def detect(
 
     class_run = None
     first_speech = None  # the first speech run long enough to be a class
+    spoken_ending = None  # seconds of speech after a long kirtan that is too short to be a class
     for run_start, run_end in _runs(labels, "speech"):
         if run_end - run_start < CLASS_MIN_SPEECH_S:
             continue
         music_before = sum(1 for lab in labels[int(start) : run_start] if lab == "music")
-        if first_speech is None:
-            first_speech = (run_start, music_before)
         if music_before >= MIN_KIRTAN_S:
+            speech_after = sum(1 for lab in labels[run_start:] if lab == "speech")
+            if speech_after < MIN_CLASS_S:
+                spoken_ending = speech_after  # closing words, not a class: keep looking
+                continue
             class_run = (run_start, run_end)
             break
+        if first_speech is None:
+            first_speech = (run_start, music_before)
 
     if class_run is None and first_speech is not None:
         run_start, music_before = first_speech
@@ -239,8 +245,15 @@ def detect(
                 sure=music_share >= SURE_KIRTAN_ONLY_SHARE,
                 kirtan_start=start,
                 mantra=mantra,
-                reasons=["No sustained speech: the music continues through the recording."],
-                features=features,
+                reasons=(
+                    [
+                        f"Only {spoken_ending} s of speech follow the music: a spoken ending, "
+                        f"not a class (a class has at least {int(MIN_CLASS_S)} s)."
+                    ]
+                    if spoken_ending is not None
+                    else ["No sustained speech: the music continues through the recording."]
+                ),
+                features={**features, "spoken_ending_s": spoken_ending},
             )
         return Decision(
             "unclear",
