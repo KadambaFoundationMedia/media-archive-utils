@@ -785,3 +785,31 @@ def test_do_not_create_row_follows_the_baserow_switch_and_skips_the_write(
         assert not s.scalars(select(m.BaserowWriteLog)).all()
         assert s.get(m.MediaFile, file_id).baserow_row_id is None
         assert s.get(m.MediaFile, file_id).current_name == "2012-07-11_KKS_Kirtan_rs.mp3"
+
+
+def test_save_does_not_close_a_pending_splitter_review(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"]
+        s.add(
+            m.Review(
+                media_file_id=file_id,
+                tool="kirtan-splitter",
+                outcome="pending",
+                proposal={"mode": "split", "split_at": 60.0, "duration": 300.0},
+                reason="test",
+                score=0.5,
+            )
+        )
+    page = client.get(f"/details/{file_id}").text
+    assert "Approve and split" in page and "Save" in page
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id], "mode": "run"})
+    run_queue()
+    client.post(
+        f"/files/{file_id}/edit",
+        data=approve_form("2011-08-28_KKS_SB-1-19-30_Oslo-no.mp3", baserow_row_id="skip"),
+    )
+    with session_scope() as s:
+        review = s.scalars(select(m.Review).where(m.Review.tool == "kirtan-splitter")).one()
+        assert review.outcome == "pending"

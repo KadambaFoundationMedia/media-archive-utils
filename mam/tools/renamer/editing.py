@@ -364,8 +364,17 @@ def save(
     pending = list(
         session.scalars(
             select(m.Review).where(
-                m.Review.media_file_id == record.id, m.Review.outcome == "pending"
+                m.Review.media_file_id == record.id,
+                m.Review.outcome == "pending",
+                m.Review.tool != "kirtan-splitter",  # the splitter's review is decided on its own
             )
+        )
+    )
+    other_open = session.scalar(
+        select(m.Review.id).where(
+            m.Review.media_file_id == record.id,
+            m.Review.outcome == "pending",
+            m.Review.tool == "kirtan-splitter",
         )
     )
     if review is not None and review not in pending:
@@ -379,5 +388,6 @@ def save(
         _learn_alias(session, before.get("place"), data.get("place"))
         r.outcome = "edited" if changed else "approved"
         r.final, r.operator, r.decided_at = data, operator, now
-    set_status(session, record, "Renamer Done", "manual-edit", f"saved by {operator}")
+    if not other_open:
+        set_status(session, record, "Renamer Done", "manual-edit", f"saved by {operator}")
     return data

@@ -1,29 +1,6 @@
-{% extends "base.html" %}
-{% block title %}Kirtan splitter review · {{ f.current_name or f.original_path | basename }}{% endblock %}
-{% block content %}
-<div class="d-flex flex-wrap align-items-start gap-2 mb-3">
-  <div class="me-auto">
-    <div class="small text-body-secondary">Kirtan splitter review</div>
-    <h1 class="h5 mb-1 text-break">{{ f.current_name or (f.original_path | basename) }}</h1>
-    <div class="small text-body-secondary text-break">{{ f.processed_path or f.original_path }}</div>
-  </div>
-  <a class="btn btn-sm btn-outline-secondary" href="/details/{{ f.id }}">File details</a>
-  {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/review/{{ next_id }}">Next <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
-</div>
-{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
-{% if review.outcome != 'pending' %}<div class="alert alert-secondary">This review is {{ review.outcome }}{% if review.operator %} by {{ review.operator }}{% endif %}.</div>{% endif %}
-
-<div class="row g-3" x-data="{ t: null, cut: {{ p.split_at if p.split_at is not none else 'null' }} }">
+{# The Kirtan splitter's review on the details page: the cut, the player around the cut, the evidence. #}
+<div class="row g-3" x-data="{ cut: {{ p.split_at if p.split_at is not none else 'null' }} }">
   <div class="col-12 col-lg-7">
-    <div class="card mb-3 border-warning">
-      <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Why this needs review
-        <span class="float-end small">score {{ '%.2f' % review.score if review.score is not none else '–' }}{% if review.spot_check %} · spot check{% endif %}</span></div>
-      <ul class="list-group list-group-flush small">
-        {% for line in review.reason.split('\n') %}<li class="list-group-item">{{ line }}</li>{% endfor %}
-        {% if p.mode != 'split' %}<li class="list-group-item">Proposed: <strong>{{ p.mode | replace('_', ' ') }}</strong> (not split).</li>{% endif %}
-      </ul>
-    </div>
-
     {% if review.outcome == 'pending' %}
     <form method="post" action="/review/{{ review.id }}/decide" class="card mb-3">
       <div class="card-header">The cut</div>
@@ -55,7 +32,6 @@
     </form>
     {% endif %}
   </div>
-
   <div class="col-12 col-lg-5">
     <div class="card mb-3"><div class="card-header">Listen around the cut</div>
       <div class="card-body">
@@ -79,4 +55,3 @@
     </div>
   </div>
 </div>
-{% endblock %}
