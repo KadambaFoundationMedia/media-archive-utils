@@ -709,6 +709,26 @@ def test_review_page_and_approval_through_the_portal(prepared):
     assert probe(copy).duration == pytest.approx(300 - 190, abs=0.5)
 
 
+def test_the_waveform_endpoints_and_page(prepared):
+    from fastapi.testclient import TestClient
+
+    from mam.manager.app import create_app
+
+    rid, copy = prepared(SURE, steady=True)
+    run(rid)
+    with session_scope() as s:
+        assert s.scalars(select(m.Review)).one().outcome == "pending"
+    with TestClient(create_app(start_queue=False)) as client:
+        page = client.get(f"/details/{rid}")
+        assert "cutEditor" in page.text and "wavesurfer.js@7.8.6" in page.text
+        assert f'"fileId": {rid}' in page.text
+        peaks = client.get(f"/files/{rid}/waveform/peaks")
+        assert peaks.status_code == 200 and peaks.json()["duration"] == pytest.approx(300, abs=1)
+        audio = client.get(f"/files/{rid}/waveform/audio", headers={"Range": "bytes=0-99"})
+        assert audio.status_code in (200, 206) and len(audio.content) > 0
+        assert client.get("/files/9999/waveform/peaks").status_code == 404
+
+
 def test_menu_lists_the_splitter(prepared):
     from fastapi.testclient import TestClient
 

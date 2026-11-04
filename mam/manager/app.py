@@ -11,13 +11,14 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
 from mam import __version__
 from mam.config import get_settings
+from mam.errors import MamError
 from mam.helpers.local_db import migrate, session_scope
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import default_status_setting, set_default_status
@@ -174,6 +175,34 @@ def category_style(name: str | None) -> str:
 
 
 templates.env.globals["category_style"] = category_style
+
+
+def _region_colors(record: m.MediaFile, proposal: dict) -> dict[str, str]:
+    """Colors of the kirtan and class regions in the waveform editor.
+
+    From the Baserow categories (`category_terms_folder.color`): the class takes its recording's
+    category, the kirtan the category of its mantra. Fixed colors when Baserow is not loaded.
+    """
+    from mam.manager.colors import css_color
+    from mam.tools.renamer.knowledge import reference_if_ready
+
+    colors = {"kirtan": "#e57b24", "class": "#3d7fdb"}
+    ref = reference_if_ready()  # never wait for Baserow just for a color
+    if ref is None:
+        return colors
+    try:
+        category = ref.matcher.by_name(record.category) if record.category else None
+        if category and css_color(category.color):
+            colors["class"] = css_color(category.color)
+        from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES
+
+        mantra = proposal.get("mantra") or MANTRA_CHOICES[0]
+        found = ref.matcher.match(mantra)
+        if found and found.category and css_color(found.category.color):
+            colors["kirtan"] = css_color(found.category.color)
+    except Exception:  # a color is never worth failing the page
+        logging.getLogger(__name__).debug("region colors fell back", exc_info=True)
+    return colors
 
 
 def create_app(start_queue: bool = True) -> FastAPI:
@@ -357,6 +386,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES, format_time
 
                 splitter = {
+                    "region_colors": _region_colors(record, proposal),
                     "mantras": MANTRA_CHOICES,
                     "split_text": format_time(proposal["split_at"])
                     if proposal.get("split_at") is not None
@@ -412,6 +442,42 @@ def create_app(start_queue: bool = True) -> FastAPI:
         if not path or not Path(path).exists():
             raise HTTPException(404, "File not available")
         return FileResponse(path)
+
+    def _waveform_source(file_id: int) -> Path:
+        """The audio the splitter works on: the extracted audio of a video, else the copy."""
+        with session_scope() as session:
+            record = session.get(m.MediaFile, file_id)
+            if record is None:
+                raise HTTPException(404)
+            meta_audio = ((record.meta or {}).get("splitter") or {}).get("audio")
+            candidates = [meta_audio, record.processed_path, record.original_path]
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                return Path(candidate)
+        raise HTTPException(404, "File not available")
+
+    @app.get("/files/{file_id}/waveform/peaks")
+    def waveform_peaks(file_id: int):
+        """Peaks for the waveform editor (made once, then kept); also readies the audio preview."""
+        from mam.manager import waveform
+
+        source = _waveform_source(file_id)
+        try:
+            data = waveform.peaks_for(source, get_settings())
+            waveform.playable(source, get_settings())
+        except MamError as exc:
+            raise HTTPException(500, str(exc)) from exc
+        return JSONResponse(data, headers={"Cache-Control": "no-store"})
+
+    @app.get("/files/{file_id}/waveform/audio")
+    def waveform_audio(file_id: int):
+        """The recording as a browser can play it (a small mp3 for WMA and video)."""
+        from mam.manager import waveform
+
+        try:
+            return FileResponse(waveform.playable(_waveform_source(file_id), get_settings()))
+        except MamError as exc:
+            raise HTTPException(500, str(exc)) from exc
 
     # ------------------------------------------------------------------ jobs
     @app.get("/nav/badges", response_class=HTMLResponse)
