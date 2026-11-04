@@ -20,7 +20,9 @@ from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
 from mam.tools.kirtan_splitter.detect import detect
 from mam.tools.kirtan_splitter.features import (
     SAMPLE_RATE,
+    Analysis,
     Sound,
+    analyse_audio,
     profile_from_samples,
     sound_profile,
     speech_profile,
@@ -241,6 +243,43 @@ def test_a_decoded_file_gets_one_score_per_second(tmp_path):
     assert max(scores) < 0.1
 
 
+def test_one_pass_gives_exactly_what_three_separate_passes_give(tmp_path):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    src = make_tone(tmp_path / "t.mp3", seconds=75, volume_db=-10)
+    out = tmp_path / "gap.mp3"
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src)]
+        + ["-af", "volume=enable='between(t,20,24)+between(t,70,75)':volume=0", str(out)],
+        check=True,
+    )
+    duration = probe(out).duration
+    one = analyse_audio(out, duration)
+    assert one.speech == speech_profile(out)
+    separate = sound_profile(out)
+    assert one.sound.level == separate.level and one.sound.high == separate.high
+    assert one.silences == find_silences(out, duration)
+    assert len(one.silences) == 2  # also a silence that lasts until the end
+
+
+def test_the_splitter_runs_on_the_cpu_pool():
+    from mam.manager.tools import TOOLS
+
+    assert TOOLS["kirtan-splitter"].pool == "cpu"
+
+
+def test_the_analysis_in_a_separate_process_gives_the_same_result(tmp_path, settings):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    tone = make_tone(tmp_path / "t.mp3", seconds=30, volume_db=-10)
+    duration = probe(tone).duration
+    in_process = analyse_audio(tone, duration)
+    elsewhere = splitter.run_analysis(tone, duration, settings)
+    assert elsewhere.speech == in_process.speech
+    assert elsewhere.sound.level == in_process.sound.level
+    assert elsewhere.silences == in_process.silences
+
+
 # ------------------------------------------------------------------- ffmpeg
 def test_find_silences(tmp_path):
     if shutil.which("ffmpeg") is None:
@@ -276,7 +315,15 @@ def test_extract_audio_from_video(tmp_path):
 
 # ----------------------------------------------------------- the whole job
 @pytest.fixture
-def prepared(settings, monkeypatch, reference, no_baserow):
+def analysis(monkeypatch):
+    """What the audio analysis finds, scripted: the job tests do not decode real audio."""
+    found = Analysis([], Sound([], []), [])
+    monkeypatch.setattr(splitter, "run_analysis", lambda audio, duration, settings: found)
+    return found
+
+
+@pytest.fixture
+def prepared(settings, monkeypatch, reference, no_baserow, analysis):
     monkeypatch.setenv("SPOT_CHECK_RATE", "0")
     get_settings.cache_clear()
     settings = get_settings()
@@ -292,13 +339,11 @@ def prepared(settings, monkeypatch, reference, no_baserow):
         folder.mkdir(parents=True)
         copy = folder / name
         shutil.copy2(original, copy)
-        monkeypatch.setattr(splitter, "speech_profile", lambda audio: scripted)
+        analysis.speech = scripted
         first = next((i for i, v in enumerate(scripted) if v >= 0.1), len(scripted))
         stop = max(0, first - 4)  # the music stops 4 s before the first speech
         loud = len(scripted) if steady else stop  # steady: the music never stops
-        monkeypatch.setattr(
-            splitter, "sound_profile", lambda audio: sound(loud, len(scripted) - loud)
-        )
+        analysis.sound = sound(loud, len(scripted) - loud)
         with session_scope() as s:
             record = register_original(s, original)
             record.processed_path, record.current_name = str(copy), name
@@ -332,9 +377,9 @@ SURE = profile(190, 100)
 
 
 @pytest.fixture
-def sure_silence(monkeypatch):
+def sure_silence(analysis):
     """Put a silence at the boundary, as a recording would have."""
-    monkeypatch.setattr(splitter, "find_silences", lambda audio, duration=None: [(189.0, 192.0)])
+    analysis.silences = [(189.0, 192.0)]
 
 
 def test_confident_split_writes_both_files(prepared, sure_silence):
@@ -548,13 +593,8 @@ def test_golden_samples(settings):
         if not audio.exists():
             continue
         duration = probe(audio).duration
-        d = detect(
-            speech_profile(audio),
-            duration,
-            find_silences(audio, duration),
-            None,
-            sound_profile(audio),
-        )
+        found = analyse_audio(audio, duration)
+        d = detect(found.speech, duration, found.silences, None, found.sound)
         assert d.mode == "split", f"{audio.name}: {d.reasons} {d.features.get('timeline')}"
         # the music fades out over several seconds on two samples: 2.5 s, not 1.5 s (SPEC.md)
         assert abs(d.split_at - case["kirtan_end"]) <= 2.5, audio.name
