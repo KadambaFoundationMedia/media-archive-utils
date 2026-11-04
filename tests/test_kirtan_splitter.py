@@ -14,13 +14,16 @@ from mam.helpers.local_db import models as m
 from mam.helpers.local_db import session_scope
 from mam.helpers.local_db.repo import register_original
 from mam.manager.tools import JobContext
+from mam.tools.kirtan_splitter import features as feat
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter import tool as splitter
 from mam.tools.kirtan_splitter.audio import extract_audio, find_silences
-from mam.tools.kirtan_splitter.detect import detect
+from mam.tools.kirtan_splitter.detect import class_confirmed, detect
 from mam.tools.kirtan_splitter.features import (
     SAMPLE_RATE,
+    Analysis,
     Sound,
+    analyse_audio,
     profile_from_samples,
     sound_profile,
     speech_profile,
@@ -256,6 +259,164 @@ def test_a_decoded_file_gets_one_score_per_second(tmp_path):
     assert max(scores) < 0.1
 
 
+def test_one_pass_gives_exactly_what_three_separate_passes_give(tmp_path):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    src = make_tone(tmp_path / "t.mp3", seconds=75, volume_db=-10)
+    out = tmp_path / "gap.mp3"
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(src)]
+        + ["-af", "volume=enable='between(t,20,24)+between(t,70,75)':volume=0", str(out)],
+        check=True,
+    )
+    duration = probe(out).duration
+    one = analyse_audio(out, duration)
+    assert one.speech == speech_profile(out)
+    separate = sound_profile(out)
+    assert one.sound.level == separate.level and one.sound.high == separate.high
+    assert one.silences == find_silences(out, duration)
+    assert len(one.silences) == 2  # also a silence that lasts until the end
+
+
+def test_an_early_stop_ends_the_decode_with_the_same_start_of_the_profile(tmp_path, monkeypatch):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    tone = make_tone(tmp_path / "t.mp3", seconds=200, volume_db=-10)  # read a minute at a time
+    duration = probe(tone).duration
+    full = analyse_audio(tone, duration)
+    monkeypatch.setattr(feat, "EARLIEST_CHECK_S", 5)
+    monkeypatch.setattr(feat, "class_confirmed", lambda profile: len(profile) >= 15)
+    assert analyse_audio(tone, duration).complete  # not asked to stop
+    early = analyse_audio(tone, duration, early_stop=True)
+    assert not early.complete and 15 <= len(early.speech) < len(full.speech)
+    assert early.speech == full.speech[: len(early.speech)]
+    assert early.sound.level == full.sound.level[: len(early.sound.level)]
+
+
+def test_no_early_stop_while_the_class_is_not_found(tmp_path, monkeypatch):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    tone = make_tone(tmp_path / "t.mp3", seconds=30, volume_db=-10)
+    monkeypatch.setattr(feat, "EARLIEST_CHECK_S", 5)
+    done = analyse_audio(tone, probe(tone).duration, early_stop=True)
+    assert done.complete and len(done.speech) >= 28  # a tone has no speech to find
+
+
+def test_the_splitter_runs_on_the_cpu_pool():
+    from mam.manager.tools import TOOLS
+
+    assert TOOLS["kirtan-splitter"].pool == "cpu"
+
+
+def test_the_analysis_in_a_separate_process_gives_the_same_result(tmp_path, settings):
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    tone = make_tone(tmp_path / "t.mp3", seconds=30, volume_db=-10)
+    duration = probe(tone).duration
+    in_process = analyse_audio(tone, duration)
+    elsewhere = splitter.run_analysis(tone, duration, settings)
+    assert elsewhere.speech == in_process.speech
+    assert elsewhere.sound.level == in_process.sound.level
+    assert elsewhere.silences == in_process.silences
+
+
+# ------------------------------------------------------------------- early stop
+def first_confirmed(speech: list[float]) -> int:
+    return next(n for n in range(1, len(speech) + 1) if class_confirmed(speech[:n]))
+
+
+@pytest.mark.parametrize("kirtan", [200, 450, 900, 2000])
+@pytest.mark.parametrize("class_tail", ["speech", "music returns", "weak speech", "silence"])
+def test_what_comes_after_the_class_is_found_cannot_change_the_decision(kirtan, class_tail):
+    first_minutes = 400  # speech of the class that is known when the analysis stops
+    tails = {
+        "speech": [0.6] * 1500,
+        "music returns": [0.01] * 600 + [0.6] * 300,
+        "weak speech": [0.12] * 1500,
+        "silence": [0.0] * 1500,
+    }
+    speech = [0.01] * kirtan + [0.6] * first_minutes + tails[class_tail]
+    snd = Sound([-10.0] * (kirtan - 4) + [-40.0] * (len(speech) - kirtan + 4), [0.1] * len(speech))
+    n = first_confirmed(speech)
+    assert n < len(speech)
+    full = detect(speech, len(speech), [], None, snd)
+    early = detect(
+        speech[:n], n, [], None, Sound(snd.level[:n], snd.high[:n])
+    )  # what the stopped analysis sees
+    for key in ("mode", "sure", "split_at", "class_start", "score"):
+        assert getattr(early, key) == getattr(full, key), key
+    assert early.features["contrast"] == full.features["contrast"]
+    assert early.features["music_end"] == full.features["music_end"]
+    assert full.mode == "split"
+
+
+def test_a_class_that_starts_with_a_short_run_is_decided_when_that_run_ends():
+    # as in the Simhachalam sample: 36 s of speech, a pause, then the long class
+    speech = [0.01] * 460 + [0.6] * 36 + [0.0] * 25 + [0.6] * 3000
+    snd = Sound([-10.0] * 456 + [-40.0] * (len(speech) - 456), [0.1] * len(speech))
+    n = first_confirmed(speech)
+    assert n < 800  # 36 s + 144 s of the long run make the 3 minutes of speech
+    full = detect(speech, len(speech), [], None, snd)
+    early = detect(speech[:n], n, [], None, Sound(snd.level[:n], snd.high[:n]))
+    for key in ("mode", "sure", "split_at", "class_start", "score"):
+        assert getattr(early, key) == getattr(full, key), key
+    assert early.features["contrast"] == full.features["contrast"]
+
+
+def test_the_class_is_confirmed_only_when_it_has_lasted():
+    speech = profile(450, 600)
+    assert not class_confirmed(speech[: 450 + 60])  # a minute of speech
+    assert not class_confirmed(speech[: 450 + 300])  # five minutes: the window is not covered
+    assert class_confirmed(speech[: 450 + 340])
+    # a short run, a pause, then more speech: decided once the run has ended and the speech
+    # so far adds up to the 3 minutes of a class
+    broken = profile(450, 36) + [0.0] * 25 + [0.6] * 400
+    assert not class_confirmed(broken[: 450 + 36 + 25 + 60])
+    assert class_confirmed(broken[: 450 + 36 + 25 + 160])
+    # a short announcement and then music again is a spoken ending, not a class
+    assert not class_confirmed(profile(450, 36) + [0.01] * 300)
+    assert not class_confirmed(profile(450, 0))  # music only
+    assert not class_confirmed(profile(40, 600))  # a lead-in too short to be a kirtan
+
+
+def test_the_lead_in_silence_never_makes_it_stop_too_early():
+    # 70 s of silence at the start, 30 s of music, then speech: too little music (the stop check
+    # counts from 60 s, as the real lead-in can be that long)
+    assert not class_confirmed([0.0] * 70 + [0.01] * 30 + [0.6] * 600)
+    assert class_confirmed([0.0] * 70 + [0.01] * 100 + [0.6] * 600)
+
+
+def test_a_stopped_analysis_that_is_not_sure_is_repeated_in_full(prepared, analysis, monkeypatch):
+    calls = []
+    full = Analysis(profile(450, 300), sound(446, 304), [], complete=True)
+    partial = Analysis(profile(450, 100, speech_value=0.15), sound(446, 104), [], complete=False)
+
+    def fake(audio, duration, settings, early_stop=None):
+        calls.append(early_stop)
+        return full if early_stop is False else partial
+
+    monkeypatch.setattr(splitter, "run_analysis", fake)
+    rid, copy = prepared(profile(450, 300))
+    with session_scope() as sess:
+        decision, _ = splitter.analyse(sess.get(m.MediaFile, rid), copy)
+    assert calls == [None, False] and decision.sure
+
+
+def test_a_stopped_analysis_that_is_sure_is_kept(prepared, analysis, monkeypatch):
+    calls = []
+    partial = Analysis(profile(450, 340), sound(446, 344), [], complete=False)
+
+    def fake(audio, duration, settings, early_stop=None):
+        calls.append(early_stop)
+        return partial
+
+    monkeypatch.setattr(splitter, "run_analysis", fake)
+    rid, copy = prepared(profile(450, 340))
+    with session_scope() as sess:
+        decision, _ = splitter.analyse(sess.get(m.MediaFile, rid), copy)
+    assert calls == [None] and decision.sure and decision.features["analysed_seconds"] == 790
+
+
 # ------------------------------------------------------------------- ffmpeg
 def test_find_silences(tmp_path):
     if shutil.which("ffmpeg") is None:
@@ -291,7 +452,17 @@ def test_extract_audio_from_video(tmp_path):
 
 # ----------------------------------------------------------- the whole job
 @pytest.fixture
-def prepared(settings, monkeypatch, reference, no_baserow):
+def analysis(monkeypatch):
+    """What the audio analysis finds, scripted: the job tests do not decode real audio."""
+    found = Analysis([], Sound([], []), [])
+    monkeypatch.setattr(
+        splitter, "run_analysis", lambda audio, duration, settings, early_stop=None: found
+    )
+    return found
+
+
+@pytest.fixture
+def prepared(settings, monkeypatch, reference, no_baserow, analysis):
     monkeypatch.setenv("SPOT_CHECK_RATE", "0")
     get_settings.cache_clear()
     settings = get_settings()
@@ -307,13 +478,11 @@ def prepared(settings, monkeypatch, reference, no_baserow):
         folder.mkdir(parents=True)
         copy = folder / name
         shutil.copy2(original, copy)
-        monkeypatch.setattr(splitter, "speech_profile", lambda audio: scripted)
+        analysis.speech = scripted
         first = next((i for i, v in enumerate(scripted) if v >= 0.1), len(scripted))
         stop = max(0, first - 4)  # the music stops 4 s before the first speech
         loud = len(scripted) if steady else stop  # steady: the music never stops
-        monkeypatch.setattr(
-            splitter, "sound_profile", lambda audio: sound(loud, len(scripted) - loud)
-        )
+        analysis.sound = sound(loud, len(scripted) - loud)
         with session_scope() as s:
             record = register_original(s, original)
             record.processed_path, record.current_name = str(copy), name
@@ -347,9 +516,9 @@ SURE = profile(190, CLASS_S)
 
 
 @pytest.fixture
-def sure_silence(monkeypatch):
+def sure_silence(analysis):
     """Put a silence at the boundary, as a recording would have."""
-    monkeypatch.setattr(splitter, "find_silences", lambda audio, duration=None: [(189.0, 192.0)])
+    analysis.silences = [(189.0, 192.0)]
 
 
 def test_confident_split_writes_both_files(prepared, sure_silence):
@@ -563,16 +732,18 @@ def test_golden_samples(settings):
         if not audio.exists():
             continue
         duration = probe(audio).duration
-        d = detect(
-            speech_profile(audio),
-            duration,
-            find_silences(audio, duration),
-            None,
-            sound_profile(audio),
-        )
+        found = analyse_audio(audio, duration)
+        d = detect(found.speech, duration, found.silences, None, found.sound)
         assert d.mode == "split", f"{audio.name}: {d.reasons} {d.features.get('timeline')}"
         # the music fades out over several seconds on two samples: 2.5 s, not 1.5 s (SPEC.md)
         assert abs(d.split_at - case["kirtan_end"]) <= 2.5, audio.name
         checked += 1
     if not checked:
         pytest.skip("no trimming-samples on this machine")
+
+
+def test_a_spoken_ending_is_not_confirmed_as_a_class():
+    ending = [0.01] * 4000 + [0.6] * 40 + [0.01] * 600  # 40 s of closing words after the kirtan
+    assert not any(class_confirmed(ending[:n]) for n in range(1, len(ending) + 1, 20))
+    # and a class that is 3 minutes of speech with pauses is a class
+    assert class_confirmed([0.01] * 600 + ([0.6] * 100 + [0.0] * 30) * 5)

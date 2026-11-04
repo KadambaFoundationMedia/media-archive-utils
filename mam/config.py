@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -50,7 +51,12 @@ class Settings(BaseSettings):
 
     # Worker pools
     workers_ml: int = 1
-    workers_cpu: int = 2
+    # ffmpeg and audio analysis (the Kirtan splitter): one per core, keeping two cores free
+    workers_cpu: int = Field(default_factory=lambda: max(2, min(8, (os.cpu_count() or 4) - 2)))
+    # run the Kirtan splitter's analysis in separate processes (threads stop scaling at about 3)
+    analysis_in_processes: bool = True
+    # stop analysing a recording once the class is found (the cut cannot change after that)
+    analysis_early_stop: bool = True
     workers_io: int = 4
 
     @field_validator("nas_root", mode="before")

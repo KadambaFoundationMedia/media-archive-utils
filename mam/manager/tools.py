@@ -88,7 +88,7 @@ TOOLS: dict[str, ToolSpec] = {
     "kirtan-splitter": ToolSpec(
         "kirtan-splitter",
         "Kirtan splitter",
-        "ml",
+        "cpu",
         _kirtan_splitter,
         "Find where the kirtan ends and split a combined recording into kirtan and class",
     ),

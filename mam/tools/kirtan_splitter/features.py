@@ -16,6 +16,7 @@ the kirtan), so `sound_profile` adds the level and the share of high frequencies
 from __future__ import annotations
 
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -24,6 +25,13 @@ import numpy as np
 
 from mam.errors import MamError
 from mam.helpers.audio_optimizer.ffmpeg import binary
+from mam.tools.kirtan_splitter.audio import parse_silences, silence_filter
+from mam.tools.kirtan_splitter.detect import (
+    CLASS_CONFIRM_S,
+    MAX_LEAD_S,
+    MIN_KIRTAN_S,
+    class_confirmed,
+)
 
 MODEL = Path(__file__).parent / "models" / "silero_vad.onnx"
 SAMPLE_RATE = 16000
@@ -105,6 +113,9 @@ HIGH_BAND_HZ = 2000  # cymbals, kartals and drums live above this; a speaking vo
 SILENCE_DB = -120.0
 
 
+EARLIEST_CHECK_S = int(MAX_LEAD_S + MIN_KIRTAN_S + CLASS_CONFIRM_S)  # no class is found sooner
+
+
 @dataclass
 class Sound:
     """Per second: loudness in dBFS (RMS) and the share of the energy above HIGH_BAND_HZ."""
@@ -153,3 +164,73 @@ def sound_profile(path: Path) -> Sound:
     if proc.wait() != 0:
         raise MamError(f"ffmpeg could not decode {path.name}: {err[-500:]}")
     return Sound(level, high)
+
+
+@dataclass
+class Analysis:
+    """Everything the splitter needs from one pass over the audio."""
+
+    speech: list[float | None]
+    sound: Sound
+    silences: list[tuple[float, float]]
+    complete: bool = True  # False: stopped early, once the class was found (see `early_stop`)
+
+
+def analyse_audio(path: Path, duration: float | None = None, early_stop: bool = False) -> Analysis:
+    """Speech profile, loudness/treble profile and silences from ONE ffmpeg decode.
+
+    With `early_stop` the decode ends as soon as the class is found (`detect.class_confirmed`):
+    the cut and the decision depend on nothing after the first CONTRAST_WINDOW_S seconds of the
+    class. The profiles then cover the start of the recording only (`complete` is False).
+
+    Gives exactly what `speech_profile`, `sound_profile` and `find_silences` give separately
+    (the same decode settings and filters), but reads and decodes the file once instead of
+    three times.
+    """
+    cmd = [binary("ffmpeg"), "-hide_banner", "-nostats", "-i", str(path)]
+    # output 1: silences, on the stream as it is; output 2: mono 16 kHz samples for the models
+    cmd += ["-map", "0:a:0", "-af", silence_filter(), "-f", "null", "-"]
+    cmd += ["-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
+    model = _Model()
+    probs: list[float] = []
+    level: list[float] = []
+    high: list[float] = []
+    vad_step = CHUNK * 4  # the model takes 512 samples at a time, without gaps between blocks
+    sec_step = SAMPLE_RATE * 4  # the level and treble are measured per whole second
+    stopped = False
+    with tempfile.TemporaryFile() as log:  # silencedetect writes its report to stderr
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log)
+        assert proc.stdout is not None
+        vad_pending = sec_pending = b""
+        while raw := proc.stdout.read(vad_step * 2000):  # about a minute at a time
+            vad_pending += raw
+            sec_pending += raw
+            usable = len(vad_pending) - len(vad_pending) % vad_step
+            samples = np.frombuffer(vad_pending[:usable], dtype=np.float32)
+            probs.extend(model(samples[i : i + CHUNK]) for i in range(0, len(samples), CHUNK))
+            vad_pending = vad_pending[usable:]
+            usable = len(sec_pending) - len(sec_pending) % sec_step
+            part = sound_from_samples(np.frombuffer(sec_pending[:usable], dtype=np.float32))
+            level.extend(part.level)
+            high.extend(part.high)
+            sec_pending = sec_pending[usable:]
+            if (
+                early_stop
+                and len(level) >= EARLIEST_CHECK_S
+                and class_confirmed(probabilities_to_profile(probs))
+            ):
+                stopped = True
+                proc.kill()
+                break
+        code = proc.wait()
+        proc.stdout.close()
+        log.seek(0)
+        text = log.read().decode(errors="replace")
+    if code != 0 and not stopped:
+        raise MamError(f"ffmpeg could not decode {path.name}: {text[-500:]}")
+    profile = probabilities_to_profile(probs)
+    # a silence still open when the decode stopped ends where the analysis ends
+    end = float(len(profile)) if stopped else duration
+    return Analysis(
+        profile, Sound(level, high), parse_silences(text, end, path), complete=not stopped
+    )
