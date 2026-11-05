@@ -81,6 +81,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - In a batch, a flagged file pauses on its own while the other files continue. After approval it resumes automatically at the next step.
 - Kirtan-only outputs are `Skipped` for steps 3 to 5.
 - **Video:** the pipeline is audio-only. Video files are renamed and copied but never edited.
+  - **After the Kirtan splitter (decided 2026-11-05):** the audio rows (the class, and the kirtan when there is one) continue through the pipeline as audio. The video row is finished after the split and its video file stays untouched. What the later tools find for the class audio (verse, title, themes, language) is also written to the video's own Baserow row, under the same rules as any other write (empty fields only; a person's values are never overwritten), so the video gets the same name details as its class audio. The video's filename follows the Renamer's rules with that evidence.
 - **Cutting:** splits and trims use stream copy in the original codec (no re-encode), because most sources are already lossy. Gain changes need a re-encode, written at the source codec, bitrate, sample rate and channel count.
 - **Loudness method:** loudness is measured with ffmpeg `ebur128`. When the peaks allow it, the gain is a pure linear change. When they don't, the gain is followed by a peak limiter running at 4× the sample rate (so inter-sample peaks are caught), with one corrective pass if limiting cost loudness. This was chosen over a two-pass `loudnorm` because it is about 7× faster with the same result. Files that needed the limiter are marked `dynamic` so they can be flagged.
 
@@ -272,6 +273,6 @@ The kirtan-splitter examples (`oslo-noi`, a kept `-2` index, `ZOOM0004` as a WHA
 - **Refreshed:** it is rebuilt when new approved recordings add coverage, such as other years or other microphones.
 
 ## 11. Open decisions
-- **Video in the pipeline after the kirtan-splitter:** the splitter extracts the audio of a video and splits it into two audio rows (kirtan, class) under the video. How the class-discoverer, content-discoverer and class-trimmer continue for the class audio (and how the video row ends) is not decided; decide it before building the class-discoverer.
+- **Video in the pipeline after the kirtan-splitter:** decided 2026-11-05, see section 4 (Video). Not built yet: it is built with the class-discoverer.
 - **Common phrases for the splitter:** ignored until a transcript exists when the splitter runs (decided 2026-11-01).
 - **Calibration:** the `calibration` table and the 0.9 start threshold are not used by the Kirtan-splitter (it cuts when it is sure, see its Automation); they stay for the other tools. `mam calibrate` and the automatic recalculation every 25 outcomes are not built yet. Review outcomes are already stored as labeled examples.
