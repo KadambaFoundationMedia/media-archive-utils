@@ -25,8 +25,10 @@
     {% endif %}
   </ul>
 </div>
-{% if review_tool == 'kirtan-splitter' %}{% include "_splitter_form.html" %}{% endif %}
 {% endif %}
+
+{# The waveform is always above the form; with a Kirtan splitter review it also holds the cut. #}
+{% include "_player.html" %}
 
 {% set running = jobs | selectattr('state', 'in', ['queued', 'running']) | list %}
 {% if running %}{% with f_id=f.id %}{% include "_file_activity.html" %}{% endwith %}
@@ -37,7 +39,6 @@
     {{ (last.finished_at | localtime('%H:%M:%S')) if last.finished_at else '' }} —
     {% if last.result %}{{ last.result.summary }}{% elif last.error %}{{ last.error.split('\n')[0] }}{% endif %}
   </div>
-
 </div>
 {% endif %}
 
@@ -56,17 +57,22 @@
 </form>
 {% endif %}
 {% if request.query_params.get('error') %}<div class="alert alert-danger">{{ request.query_params.get('error') }}</div>{% endif %}
-{% include "_edit_form.html" %}
-{% if mode == 'review' and p.new_place %}
-<div class="card mb-3">
-  <div class="card-header">New place</div>
-  <div class="card-body small">
-    <strong>{{ p.new_place.place }}</strong>{% if p.new_place.country %} ({{ p.new_place.country }}){% endif %} is not a place in Baserow yet.
-    Add it as a <code>place_location</code> option in the Baserow media table, choose it under Place and save:
-    saving also adds it with its country to the <code>place_country</code> table.
+
+{# The form: set apart from everything else on the page #}
+<section class="form-section my-4">
+  {% include "_edit_form.html" %}
+  {% if mode == 'review' and p.new_place %}
+  <div class="card mb-3">
+    <div class="card-header">New place</div>
+    <div class="card-body small">
+      <strong>{{ p.new_place.place }}</strong>{% if p.new_place.country %} ({{ p.new_place.country }}){% endif %} is not a place in Baserow yet.
+      Add it as a <code>place_location</code> option in the Baserow media table, choose it under Place and save:
+      saving also adds it with its country to the <code>place_country</code> table.
+    </div>
   </div>
-</div>
-{% endif %}
+  {% endif %}
+</section>
+
 <div class="row g-3">
   <div class="col-12 col-lg-6">
     <div class="card mb-3">
@@ -96,90 +102,79 @@
         </div>{% endif %}
       </div>
     </div>
-
-    {% if proposal %}
-    <div class="card mb-3">
-      <div class="card-header">Last Renamer proposal {% if proposal.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}</div>
-      <div class="card-body small">
-        <div class="font-monospace mb-2 text-break">{{ proposal.new_name }}</div>
-        {% if proposal.flags %}
-        <ul class="mb-2 text-warning-emphasis">{% for fl in proposal.flags %}<li>{{ fl }}</li>{% endfor %}</ul>
-        {% if proposal.dry_run %}
-        <div class="alert alert-info small py-2 mb-2">
-          This was a dry run, so nothing was copied and no review was opened.
-          Run the Renamer without dry run to copy the file and open the review for these points.
-          <form method="post" action="/actions" class="mt-2">
-            <input type="hidden" name="ids" value="{{ f.id }}">
-            <input type="hidden" name="tool" value="renamer">
-            <input type="hidden" name="back" value="/details/{{ f.id }}">
-            <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run the Renamer</button>
-          </form>
-        </div>
-        {% endif %}
-        {% endif %}
-        {% if proposal.notes %}
-        <ul class="mb-0 text-body-secondary">{% for n in proposal.notes %}<li>{{ n }}</li>{% endfor %}</ul>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
-
-    <div class="card mb-3">
-      <div class="card-header">Listen</div>
-      <div class="card-body">
-        {% if f.kind == 'audio' %}
-        <audio controls preload="none" class="w-100" src="/files/{{ f.id }}/audio"></audio>
-        <div class="small text-body-secondary mt-1">Browsers cannot play WMA files.</div>
-        {% else %}
-        <video controls preload="none" class="w-100" src="/files/{{ f.id }}/audio"></video>
-        {% endif %}
-      </div>
-    </div>
-
   </div>
 
   <div class="col-12 col-lg-6">
     {% if evidence %}{% include "_evidence.html" %}{% endif %}
-
-    {% if children %}
-    <div class="card mb-3"><div class="card-header">Derived files</div>
-      <ul class="list-group list-group-flush small">{% for c in children %}
-        <li class="list-group-item text-break">{{ c.derivation }}: {{ c.current_name }}</li>{% endfor %}</ul>
-    </div>{% endif %}
-
-    <div class="card mb-3"><div class="card-header">Jobs</div>
-      <ul class="list-group list-group-flush small">{% for j in jobs %}
-        <li class="list-group-item">
-          <strong>{{ tools[j.tool].label if j.tool in tools else j.tool }}</strong>
-          {% if j.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}
-          <span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'info' }}">{{ j.state }}</span>
-          <span class="text-body-secondary">{{ (j.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
-          {% if j.result %}<div>{{ j.result.summary }}</div>{% endif %}
-          {% if j.error %}<pre class="small text-danger mb-0 text-wrap">{{ j.error.split('\n')[0] }}</pre>{% endif %}
-        </li>{% else %}<li class="list-group-item text-body-secondary">No jobs yet</li>{% endfor %}</ul>
-    </div>
-
-    <div class="card mb-3"><div class="card-header">History</div>
-      <ul class="list-group list-group-flush small">
-        {% for e in events %}
-        <li class="list-group-item text-break">
-          <span class="text-body-secondary">{{ (e.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
-          {{ e.tool }}: {{ e.action }}{% if e.dry_run %} (dry run){% endif %}
-          {% if e.dst %}→ {{ e.dst }}{% endif %}
-        </li>{% endfor %}
-        {% for h in history %}
-        <li class="list-group-item">
-          <span class="text-body-secondary">{{ (h.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
-          {{ h.old_status }} → {{ h.new_status }}{% if h.note %} <span class="text-body-secondary">({{ h.note }})</span>{% endif %}
-        </li>{% endfor %}
-        {% for w in baserow_writes %}
-        <li class="list-group-item text-break">
-          <span class="text-body-secondary">{{ (w.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
-          Baserow {{ w.action }}{% if w.dry_run %} (dry run){% endif %}{% if w.row_id %} row {{ w.row_id }}{% endif %}:
-          <span class="font-monospace">{{ w.payload | tojson }}</span>
-        </li>{% endfor %}
-      </ul>
-    </div>
   </div>
 </div>
+
+{# Everything that is only looked at now and then #}
+<details class="card mb-3 more-details" id="more-details">
+  <summary class="card-header">More: Renamer proposal, derived files, jobs and history</summary>
+  <div class="card-body">
+    {% if proposal %}
+    <h3 class="h6">Last Renamer proposal {% if proposal.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}</h3>
+    <div class="small mb-4">
+      <div class="font-monospace mb-2 text-break">{{ proposal.new_name }}</div>
+      {% if proposal.flags %}
+      <ul class="mb-2 text-warning-emphasis">{% for fl in proposal.flags %}<li>{{ fl }}</li>{% endfor %}</ul>
+      {% if proposal.dry_run %}
+      <div class="alert alert-info small py-2 mb-2">
+        This was a dry run, so nothing was copied and no review was opened.
+        Run the Renamer without dry run to copy the file and open the review for these points.
+        <form method="post" action="/actions" class="mt-2">
+          <input type="hidden" name="ids" value="{{ f.id }}">
+          <input type="hidden" name="tool" value="renamer">
+          <input type="hidden" name="back" value="/details/{{ f.id }}">
+          <button class="btn btn-sm btn-primary" type="submit"><i class="fa-solid fa-play me-1"></i>Run the Renamer</button>
+        </form>
+      </div>
+      {% endif %}
+      {% endif %}
+      {% if proposal.notes %}
+      <ul class="mb-0 text-body-secondary">{% for n in proposal.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if children %}
+    <h3 class="h6">Derived files</h3>
+    <ul class="list-group list-group-flush small mb-4">{% for c in children %}
+      <li class="list-group-item text-break px-0">{{ c.derivation }}: {{ c.current_name }}</li>{% endfor %}</ul>
+    {% endif %}
+
+    <h3 class="h6">Jobs</h3>
+    <ul class="list-group list-group-flush small mb-4">{% for j in jobs %}
+      <li class="list-group-item px-0">
+        <strong>{{ tools[j.tool].label if j.tool in tools else j.tool }}</strong>
+        {% if j.dry_run %}<span class="badge text-bg-light border">dry run</span>{% endif %}
+        <span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'info' }}">{{ j.state }}</span>
+        <span class="text-body-secondary">{{ (j.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
+        {% if j.result %}<div>{{ j.result.summary }}</div>{% endif %}
+        {% if j.error %}<pre class="small text-danger mb-0 text-wrap">{{ j.error.split('\n')[0] }}</pre>{% endif %}
+      </li>{% else %}<li class="list-group-item text-body-secondary px-0">No jobs yet</li>{% endfor %}</ul>
+
+    <h3 class="h6">History</h3>
+    <ul class="list-group list-group-flush small mb-0">
+      {% for e in events %}
+      <li class="list-group-item text-break px-0">
+        <span class="text-body-secondary">{{ (e.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
+        {{ e.tool }}: {{ e.action }}{% if e.dry_run %} (dry run){% endif %}
+        {% if e.dst %}→ {{ e.dst }}{% endif %}
+      </li>{% endfor %}
+      {% for h in history %}
+      <li class="list-group-item px-0">
+        <span class="text-body-secondary">{{ (h.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
+        {{ h.old_status }} → {{ h.new_status }}{% if h.note %} <span class="text-body-secondary">({{ h.note }})</span>{% endif %}
+      </li>{% endfor %}
+      {% for w in baserow_writes %}
+      <li class="list-group-item text-break px-0">
+        <span class="text-body-secondary">{{ (w.created_at | localtime('%Y-%m-%d %H:%M')) }}</span>
+        Baserow {{ w.action }}{% if w.dry_run %} (dry run){% endif %}{% if w.row_id %} row {{ w.row_id }}{% endif %}:
+        <span class="font-monospace">{{ w.payload | tojson }}</span>
+      </li>{% endfor %}
+    </ul>
+  </div>
+</details>
 {% endblock %}

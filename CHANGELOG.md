@@ -22,6 +22,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Common phrases are ignored for now (they need a transcript).
 
 ### Media manager
+- Details page tidied up: the waveform is always shown above the form (it replaces the old "Listen" player and is the same player as the Kirtan splitter's, which adds the cut when a review is open); the form is set apart in its own highlighted block; input fields now stand out from their card in dark mode; the Renamer proposal, derived files, jobs and history are in one collapsed section under the page. The splitter evidence shows its times as `hh:mm:ss.mmm`.
 - Approving a review in a pipeline run now says that the pipeline goes on ("The pipeline continues by itself: Kirtan splitter is queued for this file"), with the spinner until the job has finished.
 - The file page and the Renamer review page are one page, `/details/<id>`: a file with a pending review shows the reasons and Approve / Reject / Exclude, other files show Save (so a finished file can still be corrected and updated in Baserow). Old `/files/<id>` and `/review/<id>` links redirect. The Kirtan splitter review is on that page too; saving the name there no longer closes it.
 - New "Do not create row" choice under "Baserow media row": saves or approves without writing to Baserow. Preselected while "Baserow writes" is off.

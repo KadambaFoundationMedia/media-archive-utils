@@ -110,6 +110,15 @@ templates.env.globals.update(
     source_labels=SOURCE_LABELS,
     field_labels=FIELD_LABELS,
 )
+
+
+def _hms(seconds):
+    from mam.tools.kirtan_splitter.detect import format_time
+
+    return format_time(seconds) if isinstance(seconds, int | float) else seconds
+
+
+templates.env.filters["hms"] = _hms
 templates.env.filters["basename"] = lambda p: Path(p).name if p else ""
 templates.env.filters["dirname"] = lambda p: str(Path(p).parent) if p else ""
 

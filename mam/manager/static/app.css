@@ -48,3 +48,28 @@
   color: #fff; font-size: .75rem; font-weight: 600; pointer-events: none; white-space: nowrap;
 }
 [x-cloak] { display: none !important; }
+
+/* Input fields stand out from the card they sit on (in dark mode they used to be the same
+   colour as the card). */
+:root { --field-bg: #fff; --field-border: #adb5bd; --field-focus-bg: #fff; }
+[data-bs-theme="dark"] { --field-bg: #3b434b; --field-border: #8b949e; --field-focus-bg: #454d56; }
+.form-control, .form-select {
+  background-color: var(--field-bg);
+  border-color: var(--field-border);
+}
+.form-control:focus, .form-select:focus { background-color: var(--field-focus-bg); }
+.form-control::placeholder { opacity: .55; }
+
+/* Details page: the form is set apart from the rest of the page. */
+.form-section #edit-form {
+  border: 2px solid var(--bs-primary-border-subtle);
+  box-shadow: 0 .35rem 1rem rgba(0, 0, 0, .12);
+}
+.form-section #edit-form > .card-header {
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
+  font-weight: 600;
+}
+.form-section #edit-form > .card-footer { background: var(--bs-secondary-bg); }
+.more-details > summary { cursor: pointer; }
+.more-details[open] > summary { border-bottom: 1px solid var(--bs-border-color); }
