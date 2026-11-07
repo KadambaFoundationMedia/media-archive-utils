@@ -64,6 +64,7 @@
       now: 0,
       zoomLevel: 4,
       mantra: cfg.mantra,
+      review: !!cfg.review, // a Kirtan splitter review: the cut can be set; else the player only plays
       _ws: null,
       _regions: null,
       _kirtan: null,
