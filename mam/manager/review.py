@@ -56,6 +56,7 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
         }
         result_msg = messages.get(action, "")
         file_id = None
+        resumed = None  # the next tool of the pipeline, queued by this approval
         try:
             with session_scope() as session:
                 review = session.get(m.Review, review_id)
@@ -82,7 +83,7 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                             m.Job.pipeline.is_(True),
                         )
                     ):
-                        resume_after_review(session, record, review.tool)
+                        resumed = resume_after_review(session, record, review.tool)
                 elif review.tool == "kirtan-splitter" and action == "reject":
                     from datetime import UTC, datetime
 
@@ -121,7 +122,7 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                             m.Job.pipeline.is_(True),
                         )
                     ):
-                        resume_after_review(session, record, review.tool)
+                        resumed = resume_after_review(session, record, review.tool)
                 elif action == "reject":
                     renamer.reject_review(session, review, operator, note)
                 elif action == "exclude":
@@ -133,4 +134,12 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
             return RedirectResponse(f"{back}?error={exc}", status_code=303)
         notify(request)
         target = form.get("next") or "/reviews"
-        return RedirectResponse(f"{target}?msg={result_msg}", status_code=303)
+        sep = "&" if "?" in target else "?"
+        if resumed:
+            # the pipeline goes on by itself: say so, and show the progress in the flash message
+            result_msg += (
+                f". The pipeline continues by itself: {resumed} is queued for this file "
+                "(see the Jobs page)"
+            )
+            return RedirectResponse(f"{target}{sep}msg={result_msg}&live=1", status_code=303)
+        return RedirectResponse(f"{target}{sep}msg={result_msg}", status_code=303)
