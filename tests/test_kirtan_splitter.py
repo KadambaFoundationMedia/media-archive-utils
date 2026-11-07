@@ -59,7 +59,8 @@ def test_time_round_trip():
     assert splitter.parse_time("28:13.048") == pytest.approx(1693.048)
     assert splitter.parse_time("1:02:03") == 3723
     assert splitter.parse_time("90.5") == 90.5
-    assert splitter.format_time(1693.048) == "28:13.048"
+    assert splitter.format_time(1693.048) == "00:28:13.048"
+    assert splitter.format_time(3723.5) == "01:02:03.500"
     with pytest.raises(Exception, match="not a time"):
         splitter.parse_time("soon")
 
@@ -159,8 +160,13 @@ def test_bhajans_with_talks_are_a_kirtan_recording_to_check():
     # Stockholm 2015-03-08 Bhajans: music 740 s, talk 440 s, music, a second talk, music to the end
     p = profile(740, 440) + profile(470, 430) + profile(1100, 0)
     d = detect(p, len(p))
-    assert d.mode == "kirtan_only" and not d.sure
+    assert d.mode == "kirtan_only" and d.sure  # 30 minutes of music after the talk
     assert "kirtan programme with talks" in d.reasons[0]
+    assert "00:12:20.000" in d.reasons[0] and "s of music" not in d.reasons[0]
+    # a shorter return of the music is only proposed
+    short = profile(1200, 440) + profile(400, 0)
+    e = detect(short, len(short))
+    assert e.mode == "kirtan_only" and not e.sure and "Please check" in e.reasons[0]
     # but a kirtan, a class and a short closing kirtan is still split
     q = profile(600, CLASS_S) + profile(120, 0)
     assert detect(q, len(q), [], None, sound(596, 4)).mode == "split"
@@ -642,7 +648,7 @@ def test_approving_a_review_with_an_edited_cut(prepared):
             operator="tester",
             note=None,
         )
-        assert "3:30.500" in msg
+        assert "00:03:30.500" in msg
         assert review.outcome == "edited" and review.final["split_at"] == 210.5
         record = s.get(m.MediaFile, rid)
         assert record.status == "Kirtan splitter Done"
@@ -666,6 +672,18 @@ def test_music_throughout_is_skipped(prepared):
     outcome = run(rid)
     assert outcome.state == "skipped"
     assert copy.exists()
+
+
+def test_a_random_check_says_that_nothing_is_wrong(prepared, monkeypatch):
+    monkeypatch.setenv("SPOT_CHECK_RATE", "1")
+    get_settings.cache_clear()
+    rid, _copy = prepared([0.01] * 290)
+    outcome = run(rid)
+    assert outcome.state == "review"
+    with session_scope() as s:
+        review = s.scalars(select(m.Review).where(m.Review.media_file_id == rid)).one()
+        assert review.reason.startswith("Random check, nothing is wrong")
+        assert "100%" in review.reason and "No sustained speech" in review.reason
 
 
 def test_real_run_needs_the_renamed_copy(prepared):
@@ -738,7 +756,7 @@ def test_review_page_and_approval_through_the_portal(prepared):
     with TestClient(create_app(start_queue=False)) as client:
         page = client.get(f"/details/{rid}")
         assert page.status_code == 200
-        assert "Approve and split" in page.text and "3:10.000" in page.text
+        assert "Approve and split" in page.text and "00:03:10.000" in page.text
         old = client.get(f"/review/{review_id}", follow_redirects=False)
         assert old.headers["location"] == f"/details/{rid}"
         assert client.get("/reviews").status_code == 200

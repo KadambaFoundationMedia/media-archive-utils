@@ -10,11 +10,13 @@
   const AUDITION_S = 3;
 
   function formatTime(t) {
-    // minutes:seconds.milliseconds, the same as the server's format_time
+    // hh:mm:ss.mmm, the same as the server's format_time
     const ms = Math.round(t * 1000);
-    const m = Math.floor(ms / 60000);
+    const h = Math.floor(ms / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
     const s = (ms % 60000) / 1000;
-    return m + ":" + (s < 10 ? "0" : "") + s.toFixed(3);
+    const two = (n) => (n < 10 ? "0" : "") + n;
+    return two(h) + ":" + two(m) + ":" + (s < 10 ? "0" : "") + s.toFixed(3);
   }
 
   function parseTime(text) {
@@ -88,6 +90,20 @@
         const style = getComputedStyle(document.documentElement);
         const dark = document.documentElement.getAttribute("data-bs-theme") === "dark";
         const regions = WaveSurfer.Regions.create();
+        // the time under the mouse, so a place in the waveform can be read off before clicking it
+        const plugins = [regions];
+        if (WaveSurfer.Hover) {
+          plugins.push(
+            WaveSurfer.Hover.create({
+              lineColor: "#0d6efd",
+              lineWidth: 1,
+              labelBackground: dark ? "#212529" : "#ffffff",
+              labelColor: dark ? "#f8f9fa" : "#212529",
+              labelSize: "12px",
+              formatTimeCallback: formatTime,
+            })
+          );
+        }
         const ws = WaveSurfer.create({
           container: this.$refs.wave,
           url: "/files/" + cfg.fileId + "/waveform/audio",
@@ -103,7 +119,7 @@
           autoScroll: true,
           autoCenter: false,
           dragToSeek: false,
-          plugins: [regions],
+          plugins,
         });
         this._ws = ws;
         this._regions = regions;
