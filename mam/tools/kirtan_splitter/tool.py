@@ -25,7 +25,7 @@ from mam.helpers.local_db.repo import record_event, register_derived, set_status
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter.audio import extract_audio
-from mam.tools.kirtan_splitter.detect import Decision, detect
+from mam.tools.kirtan_splitter.detect import Decision, detect, format_time
 from mam.tools.kirtan_splitter.features import Analysis, analyse_audio
 
 log = logging.getLogger(__name__)
@@ -40,15 +40,6 @@ MANTRA_CHOICES = [
 
 
 # ------------------------------------------------------------------ timestamps
-def format_time(seconds: float) -> str:
-    """28:13.048 (or 1:02:03.000)"""
-    ms = round(seconds * 1000)
-    h, rest = divmod(ms, 3_600_000)
-    mnt, rest = divmod(rest, 60_000)
-    sec = rest / 1000
-    return f"{h}:{mnt:02d}:{sec:06.3f}" if h else f"{mnt}:{sec:06.3f}"
-
-
 def parse_time(text: str) -> float:
     """'28:13.048', '1:02:03' or '1693.05' (seconds) to seconds."""
     text = text.strip().replace(",", ".")
@@ -152,7 +143,12 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
     if not decision.sure or spot:
         reason = "\n".join(decision.reasons)
         if spot and decision.sure:
-            reason = "Spot check: " + reason
+            reason = (
+                "Random check, nothing is wrong: the splitter was sure, but "
+                f"{settings.spot_check_rate:.0%} of its sure decisions are shown to you anyway, "
+                "to see how often it is right. "
+                "Nothing has been changed. What it found: " + reason
+            )
         _open_review(ctx.session, record, data, reason, decision.score, spot)
         return ToolOutcome(
             "review", f"{summary} (score {decision.score:.2f}, needs a review)", data

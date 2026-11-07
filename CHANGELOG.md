@@ -15,6 +15,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Class recordings finish sooner: the analysis stops once the class has lasted 5.5 minutes after the kirtan, because nothing later can change the cut. The decision looks at the first 5 minutes of the class only. Recordings that are not clear-cut are still analysed in full.
 - Waveform editor on the review page: the kirtan and the class as two colored regions; drag the edge between them, nudge it by 0.1 or 1 s, cut at the playhead or type the time, and listen 3 s before, around or after the cut. A long recording opens after a one-time preparation (peaks and, for WMA and video, a small mp3 preview, kept in the work folder).
 - Fix: a class that opens with a sung mantra is no longer cut 40 to 55 minutes in. The kirtan before a class must be a stretch of at least 90 s that is mostly music (70%), not music seconds scattered through a long class. A short sung opening (up to 90 s) belongs to the class. A recording of bhajans that begins with an announcement, or has talks in between with music after them, is a kirtan recording. The review reasons now say what was found at the start.
+- Times are written as `hh:mm:ss.mmm` everywhere (review reasons, the cut field, the waveform header), never as plain seconds. The waveform shows the time under the mouse.
+- A random check (5% of the sure decisions, `SPOT_CHECK_RATE`) now says so in plain words: nothing is wrong, nothing was changed.
+- A recording of bhajans with talks in between and 10 minutes or more of music after the last talk is a kirtan recording, skipped without a review; with 5 to 10 minutes it is proposed and checked.
 - Video recordings: the audio is extracted as mp3 first.
 - Common phrases are ignored for now (they need a transcript).
 

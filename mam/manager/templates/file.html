@@ -14,7 +14,7 @@
 {% if review_tool %}
 <div class="card mb-3 border-warning">
   <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Needs review: {{ tools[review_tool].label if review_tool in tools else review_tool }}
-    {% if review_tool == 'kirtan-splitter' %}<span class="float-end small">score {{ '%.2f' % review.score if review.score is not none else '–' }}{% if review.spot_check %} · spot check{% endif %}</span>{% endif %}</div>
+    {% if review_tool == 'kirtan-splitter' %}<span class="float-end small">score {{ '%.2f' % review.score if review.score is not none else '–' }}{% if review.spot_check %} · random check{% endif %}</span>{% endif %}</div>
   <ul class="list-group list-group-flush small">
     {% if review_tool == 'kirtan-splitter' %}
     {% for line in review.reason.split('\n') %}<li class="list-group-item">{{ line }}</li>{% endfor %}

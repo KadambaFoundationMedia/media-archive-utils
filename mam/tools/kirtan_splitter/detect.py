@@ -22,7 +22,8 @@ CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this long to start a class
 MIN_CLASS_S = 180.0  # less speech than this after the music is a spoken ending, not a class
 SPEECH_AT = 0.10  # smoothed speech probability from which a second counts as speech
 SMOOTH_S = 9  # seconds averaged, so a clap or a shout does not flip the label
-RETURN_MUSIC_S = 300  # music this long after the class means bhajans with talks, not kirtan+class
+RETURN_MUSIC_S = 300  # music this long after the talk: bhajans with talks (review)
+RETURN_SURE_S = 600  # music this long after the talk: certainly bhajans with talks
 MUSIC_SHARE_MIN = 0.7  # a kirtan is at least this much music (blips of speech are allowed)
 # A sung opening mantra is part of the class (editing standard, point 1), not a kirtan: it is
 # short, and it often scores as speech on the voice model. The stretch before a class must
@@ -43,6 +44,14 @@ VOTE_S = 5  # each second is judged together with its neighbours (median of this
 # rest of a long recording cannot change it and the analysis may stop once the class is found.
 CONTRAST_WINDOW_S = 300
 CLASS_CONFIRM_S = CONTRAST_WINDOW_S + 30  # a class this long (with the smoothing margin) is enough
+
+
+def format_time(seconds: float) -> str:
+    """hh:mm:ss.mmm, the one way times are written for people (00:28:13.048)."""
+    ms = round(seconds * 1000)
+    h, rest = divmod(ms, 3_600_000)
+    mnt, rest = divmod(rest, 60_000)
+    return f"{h:02d}:{mnt:02d}:{rest / 1000:06.3f}"
 
 
 @dataclass
@@ -278,7 +287,10 @@ def detect(
         if music_before == 0:
             opening = "The recording starts with speech"
         else:
-            opening = f"The class starts at {run_start}s, after {music_before}s of music"
+            opening = (
+                f"The class starts at {format_time(run_start)}, after "
+                f"{format_time(music_before)} of music"
+            )
         if sure:
             why = (
                 f"A kirtan before a class is at least {int(MIN_KIRTAN_S)} seconds of mostly "
@@ -289,8 +301,9 @@ def detect(
         else:
             why = (
                 f"There is no stretch of {int(MIN_KIRTAN_S)} seconds or more of mostly music "
-                f"before it ({music_before}s of music, {round(lead_share * 100)}% of the first "
-                f"{run_start}s): please check whether this is a kirtan followed by a class."
+                f"before it ({format_time(music_before)} of music, "
+                f"{round(lead_share * 100)}% of the first {format_time(run_start)}): "
+                "please check whether this is a kirtan followed by a class."
             )
         return Decision(
             "class_only",
@@ -321,8 +334,9 @@ def detect(
                 mantra=mantra,
                 reasons=(
                     [
-                        f"Only {spoken_short} s of speech with the music: a spoken ending or "
-                        f"announcement, not a class (a class has at least {int(MIN_CLASS_S)} s)."
+                        f"Only {format_time(spoken_short)} of speech with the music: a spoken "
+                        "ending or announcement, not a class (a class has at least "
+                        f"{format_time(MIN_CLASS_S)})."
                     ]
                     if spoken_short is not None
                     else ["No sustained speech: the music continues through the recording."]
@@ -359,11 +373,15 @@ def detect(
 
     if stop is not None:
         score = 0.35
-        reasons = [f"The music stops at {last_music}s; the first speech is at {first_voice}s."]
+        reasons = [
+            f"The music stops at {format_time(last_music)}; the first speech is at "
+            f"{format_time(first_voice)}."
+        ]
     else:
         score = 0.20
         reasons = [
-            f"Speech from {first_voice}s; no clear end of the music was found before it, "
+            f"Speech from {format_time(first_voice)}; no clear end of the music was found "
+            "before it, "
             "so the cut is at the speech."
         ]
     score += 0.25 * max(0.0, min(1.0, margin / 0.3))
@@ -376,7 +394,10 @@ def detect(
         score += 0.10
     else:
         score -= 0.2
-        reasons.append(f"The kirtan is {kirtan_seconds / 60:.1f} minutes, which is unusual.")
+        reasons.append(
+            f"The kirtan is {format_time(kirtan_seconds)} long, which is unusual "
+            f"(usually {format_time(lo)} to {format_time(hi)})."
+        )
     if mantra:
         score += 0.05
         reasons.append(f"The mantra is {mantra} (from the class).")
@@ -400,10 +421,13 @@ def detect(
                 round(min(0.95, 0.5 + 0.45 * overall), 3),
                 kirtan_start=start,
                 mantra=mantra,
+                sure=music_after >= RETURN_SURE_S,
                 reasons=[
-                    f"{round(overall * 100)}% of the recording is music, and music returns for "
-                    f"{music_after}s after the talk at {first_voice}s: a kirtan programme with "
-                    "talks, not a kirtan followed by a class. Please check."
+                    f"{round(overall * 100)}% of the recording is music. The talk at "
+                    f"{format_time(first_voice)} is followed by {format_time(music_after)} of "
+                    "music again, so this is a kirtan programme with talks, not a kirtan "
+                    "followed by a class."
+                    + ("" if music_after >= RETURN_SURE_S else " Please check.")
                 ],
                 features={
                     **features,
