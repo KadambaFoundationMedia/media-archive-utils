@@ -157,3 +157,18 @@ document.body.addEventListener("htmx:oobAfterSwap", (event) => {
     document.querySelectorAll(".row-select").forEach((box) => { box.checked = true; });
   }
 });
+
+// Tooltips (help texts are tooltips, not text on the page). Bootstrap's bundle loads deferred.
+function initTooltips(root) {
+  if (!window.bootstrap) return;
+  (root || document).querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+    bootstrap.Tooltip.getOrCreateInstance(el, { container: "body", trigger: "hover focus" });
+  });
+}
+window.addEventListener("load", () => initTooltips());
+document.body.addEventListener("htmx:afterSwap", (event) => initTooltips(event.target));
+// A clicked button hides its tooltip, so it never stays over the page after an action.
+document.addEventListener("click", (event) => {
+  const el = event.target.closest?.('[data-bs-toggle="tooltip"]');
+  if (el && window.bootstrap) bootstrap.Tooltip.getInstance(el)?.hide();
+});

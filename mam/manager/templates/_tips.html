@@ -1,0 +1,4 @@
+{# A small (?) icon that shows `text` as a tooltip: help that does not take up room on the page. #}
+{% macro tip(text) -%}
+<i class="fa-regular fa-circle-question help-tip" tabindex="0" role="img" aria-label="{{ text }}" data-bs-toggle="tooltip" data-bs-title="{{ text }}"></i>
+{%- endmacro %}

@@ -38,7 +38,7 @@
       </div>
       <div x-ref="wave" x-show="status === 'ready'" class="cut-wave"></div>
       <div x-show="status === 'ready'" x-cloak class="d-flex flex-wrap align-items-center gap-2 mt-3">
-        <button type="button" class="btn btn-primary btn-sm" @click="toggle()" title="Space">
+        <button type="button" class="btn btn-primary btn-sm" @click="toggle()" data-bs-toggle="tooltip" data-bs-title="Play or pause (space bar)">
           <i class="fa-solid" :class="playing ? 'fa-pause' : 'fa-play'"></i>
         </button>
         {% if cut_review %}
@@ -57,7 +57,7 @@
             <button type="button" class="btn btn-outline-secondary" @click="nudge(1)">+1 s</button>
           </div>
         </template>
-        <button type="button" class="btn btn-outline-secondary btn-sm" @click="cutHere()">
+        <button type="button" class="btn btn-outline-secondary btn-sm" @click="cutHere()" data-bs-toggle="tooltip" data-bs-title="Move the cut to where the playhead is now">
           <i class="fa-solid fa-scissors me-1"></i>Cut at the playhead
         </button>
         {% endif %}

@@ -520,6 +520,11 @@ def test_preview_button_is_a_dry_run(client, archive, reference, no_baserow, set
         assert all(j.dry_run for j in s.scalars(select(m.Job).where(m.Job.tool == "renamer")))
 
 
+def ids_of_review(review_id):
+    with session_scope() as s:
+        return s.get(m.Review, review_id).media_file_id
+
+
 def test_approve_writes_baserow_live_even_in_dry_run_mode(
     client, archive, reference, settings, monkeypatch
 ):
@@ -546,10 +551,7 @@ def test_approve_writes_baserow_live_even_in_dry_run_mode(
         review_id = s.scalars(select(m.Review.id)).one()
         # the run itself did not write (the Baserow writes switch is off)
         assert not s.scalars(select(m.BaserowWriteLog)).all()
-    assert (
-        "Approving renames the copy in processed-files and writes the media row live"
-        in client.get(f"/review/{review_id}").text
-    )
+    assert "writes the media row live" in client.get(f"/details/{ids_of_review(review_id)}").text
     with respx.mock(base_url="https://baserow.test/api/database") as api:
         create = api.post("/rows/table/1/").mock(return_value=httpx.Response(200, json={"id": 999}))
         response = client.post(

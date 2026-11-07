@@ -1,4 +1,5 @@
 {# The filename and the media table fields share their values; see mam/tools/renamer/editing.py #}
+{% from "_tips.html" import tip %}
 <form id="edit-form" class="card mb-3" method="post"
       action="{% if mode == 'review' %}/review/{{ review_id }}/decide{% else %}/files/{{ f.id }}/edit{% endif %}"
       data-sync="/files/{{ f.id }}/edit/sync">
@@ -6,13 +7,11 @@
   {% if review_id %}<input type="hidden" name="review_id" value="{{ review_id }}">{% endif %}
   <input type="hidden" name="auto_title" value="{{ ev.auto_title }}">
   <div class="card-header d-flex align-items-center">
-    <span class="me-auto">{% if mode == 'review' %}Decide{% else %}Name and media table{% endif %}</span>
-    <span class="small text-body-secondary">The filename and the table fields stay in step.</span>
+    <span class="me-auto">{% if mode == 'review' %}Decide{% else %}Name and media table{% endif %}{{ tip("Editing the filename fills in the fields below. Changing the Date, Place or Country rewrites that part of the filename. So the filename and the fields always say the same.") }}</span>
   </div>
   <div class="card-body">
-    <label class="form-label small mb-0" for="filename">Filename</label>
-    <input class="form-control form-control-sm font-monospace mb-1" id="filename" name="filename" value="{{ ev.filename }}" spellcheck="false">
-    <div class="small text-body-secondary mb-3">YYYY-MM-DD_KKS_WHAT_Place-cc.{{ ext }} — editing it fills the fields below; changing Date, Place or Country updates it.</div>
+    <label class="form-label small mb-0" for="filename">Filename{{ tip("Format: YYYY-MM-DD_KKS_WHAT_Place-cc." ~ ext) }}</label>
+    <input class="form-control form-control-sm font-monospace mb-3" id="filename" name="filename" value="{{ ev.filename }}" spellcheck="false">
 
     <div class="row g-2">
       <div class="col-6 col-md-3">
@@ -65,14 +64,13 @@
     </div>
 
     <div class="mt-3">
-      <label class="form-label small mb-0" for="notes">Notes</label>
+      <label class="form-label small mb-0" for="notes">Notes{{ tip("Kept with the file and added to the Baserow notes column with your name.") }}</label>
       <textarea class="form-control form-control-sm" id="notes" name="notes" rows="2"
                 placeholder="e.g. Edirol recorder; recorded in our house in Amsterdam">{{ ev.notes }}</textarea>
-      <div class="small text-body-secondary">Kept with the file and added to the Baserow <code>notes</code> column with your name.</div>
     </div>
 
     <div class="mt-3">
-      <div class="small fw-semibold mb-1">Baserow media row</div>
+      <div class="small fw-semibold mb-1">Baserow media row{{ tip("Which row of the media table this file belongs to. Saving or approving writes it live, unless you choose 'Do not create row'.") }}</div>
       {# With the Baserow writes switch off the form starts on "Do not create row"; the person can still choose a row. #}
       {% set pick = 'skip' if not baserow_on else (ev.baserow_row_id|string) %}
       {% if f.baserow_row_id %}
@@ -87,7 +85,7 @@
       </div>
       <div class="form-check small">
         <input class="form-check-input" type="radio" name="baserow_row_id" id="row-skip" value="skip" {% if pick == 'skip' %}checked{% endif %}>
-        <label class="form-check-label" for="row-skip">Do not create row <span class="text-body-secondary">(nothing is written to Baserow{% if not baserow_on %}; Baserow writes are off{% endif %})</span></label>
+        <label class="form-check-label" for="row-skip">Do not create row{{ tip("Nothing is written to Baserow: no row is created or changed." ~ (" Baserow writes are off." if not baserow_on else "")) }}</label>
       </div>
       {% for c in candidates if c.id != f.baserow_row_id %}
       <div class="form-check small">
@@ -108,12 +106,11 @@
   </div>
   <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
     {% if mode == 'review' %}
-      <button class="btn btn-success btn-sm edit-save" name="action" value="approve" type="submit" {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-check me-1"></i>Approve</button>
-      <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>
-      <button class="btn btn-outline-secondary btn-sm" name="action" value="exclude" type="submit" title="Stop processing this file"><i class="fa-solid fa-ban me-1"></i>Exclude file</button>
+      <button class="btn btn-success btn-sm edit-save" name="action" value="approve" type="submit" data-bs-toggle="tooltip" data-bs-title="Renames the copy in processed-files and writes the media row live, unless you chose 'Do not create row'. Originals are never changed." {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-check me-1"></i>Approve</button>
+      <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" data-bs-toggle="tooltip" data-bs-title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>
+      <button class="btn btn-outline-secondary btn-sm" name="action" value="exclude" type="submit" data-bs-toggle="tooltip" data-bs-title="Stop all processing of this file"><i class="fa-solid fa-ban me-1"></i>Exclude file</button>
     {% else %}
-      <button class="btn btn-success btn-sm edit-save" type="submit" {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-floppy-disk me-1"></i>Save</button>
+      <button class="btn btn-success btn-sm edit-save" type="submit" data-bs-toggle="tooltip" data-bs-title="Renames the copy in processed-files and writes the media row live, unless you chose 'Do not create row'. Originals are never changed." {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-floppy-disk me-1"></i>Save</button>
     {% endif %}
-    <span class="small text-body-secondary"><i class="fa-solid fa-database me-1 text-danger"></i>{% if mode == 'review' %}Approving{% else %}Saving{% endif %} renames the copy in processed-files and writes the media row live, unless you choose "Do not create row". Originals are never changed.</span>
   </div>
 </form>

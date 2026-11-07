@@ -1,3 +1,4 @@
+{% from "_tips.html" import tip %}
 {# The Kirtan splitter's cut form and evidence; shown inside the player's cutEditor (_player.html). #}
 <div class="row g-3">
   <div class="col-12 col-lg-7">
@@ -7,9 +8,9 @@
       <div class="card-body">
         <div class="row g-3">
           <div class="col-sm-6">
-            <label class="form-label" for="split_at">Kirtan ends (hh:mm:ss.mmm)</label>
+            <label class="form-label" for="split_at">Kirtan ends (hh:mm:ss.mmm){{ tip("Everything before this is the kirtan; this moment and after is the class. Drag the edge in the waveform, use the nudge buttons, or type the time.") }}</label>
             <input class="form-control font-monospace" id="split_at" name="split_at" value="{{ split_text }}" placeholder="00:28:13.048" x-model="cutText" @change="typed()">
-            <div class="form-text">Everything before this is the kirtan; this moment and after is the class.{% if class_text %} The speech starts at {{ class_text }}.{% endif %}</div>
+            {% if class_text %}<div class="form-text">The speech starts at {{ class_text }}.</div>{% endif %}
           </div>
           <div class="col-sm-6">
             <label class="form-label" for="mantra">Kirtan type (its name)</label>
@@ -24,10 +25,10 @@
         </div>
       </div>
       <div class="card-footer d-flex flex-wrap gap-2">
-        <button class="btn btn-success btn-sm" name="action" value="approve"><i class="fa-solid fa-scissors me-1"></i>Approve and split</button>
-        <button class="btn btn-outline-secondary btn-sm" name="action" value="no_split">Do not split</button>
-        <button class="btn btn-outline-danger btn-sm" name="action" value="reject" onclick="return confirm('Discard this result? Nothing has been cut.')">Reject result</button>
-        <button class="btn btn-outline-danger btn-sm" name="action" value="exclude" onclick="return confirm('Stop all processing of this file?')">Exclude file</button>
+        <button class="btn btn-success btn-sm" name="action" value="approve" data-bs-toggle="tooltip" data-bs-title="Cuts the file at the time above: the kirtan before it and the class after it, as two files. The kirtan gets its own Baserow row."><i class="fa-solid fa-scissors me-1"></i>Approve and split</button>
+        <button class="btn btn-outline-secondary btn-sm" name="action" value="no_split" data-bs-toggle="tooltip" data-bs-title="Keep the recording whole. Nothing is cut and the pipeline goes on.">Do not split</button>
+        <button class="btn btn-outline-danger btn-sm" name="action" value="reject" data-bs-toggle="tooltip" data-bs-title="Discard this proposal. Nothing has been cut, and the file can be run again." onclick="return confirm('Discard this result? Nothing has been cut.')">Reject result</button>
+        <button class="btn btn-outline-danger btn-sm" name="action" value="exclude" data-bs-toggle="tooltip" data-bs-title="Stop all processing of this file." onclick="return confirm('Stop all processing of this file?')">Exclude file</button>
       </div>
     </form>
     {% endif %}
