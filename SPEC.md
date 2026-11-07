@@ -78,7 +78,7 @@ These clarify docs/references/filenaming-convention.md.
 Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-discoverer → class-trimmer**.
 
 - Each tool can run on its own (one file or a batch) or as part of a pipeline coordinated by the media manager.
-- In a batch, a flagged file pauses on its own while the other files continue. After approval it resumes automatically at the next step.
+- In a batch, a flagged file pauses on its own while the other files continue. After approval it resumes automatically at the next step, and the approval message says which tool was queued (with the live spinner, decided 2026-11-07).
 - Kirtan-only outputs are `Skipped` for steps 3 to 5.
 - **Video:** the pipeline is audio-only. Video files are renamed and copied but never edited.
   - **After the Kirtan splitter (decided 2026-11-05):** the audio rows (the class, and the kirtan when there is one) continue through the pipeline as audio. The video row is finished after the split and its video file stays untouched. What the later tools find for the class audio (verse, title, themes, language) is also written to the video's own Baserow row, under the same rules as any other write (empty fields only; a person's values are never overwritten), so the video gets the same name details as its class audio. The video's filename follows the Renamer's rules with that evidence.

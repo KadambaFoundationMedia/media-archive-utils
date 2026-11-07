@@ -267,8 +267,12 @@ def stable_status(session: Session, record: m.MediaFile) -> str:
     return "Not processed"
 
 
-def resume_after_review(session: Session, record: m.MediaFile, tool: str) -> None:
-    """After a review is approved, continue the pipeline at the next tool."""
+def resume_after_review(session: Session, record: m.MediaFile, tool: str) -> str | None:
+    """After a review is approved, continue the pipeline at the next tool.
+
+    Returns the label of the tool that was queued, or None when there is none to run.
+    """
     following = next_in_pipeline(tool)
-    if following:
-        enqueue(session, following, [record.id], dry_run=False, pipeline=True)
+    if following and enqueue(session, following, [record.id], dry_run=False, pipeline=True):
+        return TOOLS[following].label
+    return None

@@ -219,6 +219,51 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
     assert no_baserow[0]["live"] is False and no_baserow[1]["live"] is True  # approval is live
 
 
+def test_approving_a_review_in_the_pipeline_says_that_the_next_tool_runs(
+    client, archive, reference, no_baserow, settings
+):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "__pipeline", "ids": [file_id]})
+    run_queue()  # the Renamer flags the file and the pipeline waits for the review
+    with session_scope() as s:
+        review = s.scalars(select(m.Review)).one()
+        assert not s.scalars(select(m.Job).where(m.Job.tool == "kirtan-splitter")).all()
+    response = client.post(
+        f"/review/{review.id}/decide",
+        data={**approve_form("2012-07-12_KKS_Kirtan_rs.mp3"), "title": "Kirtan"},
+        follow_redirects=False,
+    )
+    from urllib.parse import unquote
+
+    location = unquote(response.headers["location"])
+    assert "Approved" in location and "pipeline continues by itself" in location
+    assert "Kirtan splitter" in location and "live=1" in location
+    with session_scope() as s:
+        job = s.scalars(select(m.Job).where(m.Job.tool == "kirtan-splitter")).one()
+        assert job.state == "queued" and job.pipeline
+
+
+def test_approving_outside_the_pipeline_queues_nothing(client, archive, reference, no_baserow):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = ids(s)["R09_0004.MP3"]
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
+    run_queue()
+    with session_scope() as s:
+        review = s.scalars(select(m.Review)).one()
+    response = client.post(
+        f"/review/{review.id}/decide",
+        data={**approve_form("2012-07-12_KKS_Kirtan_rs.mp3"), "title": "Kirtan"},
+        follow_redirects=False,
+    )
+    assert "pipeline" not in response.headers["location"].lower()
+    assert "live=1" not in response.headers["location"]
+
+
 def test_reject_removes_copy_and_exclude_stops(client, archive, reference, no_baserow, settings):
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
