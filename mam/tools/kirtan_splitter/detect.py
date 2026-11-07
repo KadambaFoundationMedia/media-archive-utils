@@ -22,7 +22,11 @@ CLASS_MIN_SPEECH_S = 20.0  # a speech run needs this long to start a class
 MIN_CLASS_S = 180.0  # less speech than this after the music is a spoken ending, not a class
 SPEECH_AT = 0.10  # smoothed speech probability from which a second counts as speech
 SMOOTH_S = 9  # seconds averaged, so a clap or a shout does not flip the label
+RETURN_MUSIC_S = 300  # music this long after the class means bhajans with talks, not kirtan+class
 MUSIC_SHARE_MIN = 0.7  # a kirtan is at least this much music (blips of speech are allowed)
+# A sung opening mantra is part of the class (editing standard, point 1), not a kirtan: it is
+# short, and it often scores as speech on the voice model. The stretch before a class must
+# therefore be mostly music, not just hold enough music seconds scattered over it.
 SNAP_S = 3.0  # move the cut to a silence this close to it
 LEAD_PAD_S = 0.3  # kept before the first sound
 MAX_LEAD_S = 60.0  # a longer 'silence' at the start is a quiet recording, not a lead-in
@@ -176,8 +180,9 @@ def class_confirmed(profile: list[float | None]) -> bool:
     for run_start, run_end in _runs(labels, "speech"):
         if run_end - run_start < CLASS_MIN_SPEECH_S:
             continue
-        music_before = sum(1 for lab in labels[int(MAX_LEAD_S) : run_start] if lab == "music")
-        if music_before >= MIN_KIRTAN_S:
+        music_before, _ = _lead_in(labels, int(MAX_LEAD_S), run_start)
+        _, share = _lead_in(labels, 0, run_start)
+        if _is_kirtan_lead_in(music_before, share):
             # the speech so far already makes it a class (it can only grow); a spoken ending
             # is not decided yet, since more speech may follow
             if sum(1 for lab in labels[run_start:] if lab == "speech") < MIN_CLASS_S:
@@ -186,6 +191,17 @@ def class_confirmed(profile: list[float | None]) -> bool:
             # the last seconds of the profile are not final yet because of the smoothing)
             return run_end - run_start >= CLASS_CONFIRM_S or run_end <= len(labels) - SMOOTH_S
     return False
+
+
+def _lead_in(labels: list[str | None], lo: int, hi: int) -> tuple[int, float]:
+    """(seconds of music, share of music among the sounding seconds) in labels[lo:hi]."""
+    part = [lab for lab in labels[lo:hi] if lab is not None]
+    music = sum(1 for lab in part if lab == "music")
+    return music, (music / len(part) if part else 0.0)
+
+
+def _is_kirtan_lead_in(music: int, share: float) -> bool:
+    return music >= MIN_KIRTAN_S and share >= MUSIC_SHARE_MIN
 
 
 def _runs(labels: list[str | None], kind: str) -> list[tuple[int, int]]:
@@ -234,35 +250,63 @@ def detect(
 
     class_run = None
     first_speech = None  # the first speech run long enough to be a class
-    spoken_ending = None  # seconds of speech after a long kirtan that is too short to be a class
+    spoken_short = None  # seconds of speech too short to be a class (closing words, announcements)
     for run_start, run_end in _runs(labels, "speech"):
         if run_end - run_start < CLASS_MIN_SPEECH_S:
             continue
-        music_before = sum(1 for lab in labels[int(start) : run_start] if lab == "music")
-        if music_before >= MIN_KIRTAN_S:
-            speech_after = sum(1 for lab in labels[run_start:] if lab == "speech")
+        music_before, lead_share = _lead_in(labels, int(start), run_start)
+        speech_after = sum(1 for lab in labels[run_start:] if lab == "speech")
+        if _is_kirtan_lead_in(music_before, lead_share):
             if speech_after < MIN_CLASS_S:
-                spoken_ending = speech_after  # closing words, not a class: keep looking
+                spoken_short = speech_after  # closing words, not a class: keep looking
                 continue
             class_run = (run_start, run_end)
             break
         if first_speech is None:
-            first_speech = (run_start, music_before)
+            if speech_after < MIN_CLASS_S:
+                spoken_short = speech_after  # an announcement in a recording of music
+                continue
+            first_speech = (run_start, music_before, lead_share)
 
     if class_run is None and first_speech is not None:
-        run_start, music_before = first_speech
+        run_start, music_before, lead_share = first_speech
+        # nothing before the class is long enough to be a kirtan: whatever is sung or said first
+        # (an opening mantra, an announcement) belongs to the class
+        after = [lab for lab in labels[run_start:] if lab is not None]
+        class_share = sum(1 for lab in after if lab == "speech") / len(after)
+        sure = run_start <= MIN_KIRTAN_S and class_share >= MUSIC_SHARE_MIN
+        if music_before == 0:
+            opening = "The recording starts with speech"
+        else:
+            opening = f"The class starts at {run_start}s, after {music_before}s of music"
+        if sure:
+            why = (
+                f"A kirtan before a class is at least {int(MIN_KIRTAN_S)} seconds of mostly "
+                "music; what comes first here is shorter, so it is taken as the class's own "
+                "opening mantra or announcement (editing standard, point 1; a sung mantra "
+                "sounds like speech to the voice model)."
+            )
+        else:
+            why = (
+                f"There is no stretch of {int(MIN_KIRTAN_S)} seconds or more of mostly music "
+                f"before it ({music_before}s of music, {round(lead_share * 100)}% of the first "
+                f"{run_start}s): please check whether this is a kirtan followed by a class."
+            )
         return Decision(
             "class_only",
-            0.9 if music_before == 0 and run_start < 60 else 0.7,
-            sure=music_before == 0 and run_start < 60,
+            0.9 if sure else 0.7,
+            sure=sure,
             kirtan_start=start,
             class_start=float(run_start),
             mantra=mantra,
-            reasons=[
-                f"The recording starts with speech; there is no kirtan of at least "
-                f"{int(MIN_KIRTAN_S)} seconds before it."
-            ],
-            features={**features, "first_speech_at": run_start},
+            reasons=[f"{opening}. {why}"],
+            features={
+                **features,
+                "first_speech_at": run_start,
+                "music_before": music_before,
+                "lead_in_music_share": round(lead_share, 3),
+                "speech_share_after": round(class_share, 3),
+            },
         )
 
     if class_run is None:
@@ -277,13 +321,13 @@ def detect(
                 mantra=mantra,
                 reasons=(
                     [
-                        f"Only {spoken_ending} s of speech follow the music: a spoken ending, "
-                        f"not a class (a class has at least {int(MIN_CLASS_S)} s)."
+                        f"Only {spoken_short} s of speech with the music: a spoken ending or "
+                        f"announcement, not a class (a class has at least {int(MIN_CLASS_S)} s)."
                     ]
-                    if spoken_ending is not None
+                    if spoken_short is not None
                     else ["No sustained speech: the music continues through the recording."]
                 ),
-                features={**features, "spoken_ending_s": spoken_ending},
+                features={**features, "spoken_ending_s": spoken_short},
             )
         return Decision(
             "unclear",
@@ -345,6 +389,28 @@ def detect(
         and margin >= SURE_CONTRAST
         and music_share >= SURE_MUSIC_SHARE
     )
+    if not sure:
+        # A kirtan and a class: the class ends the recording (with questions at most). Mostly music
+        # with a talk in between and music again after it is a kirtan programme with talks.
+        overall = _mean([1.0 if lab == "music" else 0.0 for lab in labels if lab])
+        music_after = sum(1 for lab in labels[run_end:] if lab == "music")
+        if overall >= MUSIC_SHARE_MIN and music_after >= RETURN_MUSIC_S:
+            return Decision(
+                "kirtan_only",
+                round(min(0.95, 0.5 + 0.45 * overall), 3),
+                kirtan_start=start,
+                mantra=mantra,
+                reasons=[
+                    f"{round(overall * 100)}% of the recording is music, and music returns for "
+                    f"{music_after}s after the talk at {first_voice}s: a kirtan programme with "
+                    "talks, not a kirtan followed by a class. Please check."
+                ],
+                features={
+                    **features,
+                    "music_share": round(overall, 3),
+                    "music_after_s": music_after,
+                },
+            )
     if stop is not None and not sure and MIN_KIRTAN_S <= kirtan_seconds <= hi:
         reasons.append("The difference between the kirtan and the class is small: please check.")
     features.update(

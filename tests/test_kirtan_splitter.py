@@ -103,7 +103,8 @@ def test_a_small_contrast_is_not_sure():
 def test_sure_for_the_no_split_cases():
     assert detect([0.01] * 1800, 1800).sure  # music throughout
     assert detect(profile(0, 400), 400).sure  # class from the start
-    assert not detect(profile(40, 400), 440).sure  # a lead-in too short to be a kirtan
+    assert detect(profile(40, 400), 440).sure  # a short sung opening is the class's mantra
+    assert not detect(profile(120, 400), 520).sure or detect(profile(120, 400), 520).mode == "split"
     assert not detect([None] * 600, 600).sure
 
 
@@ -113,6 +114,56 @@ def test_a_short_spoken_ending_after_a_long_kirtan_is_not_a_class():
     assert d.mode == "kirtan_only" and d.sure and d.split_at is None
     assert 40 <= d.features["spoken_ending_s"] <= 50  # the 9 s smoothing widens it
     assert "spoken ending" in d.reasons[0]
+
+
+def sparse(total: int, every: int = 25) -> list[float]:
+    """Speech with one quiet second now and then (a breath, a pause), as in a long class."""
+    return [0.01 if i % every == 0 else 0.6 for i in range(total)]
+
+
+def test_scattered_quiet_seconds_in_a_class_are_not_a_kirtan():
+    # Stockholm 2015-03: a sung opening mantra scores as speech, the class follows; the few
+    # quiet seconds in 50 minutes of speech add up to 90 s but are no kirtan
+    p = sparse(3000) + [0.01] * 60 + sparse(600)
+    d = detect(p, len(p))
+    assert d.mode == "class_only" and d.sure and d.class_start < 60
+    assert detect(profile(0, 50) + sparse(3000), 3050).mode == "class_only"
+
+
+def test_a_kirtan_needs_a_stretch_that_is_mostly_music():
+    lead = sparse(1500) + profile(100, 0)  # 100 s of music, but 1500 s of speech before it
+    p = lead + profile(0, 600)
+    d = detect(p, len(p))
+    assert d.mode == "class_only" and "mostly music" in d.reasons[0] + str(d.features)
+    # a kirtan with blips of speech is still a kirtan
+    q = [0.01] * 300 + [0.6] * 25 + [0.01] * 300 + [0.6] * CLASS_S
+    assert detect(q, len(q)).mode == "split"
+
+
+def test_a_sung_opening_mantra_belongs_to_the_class_and_says_so():
+    d = detect(profile(35, 500), 535)  # 35 s sung before the class (editing standard, point 1)
+    assert d.mode == "class_only" and d.sure
+    assert "opening mantra" in d.reasons[0] and "of music" in d.reasons[0]
+    assert 30 <= d.features["music_before"] <= 35  # the 9 s smoothing narrows it
+
+
+def test_music_with_an_announcement_at_the_start_is_a_kirtan_recording():
+    # Stockholm 2015-03-06 Bhajans: 90 s of talk, then music to the end
+    p = [0.6] * 90 + [0.01] * 2594
+    d = detect(p, len(p))
+    assert d.mode == "kirtan_only" and d.sure
+    assert "announcement" in d.reasons[0]
+
+
+def test_bhajans_with_talks_are_a_kirtan_recording_to_check():
+    # Stockholm 2015-03-08 Bhajans: music 740 s, talk 440 s, music, a second talk, music to the end
+    p = profile(740, 440) + profile(470, 430) + profile(1100, 0)
+    d = detect(p, len(p))
+    assert d.mode == "kirtan_only" and not d.sure
+    assert "kirtan programme with talks" in d.reasons[0]
+    # but a kirtan, a class and a short closing kirtan is still split
+    q = profile(600, CLASS_S) + profile(120, 0)
+    assert detect(q, len(q), [], None, sound(596, 4)).mode == "split"
 
 
 def test_a_class_needs_three_minutes_of_speech():
