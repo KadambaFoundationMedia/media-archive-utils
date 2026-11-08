@@ -1,5 +1,6 @@
 {# The waveform: on every details page, above the form. With a pending Kirtan splitter review the
    same player carries the cut (regions, nudge buttons, the cut form); otherwise it only plays. #}
+{% from "_tips.html" import tip %}
 {% set cut_review = review_tool == 'kirtan-splitter' and review is not none %}
 {% if cut_review %}
 {% set editor_cfg = {"fileId": f.id, "review": true, "cut": p.get("split_at"), "kirtanStart": p.get("kirtan_start") or 0, "mantra": p.get("mantra"), "colors": region_colors} %}
@@ -13,15 +14,15 @@
 <div class="mb-3" x-data='cutEditor({{ editor_cfg | tojson }})' @keydown.window="seekKey($event)">
   <div class="card mb-3">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <span>{% if cut_review %}Waveform: drag the edge between the kirtan and the class{% else %}Waveform{% endif %}</span>
+      <span><i class="fa-solid fa-wave-square me-2"></i>Waveform{% if cut_review %}{{ tip("Drag the edge between the kirtan and the class to move the cut.") }}{% endif %}</span>
       <span class="small text-body-secondary font-monospace" x-show="status === 'ready'">
         <span x-text="formatTime(now)"></span> / <span x-text="formatTime(duration)"></span>
       </span>
     </div>
     <div class="card-body">
-      <div x-show="status === 'loading'" class="text-body-secondary py-4 text-center">
-        <span class="spinner-border spinner-border-sm me-2"></span>
-        Preparing the waveform. The first time takes up to a minute for a long recording; it is kept for next time.
+      <div x-show="status === 'loading'" class="text-body-secondary py-5 text-center" role="status"
+           data-bs-toggle="tooltip" data-bs-title="Preparing the waveform. This happens once per file and is kept for next time.">
+        <span class="spinner-border text-primary" aria-label="Preparing the waveform"></span>
       </div>
       <div x-show="status === 'error'" x-cloak>
         <div class="alert alert-warning small py-2">
@@ -44,27 +45,27 @@
         {% if cut_review %}
         <template x-if="cut !== null">
           <div class="btn-group btn-group-sm">
-            <button type="button" class="btn btn-outline-secondary" @click="beforeCut()">3 s before the cut</button>
-            <button type="button" class="btn btn-outline-secondary" @click="audition()">Around the cut (±3 s)</button>
-            <button type="button" class="btn btn-outline-secondary" @click="fromCut()">From the cut</button>
+            <button type="button" class="btn btn-outline-secondary" @click="beforeCut()" aria-label="3 s before the cut" data-bs-toggle="tooltip" data-bs-title="Play 3 s before the cut"><i class="fa-solid fa-backward-step"></i></button>
+            <button type="button" class="btn btn-outline-secondary" @click="audition()" aria-label="Around the cut" data-bs-toggle="tooltip" data-bs-title="Play around the cut (3 s on each side)"><i class="fa-solid fa-arrows-left-right-to-line"></i></button>
+            <button type="button" class="btn btn-outline-secondary" @click="fromCut()" aria-label="From the cut" data-bs-toggle="tooltip" data-bs-title="Play from the cut"><i class="fa-solid fa-forward-step"></i></button>
           </div>
         </template>
         <template x-if="cut !== null">
           <div class="btn-group btn-group-sm" role="group" aria-label="Move the cut">
-            <button type="button" class="btn btn-outline-secondary" @click="nudge(-1)">−1 s</button>
-            <button type="button" class="btn btn-outline-secondary" @click="nudge(-0.1)">−0.1</button>
-            <button type="button" class="btn btn-outline-secondary" @click="nudge(0.1)">+0.1</button>
-            <button type="button" class="btn btn-outline-secondary" @click="nudge(1)">+1 s</button>
+            <button type="button" class="btn btn-outline-secondary" @click="nudge(-1)" data-bs-toggle="tooltip" data-bs-title="Move the cut 1 s earlier"><i class="fa-solid fa-angles-left"></i></button>
+            <button type="button" class="btn btn-outline-secondary" @click="nudge(-0.1)" data-bs-toggle="tooltip" data-bs-title="Move the cut 0.1 s earlier"><i class="fa-solid fa-angle-left"></i></button>
+            <button type="button" class="btn btn-outline-secondary" @click="nudge(0.1)" data-bs-toggle="tooltip" data-bs-title="Move the cut 0.1 s later"><i class="fa-solid fa-angle-right"></i></button>
+            <button type="button" class="btn btn-outline-secondary" @click="nudge(1)" data-bs-toggle="tooltip" data-bs-title="Move the cut 1 s later"><i class="fa-solid fa-angles-right"></i></button>
           </div>
         </template>
-        <button type="button" class="btn btn-outline-secondary btn-sm" @click="cutHere()" data-bs-toggle="tooltip" data-bs-title="Move the cut to where the playhead is now">
-          <i class="fa-solid fa-scissors me-1"></i>Cut at the playhead
+        <button type="button" class="btn btn-outline-secondary btn-sm" @click="cutHere()" aria-label="Cut at the playhead" data-bs-toggle="tooltip" data-bs-title="Move the cut to where the playhead is now">
+          <i class="fa-solid fa-scissors"></i>
         </button>
         {% endif %}
         <div class="d-flex align-items-center gap-2 ms-auto">
-          <label class="small text-body-secondary mb-0" for="zoom">Zoom</label>
+          <label class="text-body-secondary mb-0" for="zoom" data-bs-toggle="tooltip" data-bs-title="Zoom"><i class="fa-solid fa-magnifying-glass-plus"></i></label>
           <input id="zoom" type="range" class="form-range" style="width: 9rem" min="1" max="300" step="1" x-model="zoomLevel" @input="zoom()">
-          {% if cut_review %}<button type="button" class="btn btn-outline-secondary btn-sm" @click="zoomToCut()" x-show="cut !== null">Zoom to the cut</button>{% endif %}
+          {% if cut_review %}<button type="button" class="btn btn-outline-secondary btn-sm" @click="zoomToCut()" x-show="cut !== null" aria-label="Zoom to the cut" data-bs-toggle="tooltip" data-bs-title="Zoom to the cut"><i class="fa-solid fa-crosshairs"></i></button>{% endif %}
         </div>
       </div>
     </div>

@@ -65,7 +65,7 @@
     </select>
   </div>
   {% if flt.folder %}<input type="hidden" name="folder" value="{{ flt.folder }}">{% endif %}
-  <div class="col-6 col-md-6 col-lg-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/" title="Clear all filters">Reset all</a></div>
+  <div class="col-6 col-md-6 col-lg-1"><a class="btn btn-sm btn-outline-secondary w-100" href="/" aria-label="Reset all filters" data-bs-toggle="tooltip" data-bs-title="Reset all filters"><i class="fa-solid fa-filter-circle-xmark"></i></a></div>
   {% if flt.folder %}
   <div class="col-12">
     <span class="badge rounded-pill text-bg-secondary fs-6 fw-normal">
@@ -106,9 +106,9 @@
       <option value="selected">Selected files</option>
       <option value="all" id="scope-all">All {{ total }} matching files</option>
     </select>
-    <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" title="Shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
-    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
-    <span id="list-loading" class="htmx-indicator small text-body-secondary ms-auto"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading…</span>
+    <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" aria-label="Preview (dry run)" data-bs-toggle="tooltip" data-bs-title="Preview (dry run): shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye"></i></button>
+    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" aria-label="Run" data-bs-toggle="tooltip" data-bs-title="Run: copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play"></i></button>
+    <span id="list-loading" class="htmx-indicator small text-body-secondary ms-auto"><span class="spinner-border spinner-border-sm" role="status" aria-label="Loading"></span></span>
     <span class="small text-body-secondary {{ '' }}" id="file-count">{{ total }} files</span>
   </div>
   <div id="file-table">
