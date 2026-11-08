@@ -167,6 +167,14 @@ function initTooltips(root) {
 }
 window.addEventListener("load", () => initTooltips());
 document.body.addEventListener("htmx:afterSwap", (event) => initTooltips(event.target));
+// Elements that appear later (Alpine templates) get their tooltip on first hover or focus.
+function lazyTooltip(event) {
+  const el = event.target.closest?.('[data-bs-toggle="tooltip"]');
+  if (!el || !window.bootstrap || bootstrap.Tooltip.getInstance(el)) return;
+  bootstrap.Tooltip.getOrCreateInstance(el, { container: "body", trigger: "hover focus" }).show();
+}
+document.addEventListener("mouseover", lazyTooltip);
+document.addEventListener("focusin", lazyTooltip);
 // A clicked button hides its tooltip, so it never stays over the page after an action.
 document.addEventListener("click", (event) => {
   const el = event.target.closest?.('[data-bs-toggle="tooltip"]');

@@ -7,7 +7,7 @@
     <a class="btn btn-outline-secondary {% if state == s %}active{% endif %}" href="/jobs{% if s %}?state={{ s }}{% endif %}">{{ label }}</a>
     {% endfor %}
   </div>
-  <form method="post" action="/jobs/cancel"><button class="btn btn-sm btn-outline-danger" type="submit">Cancel queued</button></form>
+  <form method="post" action="/jobs/cancel"><button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Cancel queued jobs" data-bs-toggle="tooltip" data-bs-title="Cancel the queued jobs"><i class="fa-solid fa-ban"></i></button></form>
 </div>
 <div id="job-table">{% include "_job_rows.html" %}</div>
 {% endblock %}

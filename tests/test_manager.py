@@ -585,7 +585,7 @@ def test_run_result_says_what_happened_in_baserow(client, archive, reference, no
     assert clean.endswith("Baserow: new row logged only (Baserow writes are off)")
     assert flagged.endswith("Baserow: written when you approve the review")
     page = client.get("/").text
-    assert ">Run</button>" in page and "Run for real" not in page
+    assert 'value="run"' in page and "Run for real" not in page
 
 
 def test_baserow_switch_on_the_home_page(client, settings):

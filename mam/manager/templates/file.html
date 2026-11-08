@@ -8,7 +8,7 @@
     <div class="small text-body-secondary text-break">{{ f.original_path }}</div>
   </div>
   {% with s=f.status %}{% include "_status.html" %}{% endwith %}
-  {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/details/{{ next_id }}">Next review <i class="fa-solid fa-chevron-right"></i></a>{% endif %}
+  {% if next_id %}<a class="btn btn-sm btn-outline-secondary" href="/details/{{ next_id }}" aria-label="Next review" data-bs-toggle="tooltip" data-bs-title="Next review"><i class="fa-solid fa-forward-step"></i></a>{% endif %}
 </div>
 
 {% if review_tool %}
@@ -51,8 +51,8 @@
         <select class="form-select form-select-sm w-auto" name="tool" aria-label="Tool" required>
           {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
         </select>
-        <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" data-bs-toggle="tooltip" data-bs-title="Shows what would happen. Nothing is copied and no review is opened."><i class="fa-regular fa-eye me-1"></i>Preview (dry run)</button>
-        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" data-bs-toggle="tooltip" data-bs-title="Copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play me-1"></i>Run</button>
+        <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" aria-label="Preview (dry run)" data-bs-toggle="tooltip" data-bs-title="Preview (dry run): shows what would happen. Nothing is copied and no review is opened."><i class="fa-regular fa-eye"></i></button>
+        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" aria-label="Run" data-bs-toggle="tooltip" data-bs-title="Run: copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play"></i></button>
       </div>
 </form>
 {% endif %}

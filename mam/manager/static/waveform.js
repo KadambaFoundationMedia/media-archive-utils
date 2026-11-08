@@ -96,10 +96,10 @@
         if (WaveSurfer.Hover) {
           plugins.push(
             WaveSurfer.Hover.create({
-              lineColor: dark ? "#D0BCFF" : "#0d6efd",
+              lineColor: dark ? "#D0BCFF" : "#6750A4",
               lineWidth: 1,
-              labelBackground: dark ? "#36343B" : "#ffffff",
-              labelColor: dark ? "#E6E0E9" : "#212529",
+              labelBackground: dark ? "#36343B" : "#E6E0E9",
+              labelColor: dark ? "#E6E0E9" : "#1D1B20",
               labelSize: "12px",
               formatTimeCallback: formatTime,
             })
@@ -113,9 +113,9 @@
           height: 150,
           normalize: true,
           minPxPerSec: this.zoomLevel,
-          waveColor: dark ? "#938F99" : "#6c757d",
-          progressColor: dark ? "#D0BCFF" : "#343a40",
-          cursorColor: dark ? "#F2B8B5" : "#dc3545",
+          waveColor: dark ? "#938F99" : "#79747E",
+          progressColor: dark ? "#D0BCFF" : "#6750A4",
+          cursorColor: dark ? "#F2B8B5" : "#B3261E",
           cursorWidth: 2,
           autoScroll: true,
           autoCenter: false,

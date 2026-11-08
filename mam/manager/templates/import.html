@@ -64,7 +64,7 @@
   <i class="fa-solid fa-cloud-arrow-up fa-2x mb-2 text-body-secondary"></i>
   <div class="mb-2">Drop audio or video files here, or choose them</div>
   <input class="form-control form-control-sm mx-auto" style="max-width:24rem" type="file" name="files" multiple accept="audio/*,video/*,.wma,.mts" id="upload-input">
-  <button class="btn btn-sm btn-outline-primary mt-2" type="submit">Upload</button>
+  <button class="btn btn-sm btn-outline-primary mt-2" type="submit" aria-label="Upload" data-bs-toggle="tooltip" data-bs-title="Upload"><i class="fa-solid fa-upload"></i></button>
   <div class="small text-body-secondary mt-1">Saved to {{ settings.inbox_path }} and registered automatically.</div>
 </form>
 {% endblock %}
