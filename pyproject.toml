@@ -23,6 +23,7 @@ dependencies = [
     "pycountry>=26.2.16",
     "numpy>=1.26",
     "onnxruntime>=1.16",
+    "send2trash>=2.2.0",
 ]
 
 [project.scripts]

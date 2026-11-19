@@ -264,7 +264,9 @@ def test_approving_outside_the_pipeline_queues_nothing(client, archive, referenc
     assert "live=1" not in response.headers["location"]
 
 
-def test_reject_removes_copy_and_exclude_stops(client, archive, reference, no_baserow, settings):
+def test_reject_removes_copy_and_exclude_stops(
+    client, archive, reference, no_baserow, settings, monkeypatch
+):
     client.post("/import", data={"root": 0, "path": ""})
     run_queue()
     with session_scope() as s:
@@ -284,9 +286,16 @@ def test_reject_removes_copy_and_exclude_stops(client, archive, reference, no_ba
     run_queue()
     with session_scope() as s:
         review_id = s.scalars(select(m.Review.id).where(m.Review.outcome == "pending")).one()
+    copy = settings.media_processed_files_path / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    assert copy.exists()
+    trashed = []
+    monkeypatch.setattr("mam.helpers.file_organizer.trash._send_to_trash", trashed.append)
     client.post(f"/review/{review_id}/decide", data={"action": "exclude", "note": "not KKS"})
+    assert trashed == [copy]  # the processed copy is removed, the original stays
+    assert (archive / "Serbia-summercamp-6-13-jul-2012" / "R09_0004.MP3").exists()
     with session_scope() as s:
-        assert s.get(m.MediaFile, file_id).status == "Excluded"
+        record = s.get(m.MediaFile, file_id)
+        assert record.status == "Excluded" and record.processed_path is None
         assert enqueue(s, "renamer", [file_id], dry_run=False) == 0  # excluded files are skipped
 
 
@@ -692,7 +701,7 @@ def test_status_list_and_guide_show_the_same_statuses_in_order(client):
         "Renamer Review",
         "Renamer Failed",
     ]
-    assert statuses[-4:] == ["Skipped", "Excluded", "Corrupted", "Processing complete"]
+    assert statuses[-5:] == ["Skipped", "Excluded", "Deleted", "Corrupted", "Processing complete"]
     # the guide explains each status in the list, in the same order
     generic = [
         s if s in STATUS_HELP else next(k for k in STATUS_HELP if k in s.split()) for s in statuses
@@ -860,3 +869,78 @@ def test_save_does_not_close_a_pending_splitter_review(client, archive, referenc
     with session_scope() as s:
         review = s.scalars(select(m.Review).where(m.Review.tool == "kirtan-splitter")).one()
         assert review.outcome == "pending"
+
+
+def _renamed_copy(client, settings):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    with session_scope() as s:
+        file_id = s.scalars(
+            select(m.MediaFile.id).where(m.MediaFile.original_path.like("%R09_0004.MP3"))
+        ).one()
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
+    run_queue()
+    copy = settings.media_processed_files_path / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    assert copy.exists()
+    return file_id, copy
+
+
+def test_delete_moves_the_copy_to_the_trash_and_keeps_the_original(
+    client, archive, reference, no_baserow, settings, monkeypatch
+):
+    trashed = []
+    monkeypatch.setattr("mam.helpers.file_organizer.trash._send_to_trash", trashed.append)
+    file_id, copy = _renamed_copy(client, settings)
+    original = archive / "Serbia-summercamp-6-13-jul-2012" / "R09_0004.MP3"
+
+    preview = client.post(
+        "/actions", data={"tool": "__delete", "ids": [file_id], "mode": "preview"}
+    )
+    assert preview.status_code == 200 and not trashed  # a preview deletes nothing
+    client.post("/actions", data={"tool": "__delete", "ids": [file_id], "mode": "run"})
+    assert trashed == [copy]
+    assert original.exists()
+    with session_scope() as s:
+        record = s.get(m.MediaFile, file_id)
+        assert record.status == "Deleted" and record.processed_path is None
+        assert s.scalars(select(m.FileEvent).where(m.FileEvent.action == "delete")).one()
+        assert enqueue(s, "renamer", [file_id], dry_run=False) == 0  # not processed again
+    assert "Deleted" in client.get("/?status=__all").text
+
+
+def test_delete_from_the_details_page_closes_a_pending_review(
+    client, archive, reference, no_baserow, settings, monkeypatch
+):
+    trashed = []
+    monkeypatch.setattr("mam.helpers.file_organizer.trash._send_to_trash", trashed.append)
+    file_id, copy = _renamed_copy(client, settings)
+    page = client.get(f"/details/{file_id}").text
+    assert f'formaction="/details/{file_id}/delete"' in page
+    response = client.post(f"/details/{file_id}/delete", follow_redirects=False)
+    assert response.status_code == 303 and trashed == [copy]
+    with session_scope() as s:
+        assert s.get(m.MediaFile, file_id).status == "Deleted"
+        assert not s.scalars(select(m.Review).where(m.Review.outcome == "pending")).all()
+    # a second delete is refused, not repeated
+    client.post(f"/details/{file_id}/delete")
+    assert len(trashed) == 1
+
+
+def test_delete_never_touches_a_file_outside_processed_files(
+    client, archive, settings, monkeypatch
+):
+    trashed = []
+    monkeypatch.setattr("mam.helpers.file_organizer.trash._send_to_trash", trashed.append)
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    original = archive / "Serbia-summercamp-6-13-jul-2012" / "R09_0004.MP3"
+    with session_scope() as s:
+        record = s.scalars(
+            select(m.MediaFile).where(m.MediaFile.original_path.like("%R09_0004.MP3"))
+        ).one()
+        record.processed_path = str(original)  # a broken record pointing at an original
+        file_id = record.id
+    client.post("/actions", data={"tool": "__delete", "ids": [file_id], "mode": "run"})
+    assert not trashed and original.exists()
+    with session_scope() as s:
+        assert s.get(m.MediaFile, file_id).status == "Not processed"

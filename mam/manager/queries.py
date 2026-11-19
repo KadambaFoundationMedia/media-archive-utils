@@ -150,7 +150,7 @@ def all_statuses(present: dict[str, int] | None = None) -> list[str]:
             label = TOOLS[name].label
             ordered += [f"Queued {label}", f"Processing {label}"]
             ordered += [f"{label} {state}" for state in ("Done", "Review", "Failed")]
-    ordered += ["Skipped", "Excluded", "Corrupted", "Processing complete"]
+    ordered += ["Skipped", "Excluded", "Deleted", "Corrupted", "Processing complete"]
     return ordered + sorted(set(present or {}) - set(ordered))
 
 

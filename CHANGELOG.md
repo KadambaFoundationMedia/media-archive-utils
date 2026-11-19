@@ -22,6 +22,8 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Common phrases are ignored for now (they need a transcript).
 
 ### Media manager
+- New **Delete**: "Delete (to the Trash)" in the Files Action menu (selected or all matching files, with a confirmation) and a **Delete** button on the file details page. The copy in processed-files is moved to the Trash (macOS Trash, Windows Recycle Bin), so it can be put back by hand. The original on the NAS and the Baserow row are never touched. The file stays in the list with the status `Deleted` and is not processed again; an open review on it is closed.
+- **Exclude** now cleans up: the original stays where it was imported, and a copy the Renamer already made in processed-files is moved to the Trash (the button warns first). The file stays in the list as `Excluded` and is not processed again.
 - Details page tidied up: the waveform is always shown above the form (it replaces the old "Listen" player and is the same player as the Kirtan splitter's, which adds the cut when a review is open); the form is set apart in its own highlighted block; input fields now stand out from their card in dark mode; the Renamer proposal, derived files, jobs and history are in one collapsed section under the page. The splitter evidence shows its times as `hh:mm:ss.mmm`.
 - Material Design 3 in light mode too, on every page: M3 colors, pill-shaped buttons, rounded cards, filled input fields, M3 colors for the waveform.
 - Icons instead of words where the meaning is clear (preview, run, next review, waveform play/nudge/zoom controls, upload, cancel queued, reset filters), each with a tooltip. The "Preparing the waveform" sentence and the "Loading…" text are now just a spinning icon.

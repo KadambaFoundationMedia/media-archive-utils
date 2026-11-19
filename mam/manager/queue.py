@@ -61,7 +61,7 @@ def enqueue(
         return 1
     for file_id in file_ids:
         record = session.get(m.MediaFile, file_id)
-        if record is None or record.status in ("Excluded",):
+        if record is None or record.status in ("Excluded", "Deleted"):
             continue
         busy = session.scalar(
             select(m.Job.id).where(
