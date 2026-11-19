@@ -52,7 +52,10 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
         note = (form.get("note") or "").strip() or None
         messages = {
             "reject": "Result rejected: the copy was removed and the file is Not processed",
-            "exclude": "File excluded from further processing",
+            "exclude": (
+                "File excluded from further processing (the original was not touched; "
+                "any copy in processed-files went to the Trash)"
+            ),
         }
         result_msg = messages.get(action, "")
         file_id = None

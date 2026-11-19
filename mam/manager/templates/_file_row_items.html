@@ -19,7 +19,7 @@
       </td>
       <td class="text-break small">
         {% if f.current_name %}<span class="font-monospace">{{ f.current_name }}</span>
-        {% elif proposal %}<span class="font-monospace text-body-secondary" title="Proposed by a dry run">{{ proposal.new_name }}</span>
+        {% elif proposal and f.status not in ('Excluded', 'Deleted') %}<span class="font-monospace text-body-secondary" title="Proposed by a dry run">{{ proposal.new_name }}</span>
           <span class="badge text-bg-light border">dry run</span>
         {% else %}<span class="text-body-secondary">–</span>{% endif %}
       </td>

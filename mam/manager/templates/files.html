@@ -93,14 +93,16 @@
   </dl>
 </details>
 
-<form id="actions" method="post" action="/actions" x-data="{ scope: 'selected' }">
+<form id="actions" method="post" action="/actions" x-data="{ scope: 'selected', tool: '' }"
+      @submit="if (tool === '__delete' && $event.submitter && $event.submitter.value === 'run' && !confirm('Delete the ' + (scope === 'all' ? 'matching' : 'selected') + ' files?\n\nTheir copies in processed-files go to the Trash and can be put back from there. Originals and Baserow rows are not touched.')) $event.preventDefault()">
   <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
   {% for k, v in flt.query_args().items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
   <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-    <select class="form-select form-select-sm w-auto" name="tool" aria-label="Action" required>
+    <select class="form-select form-select-sm w-auto" name="tool" x-model="tool" aria-label="Action" required>
       <option value="" disabled selected>Action…</option>
       <option value="__pipeline">Run full pipeline</option>
       {% for t in menu %}<option value="{{ t.name }}" title="{{ t.description }}">{{ t.label }}</option>{% endfor %}
+      <option value="__delete">Delete (to the Trash)</option>
     </select>
     <select class="form-select form-select-sm w-auto" name="scope" x-model="scope" aria-label="Which files">
       <option value="selected">Selected files</option>

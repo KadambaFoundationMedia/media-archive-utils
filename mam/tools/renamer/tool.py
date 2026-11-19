@@ -527,4 +527,10 @@ def exclude_file(session: Session, review: m.Review, operator: str, note: str | 
     record = session.get(m.MediaFile, review.media_file_id)
     review.outcome, review.operator, review.note = "excluded", operator, note
     review.decided_at = datetime.now(UTC)
+    # The original stays where it was imported. A copy the Renamer already made goes to the
+    # Trash, so an excluded file is not left in processed-files (decided 2026-11-19).
+    from mam.helpers.file_organizer.trash import trash_processed_copy
+
+    trash_processed_copy(session, record, tool="renamer-review")
+    record.current_name = None
     set_status(session, record, "Excluded", "renamer-review", note or f"excluded by {operator}")

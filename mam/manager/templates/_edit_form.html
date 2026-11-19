@@ -108,9 +108,12 @@
     {% if mode == 'review' %}
       <button class="btn btn-success btn-sm edit-save" name="action" value="approve" type="submit" data-bs-toggle="tooltip" data-bs-title="Renames the copy in processed-files and writes the media row live, unless you chose 'Do not create row'. Originals are never changed." {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-check me-1"></i>Approve</button>
       <button class="btn btn-outline-danger btn-sm" name="action" value="reject" type="submit" data-bs-toggle="tooltip" data-bs-title="Discard this result and return the file to Not processed"><i class="fa-solid fa-rotate-left me-1"></i>Reject result</button>
-      <button class="btn btn-outline-secondary btn-sm" name="action" value="exclude" type="submit" data-bs-toggle="tooltip" data-bs-title="Stop all processing of this file"><i class="fa-solid fa-ban me-1"></i>Exclude file</button>
+      <button class="btn btn-outline-secondary btn-sm" name="action" value="exclude" type="submit" data-bs-toggle="tooltip" data-bs-title="Stop all processing of this file. The original stays where it was imported; a copy in processed-files goes to the Trash."{% if f.processed_path %} onclick="return confirm('Exclude this file?\n\nIts copy in processed-files will be removed (moved to the Trash). The original is not touched.')"{% endif %}><i class="fa-solid fa-ban me-1"></i>Exclude file</button>
     {% else %}
       <button class="btn btn-success btn-sm edit-save" type="submit" data-bs-toggle="tooltip" data-bs-title="Renames the copy in processed-files and writes the media row live, unless you chose 'Do not create row'. Originals are never changed." {% if edit_problems %}disabled{% endif %}><i class="fa-solid fa-floppy-disk me-1"></i>Save</button>
+    {% endif %}
+    {% if f.status != 'Deleted' %}
+    <button class="btn btn-outline-danger btn-sm ms-auto" type="submit" formaction="/details/{{ f.id }}/delete" formnovalidate id="delete-file" data-bs-toggle="tooltip" data-bs-title="Move the copy in processed-files to the Trash. The original and the Baserow row are not touched." onclick="return confirm('Delete this file?\n\nThe copy in processed-files goes to the Trash and can be put back from there. The original and the Baserow row are not touched.')"><i class="fa-solid fa-trash-can me-1"></i>Delete</button>
     {% endif %}
   </div>
 </form>

@@ -36,6 +36,7 @@ STATUS_COLORS = {
     "Not processed": "secondary",
     "Corrupted": "danger",
     "Excluded": "dark",
+    "Deleted": "dark",
     "Skipped": "light",
     "Processing complete": "success",
 }
@@ -86,6 +87,7 @@ STATUS_HELP = {
     "Failed": "The tool hit an error (see Jobs). Fix the cause and retry.",
     "Skipped": "The step does not apply to this file.",
     "Excluded": "A reviewer stopped all processing of this file.",
+    "Deleted": "The copy in processed-files was moved to the Trash. The original was not touched.",
     "Corrupted": "The file cannot be read or decoded.",
     "Processing complete": "Every tool in the pipeline has finished.",
 }
@@ -305,6 +307,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
         tool = form.get("tool", "")
         # Two buttons: "Preview (dry run)" sends mode=preview, "Run" sends mode=run.
         dry_run = form.get("dry_run") == "on" or form.get("mode") == "preview"
+        if tool == "__delete":
+            return _delete_response(request, form, dry_run)
         pipeline = tool == "__pipeline"
         if pipeline:
             tool = pipeline_start()
@@ -324,6 +328,57 @@ def create_app(start_queue: bool = True) -> FastAPI:
         back = re.sub(r"[?&](msg|live)=[^&]*", "", form.get("back") or "/")
         sep = "&" if "?" in back else "?"
         return RedirectResponse(f"{back}{sep}msg={msg}&live=1", status_code=303)
+
+    def _delete_response(request: Request, form, dry_run: bool) -> RedirectResponse:
+        """Delete files from the list: their processed copies go to the Trash."""
+        from mam.helpers.file_organizer.trash import delete_file
+
+        deleted, skipped, to_trash = 0, [], 0
+        with session_scope() as session:
+            if form.get("scope") == "all":
+                flt = queries.FileFilter.from_params(form, default_status="__all")
+                ids = queries.matching_ids(session, flt)
+            else:
+                ids = [int(i) for i in form.getlist("ids")]
+            for file_id in ids:
+                record = session.get(m.MediaFile, file_id)
+                if record is None:
+                    continue
+                result = delete_file(session, record, dry_run=dry_run)
+                to_trash += bool(result.trashed)
+                if result.deleted:
+                    deleted += 1
+                elif not dry_run:
+                    skipped.append(result.message)
+        if dry_run:
+            msg = (
+                f"Preview: {len(ids)} file(s) would be deleted "
+                f"({to_trash} copies moved to the Trash)"
+            )
+        else:
+            msg = f"Deleted {deleted} file(s): the copies in processed-files went to the Trash"
+            if skipped:
+                msg += f"; {len(skipped)} not deleted ({skipped[0]})"
+        notify(request)
+        back = re.sub(r"[?&](msg|live)=[^&]*", "", form.get("back") or "/")
+        sep = "&" if "?" in back else "?"
+        return RedirectResponse(f"{back}{sep}msg={msg}", status_code=303)
+
+    @app.post("/details/{file_id}/delete")
+    def delete_one(request: Request, file_id: int):
+        from mam.helpers.file_organizer.trash import delete_file
+
+        with session_scope() as session:
+            record = session.get(m.MediaFile, file_id)
+            if record is None:
+                raise HTTPException(404)
+            result = delete_file(session, record, dry_run=False)
+        if not result.deleted:
+            return RedirectResponse(f"/details/{file_id}?error={result.message}", status_code=303)
+        notify(request)
+        return RedirectResponse(
+            f"/?msg=File deleted: {result.message}. The original was not touched.", status_code=303
+        )
 
     # ----------------------------------------------------------- file detail
     @app.get("/files/{file_id}")
