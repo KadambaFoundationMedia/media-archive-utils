@@ -16,7 +16,32 @@
       <td><span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'secondary' if j.state == 'cancelled' else 'info' }}">
         {% if j.state == 'running' %}<i class="fa-solid fa-spinner fa-spin me-1"></i>{% endif %}{{ j.state }}</span></td>
       <td class="text-break">
-        {% if j.result %}{{ j.result.summary }}{% endif %}
+        {% if j.result %}{{ j.result.summary }}
+          {% set d = j.result %}
+          {% if d.duplicates_by_folder %}
+          <details class="mt-1 scan-detail"><summary><i class="fa-regular fa-copy me-1"></i>{{ d.duplicates }} identical cop{{ 'y' if d.duplicates == 1 else 'ies' }}</summary>
+            <div class="small text-body-secondary mb-1">Each file is byte-identical to one already registered (shown after the arrow); it was not added again.</div>
+            {% for g in d.duplicates_by_folder %}
+            <details class="ms-3"><summary class="text-break"><i class="fa-regular fa-folder me-1"></i>{{ g.folder }} <span class="badge text-bg-secondary">{{ g['items'] | length }}</span></summary>
+              <ul class="list-unstyled ms-3 mb-1">
+              {% for it in g['items'] %}<li class="text-break">{{ it.name }} <i class="fa-solid fa-arrow-right-long mx-1 text-body-secondary"></i><span class="text-body-secondary">{{ it.of }}</span></li>{% endfor %}
+              </ul>
+            </details>
+            {% endfor %}
+          </details>
+          {% endif %}
+          {% if d.ignored_by_type %}
+          <details class="mt-1 scan-detail"><summary><i class="fa-regular fa-eye-slash me-1"></i>{{ d.ignored }} other files ignored</summary>
+            <div class="small text-body-secondary mb-1">Not audio or video, so not registered. Grouped by file type.</div>
+            {% for t in d.ignored_by_type %}
+            <details class="ms-3"><summary><code>{{ t.ext }}</code> <span class="badge text-bg-secondary">{{ t.count }}</span></summary>
+              <ul class="list-unstyled ms-3 mb-1">{% for f in t.files %}<li class="text-break">{{ f }}</li>{% endfor %}</ul>
+            </details>
+            {% endfor %}
+          </details>
+          {% endif %}
+          {% if d.details_truncated %}<div class="small text-body-secondary mt-1"><i class="fa-solid fa-circle-info me-1"></i>Lists show the first {{ 2000 }} of each; the counts above are complete.</div>{% endif %}
+        {% endif %}
         {% if j.error %}<details><summary class="text-danger">{{ j.error.split('\n')[0][:160] }}</summary><pre class="small text-wrap">{{ j.error }}</pre></details>{% endif %}
       </td>
       <td class="text-nowrap">{{ (j.created_at | localtime('%m-%d %H:%M:%S')) }}</td>
