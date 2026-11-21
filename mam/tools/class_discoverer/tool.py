@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import random
 import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -198,6 +199,24 @@ def decide(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def duration_text(seconds: float) -> str:
+    minutes, secs = divmod(round(seconds), 60)
+    return f"{minutes} min {secs:02d} s" if minutes else f"{secs} s"
+
+
+def took(t: dict[str, float]) -> str:
+    """'4 min 12 s (volume 3 s, transcription 3 min 58 s, verse check 11 s)'."""
+    transcription = (
+        "transcript from the cache"
+        if not t["transcription_s"]
+        else duration_text(t["transcription_s"])
+    )
+    return (
+        f"{duration_text(t['total_s'])} (volume {duration_text(t['gain_s'])}, "
+        f"transcription {transcription}, verse check {duration_text(t['verse_s'])})"
+    )
+
+
 def class_start(announcements: list[dict[str, Any]], found: dict[str, Any] | None) -> float | None:
     """When the verse was announced: recorded for the class-trimmer, nothing is cut here."""
     return found["time"] if found else None
@@ -234,6 +253,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     skip = not_a_class(record)
     if skip:
         return ToolOutcome("skipped", skip, {})
+    started = time.monotonic()
     audio = source_audio(record, dry_run=ctx.dry_run)
     file_ref = filename_verse(record)
     client = VedabaseClient(settings)
@@ -241,6 +261,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         gain = apply_gain(ctx.session, record, audio, settings, dry_run=ctx.dry_run)
     except CorruptedMedia as exc:
         return ToolOutcome("corrupted", str(exc), {})
+    gained = time.monotonic()
     sha = record.sha256 or sha256(audio)
     if not ctx.dry_run:
         record.sha256 = sha
@@ -248,6 +269,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     ctx.session.commit()  # the transcription takes minutes; do not hold the database
     transcript, cached = transcribe(ctx.session, audio, sha, settings)
     ctx.session.commit()  # vedabase.io caches pages through its own session: no lock may be held
+    transcribed = time.monotonic()
     if prefetch is not None:
         prefetch.join()
     try:
@@ -255,6 +277,13 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     except VedabaseError as exc:
         # vedabase.io unreachable: keep the transcript, the job can be retried
         raise MamError(f"The transcript is saved, but {exc}") from exc
+    finished = time.monotonic()
+    timings = {
+        "gain_s": round(gained - started, 1),
+        "transcription_s": round(transcribed - gained, 1),  # 0 when the transcript was cached
+        "verse_s": round(finished - transcribed, 1),
+        "total_s": round(finished - started, 1),
+    }
     decision = decide(data)
     languages = [LANGUAGE_NAMES.get(code, code) for code in transcript.languages[:3]]
     data.update(
@@ -265,8 +294,9 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         class_start=class_start(data["announcements"], data["found"]),
         transcript_cached=cached,
         segments=len(transcript.segments),
+        timings=timings,
     )
-    summary = "; ".join(decision["reasons"])
+    summary = "; ".join(decision["reasons"]) + f" Took {took(timings)}."
     if ctx.dry_run:
         return ToolOutcome("info", f"Would: {summary}", data)
 
