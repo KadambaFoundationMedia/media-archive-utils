@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections import Counter
 from pathlib import Path
@@ -136,3 +137,27 @@ def write_markdown(t: Transcript, path: Path, title: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(markdown_text(t, title), encoding="utf-8")
     return path
+
+
+def transcript_file(settings: Settings, processed: Path) -> Path:
+    """`transcriptions/<category folder>/<name>.md` for an audio copy in processed-files."""
+    folder = Path()
+    root = settings.media_processed_files_path.resolve()
+    with contextlib.suppress(ValueError):  # outside processed-files (a dry run): the root
+        folder = processed.resolve().parent.relative_to(root)
+    return settings.transcriptions_path / folder / f"{processed.stem}.md"
+
+
+def follow_audio(settings: Settings, old: Path | None, new: Path) -> Path | None:
+    """Move the transcript along when its audio was renamed or filed in another folder.
+
+    Never overwrites: a transcript already at the new place stays and the old one is left.
+    """
+    if old is None or old == new:
+        return None
+    src, dst = transcript_file(settings, old), transcript_file(settings, new)
+    if src == dst or not src.exists() or dst.exists():
+        return None
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    src.rename(dst)
+    return dst

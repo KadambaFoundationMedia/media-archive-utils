@@ -10,7 +10,6 @@ Decisions (Edwin, 2026-11-21, see SPEC.md section 4):
 
 from __future__ import annotations
 
-import contextlib
 import logging
 import random
 import threading
@@ -27,7 +26,7 @@ from mam.errors import CorruptedMedia, MamError, VedabaseError
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import sha256
 from mam.helpers.local_db.repo import set_status
-from mam.helpers.transcriber import Transcript, transcribe, write_markdown
+from mam.helpers.transcriber import Transcript, transcribe, transcript_file, write_markdown
 from mam.helpers.vedabase import VedabaseClient, VerseRef
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.class_discoverer.announce import (
@@ -244,12 +243,7 @@ def _prefetch(client: VedabaseClient, ref: VerseRef | None) -> threading.Thread 
 
 
 def transcript_path(settings: Settings, record: m.MediaFile, audio: Path) -> Path:
-    """`transcriptions/<category folder>/<name>.md`, the audio's folder below processed-files."""
-    folder = Path()
-    root = settings.media_processed_files_path.resolve()
-    with contextlib.suppress(ValueError):  # outside processed-files (a dry run): the root
-        folder = audio.resolve().parent.relative_to(root)
-    return settings.transcriptions_path / folder / f"{audio.stem}.md"
+    return transcript_file(settings, audio)
 
 
 def run_class_discoverer(ctx: JobContext) -> ToolOutcome:

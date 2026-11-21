@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Class-discoverer
+- A transcript now follows its audio: when the Renamer renames the copy or files it in another category folder (also after a Save in the portal), the transcript moves and is renamed with it.
 - Transcripts are saved in the matching category subfolder of `transcriptions/`, the same folder the audio copy has in processed-files.
 - A verse only counts as the class verse when it is announced in the first 10 minutes and before the Translation or Purport is read, so a verse quoted in the purport can no longer win.
 

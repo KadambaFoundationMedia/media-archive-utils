@@ -7,13 +7,17 @@ class-discoverer and the later tools never transcribe the same content twice.
 
 from mam.helpers.transcriber.models import Segment, Transcript, format_timestamp
 from mam.helpers.transcriber.store import (
+    follow_audio,
     load_transcript,
     markdown_text,
     transcribe,
+    transcript_file,
     write_markdown,
 )
 
 __all__ = [
+    "follow_audio",
+    "transcript_file",
     "Segment",
     "Transcript",
     "format_timestamp",

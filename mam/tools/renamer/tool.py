@@ -24,6 +24,7 @@ from mam.helpers.local_db.app_settings import (
 )
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
+from mam.helpers.transcriber import follow_audio
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.renamer.dates import DateValue
 from mam.tools.renamer.knowledge import (
@@ -549,7 +550,13 @@ def _store_evidence(session: Session, record: m.MediaFile, proposal: Proposal) -
 
 
 def _apply_display(record: m.MediaFile, data: dict[str, Any], final: Path) -> None:
+    old = Path(record.processed_path) if record.processed_path else None
     record.processed_path = str(final)
+    if old is not None and old != final:
+        try:  # the transcript follows its audio (SPEC.md section 5)
+            follow_audio(get_settings(), old, final)
+        except OSError:
+            log.warning("Could not move the transcript of %s", old, exc_info=True)
     record.current_name = final.name
     record.rec_date = data["when"]
     record.title = data.get("what")
