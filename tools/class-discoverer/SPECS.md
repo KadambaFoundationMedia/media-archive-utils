@@ -15,7 +15,7 @@ All recordings are from ISKCON temples, (the International Society for Krishna c
 ## Goals
 - Use @helpers/audio-optimizer/SPECS.md to improve the audio quality of the whole recording
 - Transcribe the full recording
-- Save the transcription to a new file in the default transcription folder
+- Save the transcription to a new file in the default transcription folder, in the matching category subfolder (same principle as the Renamer tool uses)
   - Use the tools/renamer/specs.md tool to rename it correctly
 - Determine the scripture and verse from the filename, transcription or other metadata
   - Use the https://vedabase.io to confirm or enrich the "WHAT"

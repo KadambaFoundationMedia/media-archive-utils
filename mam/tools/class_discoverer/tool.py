@@ -10,6 +10,7 @@ Decisions (Edwin, 2026-11-21, see SPEC.md section 4):
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import random
 import threading
@@ -243,7 +244,12 @@ def _prefetch(client: VedabaseClient, ref: VerseRef | None) -> threading.Thread 
 
 
 def transcript_path(settings: Settings, record: m.MediaFile, audio: Path) -> Path:
-    return settings.transcriptions_path / f"{audio.stem}.md"
+    """`transcriptions/<category folder>/<name>.md`, the audio's folder below processed-files."""
+    folder = Path()
+    root = settings.media_processed_files_path.resolve()
+    with contextlib.suppress(ValueError):  # outside processed-files (a dry run): the root
+        folder = audio.resolve().parent.relative_to(root)
+    return settings.transcriptions_path / folder / f"{audio.stem}.md"
 
 
 def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
