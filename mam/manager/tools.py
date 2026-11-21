@@ -77,6 +77,12 @@ def _kirtan_splitter(ctx: JobContext) -> ToolOutcome:
     return run_kirtan_splitter(ctx)
 
 
+def _class_discoverer(ctx: JobContext) -> ToolOutcome:
+    from mam.tools.class_discoverer.tool import run_class_discoverer
+
+    return run_class_discoverer(ctx)
+
+
 TOOLS: dict[str, ToolSpec] = {
     "renamer": ToolSpec(
         "renamer",
@@ -91,6 +97,13 @@ TOOLS: dict[str, ToolSpec] = {
         "cpu",
         _kirtan_splitter,
         "Find where the kirtan ends and split a combined recording into kirtan and class",
+    ),
+    "class-discoverer": ToolSpec(
+        "class-discoverer",
+        "Class discoverer",
+        "ml",
+        _class_discoverer,
+        "Even out the volume, transcribe the class and find its verse on vedabase.io",
     ),
     "scan": ToolSpec(
         "scan",

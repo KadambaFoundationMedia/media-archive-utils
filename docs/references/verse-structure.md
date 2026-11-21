@@ -74,3 +74,10 @@ How many numbers a single verse has depends on the scripture, so any extra numbe
 - **Separators:** filenames use hyphens (`BG-2-54`, `SB-9-20-20-27`, `CC-Madhya-20-154`); titles, such as the Baserow `title`, use dots between the numbers (`BG 2.54`, `SB 9.20.20-27`, `CC Madhya 20.154`). The Baserow `tag` holds only the numbers (`2.54`, `Madhya 20.154`).
 - Source names use many variants of the same abbreviation (`S.B.`, `SB`, `Srimad-bhagavatam`, `B.G.`, `CC`, `Chaitanya Charitamrita`). The accepted variants per category are in the Baserow `category_terms_folder` table.
 - Some verses have no purport (e.g. CC Madhya 20.154); the topics of such a class come from the transcript.
+
+## Verse announcements in a recording
+The class-discoverer reads the speaker's announcement of the verse in the transcript, then confirms it on vedabase.io (see SPEC.md section 4):
+- A book name ("Bhagavad-gita as it is", "Srimad-Bhagavatam", "Caitanya-caritamrta", "Madhya lila") followed or surrounded by the numbers: "chapter two, text fifty-one", "first canto, chapter nineteen, text thirty-one", or digits ("SB 3.6.6").
+- A range is "text 20 to 27" (a range has no vedabase.io page of its own: the first and the last verse are checked).
+- An announcement missing a number ("It's thirty one, first canto") is not a verse.
+- A verse is confirmed when the English translation on vedabase.io is heard in the transcript (the speaker reads it). The vedabase.io page layout: `div.av-devanagari` (CC: `av-bengali`), `av-verse_text`, `av-synonyms`, `av-translation`, `av-purport`; verse ranges have no URL; robots.txt asks for 10 s between requests and disallows `/advanced-view/`, `/search/` and the synonym links.

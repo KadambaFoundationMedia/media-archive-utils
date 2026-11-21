@@ -1,0 +1,38 @@
+{# The class discoverer's review: the verse heard in the recording against the filename's. #}
+<form method="post" action="/review/{{ review.id }}/decide" class="card mb-3">
+  <div class="card-header">Which verse is it?</div>
+  <div class="card-body small">
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="fw-semibold">Heard in the recording</div>
+        {% if p.found %}
+        <div><code>{{ p.found.what }}</code> ({{ p.found.tag }}), announced at {{ p.found.time | hms }}{% if p.found.heard > 1 %}, heard {{ p.found.heard }} times{% endif %}</div>
+        <div>On vedabase.io: {{ 'yes' if p.found.on_vedabase else 'no' }}{% if p.found.match %} · translation heard: {{ '%.0f' % (p.found.match.share * 100) }}%{% endif %}</div>
+        <blockquote class="border-start ps-2 my-2 text-body-secondary">{{ p.found.excerpt }}</blockquote>
+        {% else %}<div class="text-body-secondary">No verse was announced.</div>{% endif %}
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="fw-semibold">In the filename</div>
+        {% if p.file %}
+        <div><code>{{ p.file }}</code></div>
+        {% if p.file_match and p.file_match.match %}<div>Translation heard in the recording: {{ '%.0f' % (p.file_match.match.share * 100) }}%</div>{% endif %}
+        {% else %}<div class="text-body-secondary">No verse.</div>{% endif %}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="what">Another verse (e.g. BG-2-51, SB-9-20-20-27, CC-Madhya-20-154)</label>
+        <input class="form-control" id="what" name="what" placeholder="optional">
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="note">Note (optional)</label>
+        <input class="form-control" id="note" name="note">
+      </div>
+    </div>
+  </div>
+  <div class="card-footer d-flex flex-wrap gap-2">
+    {% if p.found %}<button class="btn btn-success btn-sm" name="action" value="use_transcript" data-bs-toggle="tooltip" data-bs-title="Rename with the verse from the recording (the Renamer is queued with it as evidence).">Use {{ p.found.what }}</button>{% endif %}
+    {% if p.file %}<button class="btn btn-outline-secondary btn-sm" name="action" value="keep_filename" data-bs-toggle="tooltip" data-bs-title="Keep the verse in the filename. Nothing is renamed.">Keep {{ p.file }}</button>{% endif %}
+    <button class="btn btn-outline-primary btn-sm" name="action" value="custom" data-bs-toggle="tooltip" data-bs-title="Rename with the verse typed above.">Use the typed verse</button>
+    <button class="btn btn-outline-danger btn-sm" name="action" value="reject" data-bs-toggle="tooltip" data-bs-title="Discard this result. The file can be run again." onclick="return confirm('Discard this result?')">Reject result</button>
+    <button class="btn btn-outline-danger btn-sm" name="action" value="exclude" data-bs-toggle="tooltip" data-bs-title="Stop all processing of this file." onclick="return confirm('Stop all processing of this file?')">Exclude file</button>
+  </div>
+</form>

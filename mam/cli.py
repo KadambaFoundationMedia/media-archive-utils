@@ -345,6 +345,19 @@ def kirtan_split(
     _run_tool_cli("kirtan-splitter", path, dry_run)
 
 
+@app.command("class-discover")
+def class_discover(
+    path: Path,
+    dry_run: DryRun = True,
+) -> None:
+    """Even out the volume, transcribe a class and find its verse on vedabase.io.
+
+    A dry run transcribes (the transcript is cached) and reports what it would do, but changes
+    no file. A real run works on the renamed copy in processed-files.
+    """
+    _run_tool_cli("class-discoverer", path, dry_run)
+
+
 @app.command()
 def reset(
     processed_files: Annotated[bool, typer.Option(help="Delete the processed copies.")] = True,

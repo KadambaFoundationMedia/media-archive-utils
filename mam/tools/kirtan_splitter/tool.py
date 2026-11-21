@@ -153,7 +153,9 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
         return ToolOutcome(
             "review", f"{summary} (score {decision.score:.2f}, needs a review)", data
         )
-    if decision.mode in ("kirtan_only", "class_only"):
+    if decision.mode == "class_only":  # no kirtan to split: the class itself goes on
+        return ToolOutcome("skipped", summary, {**data, "continue_pipeline": True})
+    if decision.mode == "kirtan_only":
         return ToolOutcome("skipped", summary, data)
     result = apply_split(ctx.session, record, work_audio, data, settings, dry_run=False)
     return ToolOutcome("done", f"{summary} {result['summary']}", {**data, **result})
