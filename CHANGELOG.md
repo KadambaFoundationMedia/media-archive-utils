@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Class-discoverer
+- A verse only counts as the class verse when it is announced in the first 10 minutes and before the Translation or Purport is read, so a verse quoted in the purport can no longer win.
 
 ### Media manager
 - Jobs page: a Scan folder result now has collapsible lists. **Identical copies** are grouped by folder and show which registered file each one duplicates; **other files ignored** are grouped by file type with counts. The lists keep the first 2000 of each (the counts stay complete).

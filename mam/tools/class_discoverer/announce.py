@@ -29,6 +29,15 @@ LILA_RE = re.compile(r"\b(adi|madhya|antya)\b")
 NOISE = {"number", "no", "the", "is", "it", "its", "of", "in"}
 
 
+ANNOUNCE_WINDOW_S = 600.0  # the verse is announced at the beginning of the class
+MARKER_RE = re.compile(r"^\W*(translation|purport|synonyms)\W*$", re.IGNORECASE)
+
+
+def is_section_marker(text: str) -> bool:
+    """The speaker announcing a part of the verse ('Translation', 'Purport', 'Synonyms')."""
+    return bool(MARKER_RE.match(text.strip()))
+
+
 @dataclass
 class Announcement:
     book: str
@@ -37,6 +46,7 @@ class Announcement:
     start: float  # seconds of the segment where it was heard
     excerpt: str
     issue: str | None = None  # why it is not usable (e.g. an incomplete reference)
+    quoted: bool = False  # a verse quoted in the purport, not the verse of the class
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -47,6 +57,7 @@ class Announcement:
             "start": self.start,
             "excerpt": self.excerpt,
             "issue": self.issue,
+            "quoted": self.quoted,
         }
 
 
@@ -131,26 +142,37 @@ def read_window(book: str, text: str) -> tuple[VerseRef | None, dict[str, Any], 
 def find_announcements(
     transcript: Transcript, *, max_seconds: float | None = None
 ) -> list[Announcement]:
-    """Every place where the speaker names a book with verse numbers."""
+    """Every place where the speaker names a book with verse numbers.
+
+    A verse named after the speaker has started reading the translation or purport, or later
+    than the first ten minutes, is a quotation inside the purport, not the verse of the class
+    (seen on the 2008-01-04-2 sample): it is marked `quoted`.
+    """
     segs = transcript.segments
     out: list[Announcement] = []
+    marker_seen = False
     for i, seg in enumerate(segs):
         if max_seconds is not None and seg.start > max_seconds:
             break
+        if is_section_marker(seg.text):
+            marker_seen = True
+            continue
         text = seg.text.lower()
         for book, pattern in BOOKS.items():
-            if not pattern.search(text):
+            match = pattern.search(text)
+            if not match:
                 continue
             # the numbers are spoken in the same or the next two segments
             window = " ".join(s.text for s in segs[max(0, i - 1) : i + 3])
             ref, heard, issue = read_window(book, window)
-            out.append(Announcement(book, ref, heard, seg.start, window[:300], issue))
+            quoted = ref is not None and (marker_seen or seg.start > ANNOUNCE_WINDOW_S)
+            out.append(Announcement(book, ref, heard, seg.start, window[:300], issue, quoted))
     return out
 
 
 def best_announcement(found: list[Announcement]) -> tuple[Announcement | None, Counter]:
     """The complete announcement heard most often (the earliest on a tie)."""
-    complete = [a for a in found if a.ref is not None]
+    complete = [a for a in found if a.ref is not None and not a.quoted]
     if not complete:
         return None, Counter()
     votes: Counter = Counter(a.ref.what for a in complete)  # type: ignore[union-attr]
