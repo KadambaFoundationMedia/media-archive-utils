@@ -10,9 +10,9 @@ Decisions (Edwin, 2026-11-21, see SPEC.md section 4):
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import random
-import contextlib
 import threading
 import time
 from datetime import UTC, datetime
