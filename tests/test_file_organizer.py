@@ -1,4 +1,5 @@
 import shutil
+from pathlib import Path
 
 import pytest
 
@@ -89,3 +90,24 @@ def test_never_writes_into_originals(category_rows, tone, settings, monkeypatch)
         FileOrganizer(CategoryMatcher(category_rows), settings).organize(
             tone, "y.mp3", "BG-2-51", tool="t", dry_run=False
         )
+
+
+def test_unprocessed_and_identical_files_keep_the_original_folders(matcher, tone, settings):
+    from mam.helpers.file_organizer.organizer import origin_subfolder
+
+    nested = settings.media_sample_files_path / "2012" / "Radhadesh Jan 2012" / "R09_0008.mp3"
+    nested.parent.mkdir(parents=True)
+    shutil.copy2(tone, nested)
+    org = FileOrganizer(matcher)
+    kept = Path("2012") / "Radhadesh Jan 2012"
+    assert origin_subfolder(nested, settings) == kept
+    top = settings.media_sample_files_path / "x.mp3"
+    assert origin_subfolder(top, settings) == Path()  # straight in the import root: no folder
+    result = org.organize(
+        nested, "2012-MM-DD_KKS.mp3", None, tool="t", dry_run=False, origin=nested
+    )
+    assert result.dst == settings.media_unprocessed_files_path / kept / "2012-MM-DD_KKS.mp3"
+    assert result.dst.exists()
+    twin = org.place_duplicate(nested, tool="t", dry_run=False)
+    assert twin.dst == settings.media_identical_files_path / kept / "R09_0008.mp3"
+    assert twin.dst.exists()

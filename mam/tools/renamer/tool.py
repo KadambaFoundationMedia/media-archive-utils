@@ -389,7 +389,8 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
     ctx.session.commit()
     organizer = FileOrganizer(res.ref.matcher, settings)
     move_files, postfix = renamer_move_files(), renamer_postfix()
-    folder, _ = organizer.target_folder(proposal.what, proposal.category)
+    origin = Path(record.original_path)
+    folder, _ = organizer.target_folder(proposal.what, proposal.category, origin)
     unique, other = reserve_name(record.id, folder, proposal.new_name)
     if other:
         proposal.flags.append(
@@ -407,6 +408,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         category=proposal.category,
         move_original=move_files,
         postfix=postfix,
+        origin=origin,
     )
     for warning in placed.warnings:
         proposal.notes.append(warning)

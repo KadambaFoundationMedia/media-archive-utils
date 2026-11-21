@@ -305,7 +305,8 @@ def save(
 
     session.commit()  # release before helpers write through their own sessions
     organizer = FileOrganizer(ref.matcher, settings)
-    folder, _ = organizer.target_folder(parsed["what"], category)
+    origin = Path(record.original_path) if record.original_path else None
+    folder, _ = organizer.target_folder(parsed["what"], category, origin)
     name, _ = reserve_name(record.id, folder, _clean(values["filename"]))
     placed = organizer.organize(
         source_path(record),
@@ -315,6 +316,7 @@ def save(
         dry_run=False,
         media_file_id=record.id,
         category=category,
+        origin=origin,
     )
     row_id = _clean(values.get("baserow_row_id"))
     skip_row = row_id == SKIP_ROW  # "Do not create row": the file is renamed, Baserow untouched
