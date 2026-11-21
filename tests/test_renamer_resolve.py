@@ -31,6 +31,9 @@ def tree(settings):
         "JANMASTAMI  LJUBLANA 2015/150905_0124_D.mp3",
         "Oslo/2011-08-28_KKS_Bhajans_Oslo_sr.mp3",
         "ambiguous/KKS_Lecture_03-04-11.mp3",
+        "Sample files/vyasa puja 2015/R09_0008.MP3",
+        "Sample files/vyasa puja 2015/Nama-rupa/ZOOM0001.MP3",
+        "Sample files/Srimad Bhagavatam 2015/R09_0001.MP3",
     ]
     for name in names:
         path = root / name
@@ -73,7 +76,7 @@ def propose(reference, settings, tree):
             "HH Kadamba Kanana Swami - SB 3.6.6 - Sweden - 27_8_15.mp3",
             "2015-08-27_KKS_SB-3-6-6_se.mp3",
         ),
-        ("JANMASTAMI  LJUBLANA 2015/150905_0124_D.mp3", "2015-09-05_KKS_Ljubljana-si.mp3"),
+        ("JANMASTAMI  LJUBLANA 2015/150905_0124_D.mp3", "2015-09-05_KKS_Janmastami_Ljubljana-si.mp3"),
     ],
 )
 def test_names(propose, name, expected):
@@ -325,3 +328,17 @@ def test_a_place_that_is_summercamp_by_alias_gives_the_summercamp_category(
     path.write_bytes(b"")
     p = Resolver(build_reference(raw), [tree]).propose(path)
     assert p.place == "Summercamp" and p.category == "Summercamp"
+
+
+def test_folder_category_gives_the_what_when_the_filename_has_none(propose):
+    for rel in ("Sample files/vyasa puja 2015/R09_0008.MP3",
+                "Sample files/vyasa puja 2015/Nama-rupa/ZOOM0001.MP3"):
+        p = propose(rel)
+        assert p.category == "Vyasa-puja" and p.what == "Vyasa-puja"
+        assert p.new_name == "2015-MM-DD_KKS_Vyasa-puja.mp3"
+        assert not any("Non-descriptive" in f for f in p.flags)
+
+
+def test_folder_scripture_category_is_not_used_as_the_what(propose):
+    p = propose("Sample files/Srimad Bhagavatam 2015/R09_0001.MP3")
+    assert p.category == "Srimad-bhagavatam" and p.what is None

@@ -60,6 +60,9 @@ Other spellings of a place are kept in the `aliases` column of `place_country` (
 
 When a file names no place or country, the Renamer may take the country from the other files in the same folder: if the places they name are all in one country, that country is used (e.g. `cz` for the files next to `03 BRNO LEKCE.mp3`). The city is left out until it is known.
 
+### WHAT from the folder
+When the filename gives no WHAT (`R09_0008.MP3`, `ZOOM0001.MP3`) but a parent folder matches a category in `category_terms_folder` (`Vyasa puja 2015` gives `Vyasa-puja`), that category is the WHAT: `2015-MM-DD_KKS_Vyasa-puja.mp3`. Several files of one folder get `-2`, `-3` (see clashes below). Scripture categories (`SB`, `BG`, `CC`) are not used this way, because they need a verse.
+
 ### Summercamp
 A name or folder with `summercamp` in it (`Serbia-Summercamp`, `Swiss summercamp`, `Summer-camp`) is in the `Summercamp` category, unless the filename has a book and verse; the book's category then wins.
 
