@@ -119,3 +119,15 @@ def test_other_spellings_of_canto():
         t = real_segments((10, f"Srimad Bhagavatam {spoken}"))
         best, _ = best_announcement(find_announcements(t))
         assert best is not None and best.ref.what == "SB-3-6-6", spoken
+
+
+def test_a_correction_wins_and_the_first_reading_is_the_alternative():
+    """Oslo sample: 'First Canto, Chapter 9, ... text 31. Huh? No? 31? Yeah. Chapter 19.'"""
+    t = real_segments(
+        (0, "It's 31. First Canto, Chapter 9, the appearance of Sukadeva Goswami, text 31."),
+        (7, "Huh? No? 31? Yeah. Chapter 19."),
+        (15, "19."),
+    )
+    best, _ = best_announcement(find_announcements(t))
+    assert best.ref.what == "SB-1-19-31"
+    assert best.partial["alternatives"] == ["SB-1-9-31"]

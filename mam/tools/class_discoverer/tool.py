@@ -14,6 +14,7 @@ import logging
 import random
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -127,13 +128,26 @@ def discover(
         "quality": transcript_quality(transcript.segments, transcript.fallback),
     }
     if best is not None and best.ref is not None:
+        heard_times = votes[best.ref.what]
         exists, match, note = _confirm(client, best.ref, transcript)
+        if not (exists and match and match.confirmed):
+            # the speaker may have corrected himself ('chapter 9 ... no, chapter 19'): the last
+            # reading is tried first, the first reading is the alternative
+            for alt in best.partial.get("alternatives") or []:
+                alt_ref = VerseRef.from_what(alt)
+                if alt_ref is None:
+                    continue
+                a_exists, a_match, a_note = _confirm(client, alt_ref, transcript)
+                if a_exists and a_match and a_match.confirmed:
+                    best = replace(best, ref=alt_ref)
+                    exists, match, note = a_exists, a_match, a_note
+                    break
         data["found"] = {
             "what": best.ref.what,
             "tag": best.ref.tag,
             "time": best.start,
             "excerpt": best.excerpt,
-            "heard": votes[best.ref.what],
+            "heard": heard_times,
             "on_vedabase": exists,
             "match": match.to_dict() if match else None,
             "note": note,

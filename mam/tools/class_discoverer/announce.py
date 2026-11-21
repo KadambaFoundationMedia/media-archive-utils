@@ -110,39 +110,48 @@ def read_window(book: str, text: str) -> tuple[VerseRef | None, dict[str, Any], 
         heard["dotted"] = dotted.group(1)
     keywords = CANTO_WORDS | {"chapter", "text", "texts", "verse", "verses"}
     kw = _numbers_after(tokens, keywords)
-    values: dict[str, int] = {}
+    values: dict[str, int] = {}  # the last number said for each part: a correction wins
+    firsts: dict[str, int] = {}  # the first number said, kept as the alternative
     ends: dict[str, int | None] = {}
     for word, value, pos in kw:
         key = "canto" if word in CANTO_WORDS else "chapter" if word == "chapter" else "verse"
-        if key not in values:
-            values[key] = value
-            if key == "verse":
-                ends[key] = _range_end(tokens, pos, value)
+        firsts.setdefault(key, value)
+        values[key] = value
+        if key == "verse":
+            ends[key] = _range_end(tokens, pos, value)
     heard.update(values)
     lila = LILA_RE.search(lower)
     if lila:
         heard["lila"] = lila.group(1).capitalize()
-    nums: list[int] = []
-    if book == "BG":
-        if "chapter" in values and "verse" in values:
-            nums = [values["chapter"], values["verse"]]
-        elif dotted and dotted.group(1).count(".") == 1:
-            nums = [int(n) for n in dotted.group(1).split(".")]
-    elif book == "SB":
-        if {"canto", "chapter", "verse"} <= values.keys():
-            nums = [values["canto"], values["chapter"], values["verse"]]
-        elif dotted and dotted.group(1).count(".") == 2:
-            nums = [int(n) for n in dotted.group(1).split(".")]
-    else:
-        lila_name = heard.get("lila")
-        if lila_name and "chapter" in values and "verse" in values:
-            nums = [values["chapter"], values["verse"]]
-        elif lila_name and dotted and dotted.group(1).count(".") == 1:
-            nums = [int(n) for n in dotted.group(1).split(".")]
+
+    def numbers(parts: dict[str, int]) -> list[int]:
+        if book == "BG":
+            if "chapter" in parts and "verse" in parts:
+                return [parts["chapter"], parts["verse"]]
+            if dotted and dotted.group(1).count(".") == 1:
+                return [int(n) for n in dotted.group(1).split(".")]
+        elif book == "SB":
+            if {"canto", "chapter", "verse"} <= parts.keys():
+                return [parts["canto"], parts["chapter"], parts["verse"]]
+            if dotted and dotted.group(1).count(".") == 2:
+                return [int(n) for n in dotted.group(1).split(".")]
+        else:
+            lila_name = heard.get("lila")
+            if lila_name and "chapter" in parts and "verse" in parts:
+                return [parts["chapter"], parts["verse"]]
+            if lila_name and dotted and dotted.group(1).count(".") == 1:
+                return [int(n) for n in dotted.group(1).split(".")]
+        return []
+
+    nums = numbers(values)
     if not nums:
         return None, heard, "The announcement names no complete verse"
     end = ends.get("verse")
-    ref = VerseRef(book, tuple(nums), heard.get("lila") if book == "CC" else None, end)
+    lila_name = heard.get("lila") if book == "CC" else None
+    ref = VerseRef(book, tuple(nums), lila_name, end)
+    first = numbers(firsts)
+    if first and first != nums:  # 'chapter 9 ... no, chapter 19': try the first reading too
+        heard["alternatives"] = [VerseRef(book, tuple(first), lila_name, end).what]
     return ref, heard, None
 
 
