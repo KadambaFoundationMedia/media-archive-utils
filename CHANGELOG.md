@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Class-discoverer
+- Verse look-up on vedabase.io (groundwork, no tool yet): reads `SB-9-20-20-27`-style references (a range is fetched verse by verse), parses the transliteration, synonyms, translation and purport from the page, and caches each verse in the local DB for good. Requests keep the 10 second crawl delay from vedabase.io's robots.txt. New table `vedabase_verse` (migration 0004).
+
 ### Media manager
 - Settings page: options now save by themselves when you change them (a check mark shows, or the problem if a value is refused), so there are no Save buttons any more.
 
