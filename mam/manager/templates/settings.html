@@ -7,38 +7,47 @@
 
 <div class="row g-3">
   <div class="col-12 col-lg-6">
-    <form method="post" action="/settings/default-status" class="card mb-3">
+    <div class="card mb-3">
       <div class="card-header">File list</div>
       <div class="card-body">
         <label class="form-label small mb-1" for="default_status">Default Status filter</label>
-        <div class="d-flex gap-2">
-          <select class="form-select form-select-sm w-auto" id="default_status" name="default_status">
+        <div class="d-flex gap-2 align-items-center">
+          <select class="form-select form-select-sm w-auto" id="default_status" name="default_status"
+                  hx-post="/settings/default-status" hx-trigger="change" hx-include="this"
+                  hx-target="#saved-default-status" hx-swap="innerHTML">
             {% for value, label, group in status_choices %}
             {% if group and loop.previtem[2] != group %}<optgroup label="{{ group }}">{% endif %}
             <option value="{{ value }}" {% if default_status == value %}selected{% endif %}>{{ label }}</option>
             {% if group and (loop.last or loop.nextitem[2] != group) %}</optgroup>{% endif %}
             {% endfor %}
           </select>
-          <button class="btn btn-sm btn-primary" type="submit">Save</button>
+          <span id="saved-default-status" aria-live="polite"></span>
         </div>
         <div class="small text-body-secondary mt-1">The file list opens on this status, and <strong>Reset all</strong> returns to it. Default: All files.</div>
       </div>
-    </form>
-    <form method="post" action="/settings/renamer" class="card mb-3">
+    </div>
+    <div class="card mb-3">
       <div class="card-header">Renamer</div>
       <div class="card-body">
-        <div class="form-check form-switch mb-3">
-          <input class="form-check-input" type="checkbox" role="switch" id="renamer_move_files" name="move_files" {% if renamer_move_files %}checked{% endif %}>
+        <div class="form-check form-switch mb-3 d-flex align-items-center gap-2 ps-0">
+          <input class="form-check-input ms-0 mt-0" type="checkbox" role="switch" id="renamer_move_files" name="move_files"
+                 {% if renamer_move_files %}checked{% endif %}
+                 hx-post="/settings/renamer/move" hx-trigger="change"
+                 hx-vals='js:{move_files: event.target.checked ? "on" : "off"}'
+                 hx-target="#saved-renamer-move" hx-swap="innerHTML">
           <label class="form-check-label" for="renamer_move_files">Move files instead of copying{{ tip("Off: the Renamer copies files and the originals stay where they are. On: the file is moved to processed-files and leaves its original place. A move is only completed after the new file has been read back and matches; if anything fails the original stays.") }}</label>
+          <span id="saved-renamer-move" aria-live="polite"></span>
         </div>
         <label class="form-label small mb-1" for="renamer_postfix">Add postfix to processed filenames{{ tip("When a file is copied, the original left behind is renamed with this text before its extension, so you can see it is done (2008-01-04.mp3 becomes 2008-01-04_processed.mp3). Empty means no postfix. Not used when files are moved, because no original is left. Letters, digits, _ and - only.") }}</label>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 align-items-center">
           <input class="form-control form-control-sm w-auto" id="renamer_postfix" name="postfix" maxlength="30"
-                 value="{{ renamer_postfix }}" placeholder="_processed" autocomplete="off" pattern="[A-Za-z0-9_\-]*">
-          <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                 value="{{ renamer_postfix }}" placeholder="_processed" autocomplete="off"
+                 hx-post="/settings/renamer/postfix" hx-trigger="change, keyup changed delay:700ms" hx-include="this"
+                 hx-target="#saved-renamer-postfix" hx-swap="innerHTML">
+          <span id="saved-renamer-postfix" aria-live="polite"></span>
         </div>
       </div>
-    </form>
+    </div>
     <div class="card mb-3">
       <div class="card-header">Current settings <span class="small text-body-secondary">(folders and pools come from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
       <div class="card-body">

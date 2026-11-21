@@ -140,15 +140,26 @@ def test_postfix_refuses_what_would_break_a_filename(text):
         clean_postfix(text)
 
 
-def test_settings_page_saves_the_renamer_block(client):
+def test_settings_page_has_the_renamer_block_and_autosaves(client):
+    from mam.helpers.local_db.app_settings import renamer_move_files, renamer_postfix
+
     page = client.get("/settings").text
     assert "Move files instead of copying" in page
     assert "Add postfix to processed filenames" in page
-    client.post("/settings/renamer", data={"move_files": "on", "postfix": "_processed"})
+    assert 'hx-post="/settings/renamer/move"' in page and "Save</button>" not in page
+
+    saved = client.post("/settings/renamer/postfix", data={"postfix": "_processed"})
+    assert "saved" in saved.text and renamer_postfix() == "_processed"
+    saved = client.post("/settings/renamer/move", data={"move_files": "on"})
+    assert "saved" in saved.text and renamer_move_files()
+    assert renamer_postfix() == "_processed"  # each control saves only itself
+    client.post("/settings/renamer/move", data={"move_files": "off"})
+    assert not renamer_move_files() and renamer_postfix() == "_processed"
+
+    bad = client.post("/settings/renamer/postfix", data={"postfix": ".x"})
+    assert "letters, digits" in bad.text.lower() and renamer_postfix() == "_processed"
     page = client.get("/settings").text
-    assert 'value="_processed"' in page and "checked" in page.split("renamer_move_files")[1][:80]
-    bad = client.post("/settings/renamer", data={"postfix": ".x"}, follow_redirects=False)
-    assert "error=" in bad.headers["location"]
+    assert 'value="_processed"' in page
 
 
 CLEAN = "From JVD (8.9.11)/KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"
