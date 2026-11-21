@@ -16,7 +16,7 @@
   <div class="card-header"><i class="fa-solid fa-flag me-1 text-warning"></i>Needs review: {{ tools[review_tool].label if review_tool in tools else review_tool }}
     {% if review_tool == 'kirtan-splitter' %}<span class="float-end small">score {{ '%.2f' % review.score if review.score is not none else '–' }}{% if review.spot_check %} · random check{% endif %}</span>{% endif %}</div>
   <ul class="list-group list-group-flush small">
-    {% if review_tool == 'kirtan-splitter' %}
+    {% if review_tool in ('kirtan-splitter', 'class-discoverer') %}
     {% for line in review.reason.split('\n') %}<li class="list-group-item">{{ line }}</li>{% endfor %}
     {% if p.mode != 'split' %}<li class="list-group-item">Proposed: <strong>{{ p.mode | replace('_', ' ') }}</strong> (not split).</li>{% endif %}
     {% else %}
@@ -26,6 +26,8 @@
   </ul>
 </div>
 {% endif %}
+
+{% if review_tool == 'class-discoverer' %}{% include "_discoverer_form.html" %}{% endif %}
 
 {# The waveform is always above the form; with a Kirtan splitter review it also holds the cut. #}
 {% include "_player.html" %}

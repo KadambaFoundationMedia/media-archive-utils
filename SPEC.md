@@ -28,14 +28,14 @@ Items under "Open decisions" are not decided: ask instead of guessing.
   - `mam doctor`: check ffmpeg/ffprobe, the transcription backend and models, `.env`, and whether Baserow can be reached
 - **Install:** `uv sync`. External binaries (ffmpeg, ffprobe, whisper-cli) come from Homebrew on macOS and winget on Windows.
 - **Transcription:**
-  - macOS (Apple Silicon): `mlx-whisper` with the large-v3-turbo model
+  - macOS (Apple Silicon): `mlx-whisper` with the large-v3-turbo model (`mlx-community/whisper-large-v3-turbo`, installed by `uv sync`)
   - Windows: whisper.cpp `whisper-cli` with the GGML large-v3-turbo model
   - Both backends sit behind one transcriber interface. Each run records engine, version, model hash, backend and any fallback (see ARCHITECTURE.md).
 - **Local database:** SQLite on the local disk, never on the NAS share. Export and import use the SQLite file plus a JSON/CSV dump command.
 - **LLM:** a pluggable provider interface. The default is the Claude API (latest model, key in `.env`); a local model is optional. Results are cached by (input hash, prompt version) so re-runs are not billed again.
   - The Renamer is deterministic (date parsing, regexes, lookups). It uses the LLM only as a fallback for unusual or foreign-language folder and file names.
 - **Speaker separation:** lightweight speaker embeddings (for example SpeechBrain ECAPA) are compared against a KKS voice profile built from the sample files (see section 10). A segment that is "not KKS" is an audience candidate.
-- **Vedabase:** verse pages are fetched on demand and cached in the local DB indefinitely. Requests are limited to 1 per second and send a clear User-Agent.
+- **Vedabase:** verse pages are fetched on demand and cached in the local DB indefinitely. Requests are at least 10 seconds apart (the crawl delay in vedabase.io's robots.txt, checked 2026-11-21) and send a clear User-Agent. The delay is hidden by the transcription: the class-discoverer fetches the filename's verse pages while the recording is transcribed. A range has no page of its own (`/sb/9/20/20-27/` is a 404), so only the first and the last verse of a range are fetched.
 - **Concurrency:** a job queue persisted in SQLite, with a worker pool per resource. Defaults: 1 ML worker (transcription, embeddings), ffmpeg/CPU workers (one per core, keeping two free, at most 8; the Kirtan splitter runs here, its analysis in separate processes), and I/O workers for copies and Baserow. All sizes are configurable in `.env`. The queue survives restarts, so the Renamer can process hundreds of files while ML work runs one file at a time.
 - **Users:** one operator on localhost. The server binds to 127.0.0.1 with no authentication. The operator name from config is recorded on every approval.
 
@@ -142,10 +142,25 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
 - **Review (on the details page):** shows the reasons, the timeline and evidence, shows the waveform editor (below), and takes the cut as `minutes:seconds` (typed or set in the editor) and the kirtan type. Buttons: **Approve and split**, **Do not split**, **Reject result**, **Exclude file**. The cut is made only on approval. An approved cut within 1.5 s of the proposal counts as approved, otherwise as edited; both are labeled examples for the threshold. 
 
 ### Class-discoverer
-- **Whole-recording gain:** runs the audio-optimizer and writes the result to the processed copy (encode #1). The kirtan-splitter has already separated any kirtan, so the gain is measured on the class alone and loud singing cannot skew it.
-- **Verse discovery:** transcribes the recording, determines the scripture and verse, and confirms them on vedabase.io.
-- **Filename precedence:** if the transcript clearly shows a different verse than the filename, the name is kept and the file is flagged for review. The review shows both candidates with a transcript excerpt.
-- **Language:** transcribes as spoken, in any language. Detected languages are merged into the Baserow `language` field.
+Decided by Edwin on 2026-11-21. Built in `mam/tools/class_discoverer/` (the transcriber is `mam/helpers/transcriber/`, vedabase.io is `mam/helpers/vedabase/`); in the Action menu and as `mam class-discover <file>` (dry run by default).
+- **Order:** whole-recording gain, then transcription, then the verse.
+- **Whole-recording gain:** runs the audio-optimizer on the processed copy (encode #1). The kirtan-splitter has already separated any kirtan, so the gain is measured on the class alone and loud singing cannot skew it. A recording that already meets -18 LUFS +/-1 LU is left alone (no needless re-encode). A result that needed the limiter is stored as `dynamic`.
+- **Transcription:** the full recording, as spoken, in any language (language detected by the model). The transcript is cached in the local DB by the content hash of the audio, so a re-run and the later tools never transcribe the same content twice, and is written to `transcriptions/<base-name>.md`. Segment timestamps by default; word timestamps are off (`TRANSCRIBE_WORDS=true` turns them on) because they cost speed.
+- **Verse discovery, rules first:** the transcript is searched for the speaker's announcement of the book with its numbers ("Bhagavad-gita as it is, chapter two, text fifty-one", "first canto, chapter nineteen, text thirty-one", digits such as "SB 3.6.6", and a range "text 20 to 27"). The announcement heard most often wins (the earliest on a tie). An announcement without all its numbers ("It's thirty one, first canto") is not a verse. English number words are understood; other languages fall to the unconfirmed case below. The Claude API as a fallback when the rules find nothing is **not built yet**.
+- **Confirmation on vedabase.io:** the verse page must exist, and at least 30% (`CONFIRM_SHARE` in `match.py`, to be tuned on real samples) of the three-word sequences of its English translation must be heard in the transcript. The first and the last verse of a range are checked.
+- **Automation (no score threshold, like the splitter):** the class-discoverer is **sure** when the verse is announced and confirmed.
+  - The filename has no complete verse: the Renamer is queued with the verse as evidence (`what`, `verse_tag`, `languages`) and the filename changes at once. Another verse than the filename's is never overwritten silently.
+  - The filename has the same verse: nothing changes.
+  - The filename has a **different** verse than the recording announces: the filename is kept and the file goes to `Class discoverer Review` with both candidates and a transcript excerpt.
+  - A verse that is announced but not confirmed goes to review.
+  - No verse announced: a filename with a verse is kept; with no verse the WHAT stays as the Renamer set it and the file is Done when it has a category, and goes to review when it has no WHAT or category at all (festival, story or seminar recordings).
+  - 5% of the sure naming decisions (`SPOT_CHECK_RATE`) are shown in review anyway and change nothing until approved.
+- **Review (details page):** shows the verse heard (time, how often, vedabase.io, share of the translation heard, excerpt) against the filename's. Buttons: use the verse from the recording, keep the filename's verse, use a typed verse (e.g. `BG-2-51`), reject, exclude.
+- **No title.** The content-discoverer finds the title and adds it to the filename when the filename has none yet (decided 2026-11-21). The class-discoverer adds no title.
+- **No trimming.** Only the class-trimmer trims (decided 2026-11-21). The moment the verse is announced is stored as `class_start` with the result, for the class-trimmer.
+- **Language:** the detected languages are merged (union) into the Baserow `language` field, through the Renamer's evidence. Only options that exist in Baserow are written.
+- **Video:** a class audio cut from a video also gives its verse and languages to the video's own row, by queueing the Renamer for the video with the same evidence (empty fields only, a person's values are never overwritten). Renaming the derived class *audio* file itself (it has no original path for the Renamer to read) is not built yet.
+- **Kirtan-only recordings** are `Skipped`. A recording the splitter found to have no kirtan (`class_only`) continues to this step.
 
 ### Content-discoverer
 - 1 to 5 topics, each at most 2 words and not too general. They are written to the Baserow `themes` column as one text value separated by a comma and a space (`Krishna Prema, Kali Yuga`), the format the existing rows already use.
@@ -294,6 +309,7 @@ The kirtan-splitter examples (`oslo-noi`, a kept `-2` index, `ZOOM0004` as a WHA
 - **Refreshed:** it is rebuilt when new approved recordings add coverage, such as other years or other microphones.
 
 ## 11. Open decisions
-- **Video in the pipeline after the kirtan-splitter:** decided 2026-11-05, see section 4 (Video). Not built yet: it is built with the class-discoverer.
+- **Video in the pipeline after the kirtan-splitter:** decided 2026-11-05, see section 4 (Video). The video row now gets the verse and languages (class-discoverer); renaming the derived class audio of a video is not built yet.
+- **Class-discoverer fallback to the Claude API** when the rules find no verse: agreed 2026-11-21, not built yet. The LLM provider interface does not exist yet.
 - **Common phrases for the splitter:** ignored until a transcript exists when the splitter runs (decided 2026-11-01).
 - **Calibration:** the `calibration` table and the 0.9 start threshold are not used by the Kirtan-splitter (it cuts when it is sure, see its Automation); they stay for the other tools. `mam calibrate` and the automatic recalculation every 25 outcomes are not built yet. Review outcomes are already stored as labeled examples.

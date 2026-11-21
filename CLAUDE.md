@@ -58,6 +58,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Install: `uv sync`
 - Run media manager: `uv run mam serve` (http://127.0.0.1:8000)
 - Run the Kirtan Splitter from the command line: `uv run mam kirtan-split <file>` (dry run; add `--no-dry-run` after the Renamer has run)
+- Run the Class discoverer from the command line: `uv run mam class-discover <file>` (dry run; add `--no-dry-run` on the renamed copy)
 - Run the Renamer from the command line: `uv run mam rename <file-or-folder>` (dry run; add `--no-dry-run` to copy)
 - Environment check: `mam doctor`
 - Show version: `uv run mam --version` (also in the portal footer)

@@ -15,3 +15,7 @@ class CorruptedMedia(MamError):
 
 class BaserowError(MamError):
     """Raised when Baserow rejects a request or a write fails validation."""
+
+
+class VedabaseError(MamError):
+    """Raised when vedabase.io cannot be reached or answers unexpectedly."""

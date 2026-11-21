@@ -227,7 +227,11 @@ class JobQueue:
                     set_status(session, record, status_for(spec.label, "failed"), tool, str(exc))
             return
 
-        if pipeline and not dry_run and outcome.state == "done":
+        if (
+            pipeline
+            and not dry_run
+            and (outcome.state == "done" or outcome.data.get("continue_pipeline"))
+        ):
             following = next_in_pipeline(tool)
             if following:
                 with session_scope() as session:

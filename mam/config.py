@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     trimming_samples_path: Path = REPO_ROOT / "trimming-samples"
     transcriptions_path: Path = REPO_ROOT / "transcriptions"
 
+    # Transcription (SPEC.md section 1): `auto` is mlx-whisper on Apple Silicon, else whisper.cpp.
+    transcriber_backend: str = "auto"  # auto | mlx | whispercpp
+    whisper_mlx_model: str = "mlx-community/whisper-large-v3-turbo"
+    whisper_cli: str | None = None  # path of whisper-cli when it is not on PATH
+    whisper_cpp_model: Path | None = None  # ggml-large-v3-turbo.bin
+    whisper_device: str = "auto"  # auto: Metal/GPU first, local CPU when that fails
+    transcribe_words: bool = False  # word timestamps cost speed; segment timestamps suffice
+
+    # Vedabase (robots.txt asks for a 10 s crawl delay; verse pages are cached for good)
+    vedabase_url: str = "https://vedabase.io"
+    vedabase_delay_s: float = 10.0
+
     # Local state (never on the NAS share)
     local_db_path: Path = DEFAULT_HOME / "mam.sqlite"
     work_dir: Path = DEFAULT_HOME / "work"

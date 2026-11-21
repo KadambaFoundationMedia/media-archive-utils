@@ -10,7 +10,7 @@ from mam.config import get_settings
 from mam.errors import MamError
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.db import session_scope
-from mam.manager.queue import resume_after_review
+from mam.manager.queue import resume_after_review, stable_status
 
 
 def register_review_routes(app: FastAPI, render, notify) -> None:
@@ -87,6 +87,49 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                         )
                     ):
                         resumed = resume_after_review(session, record, review.tool)
+                elif review.tool == "class-discoverer" and action in (
+                    "use_transcript",
+                    "keep_filename",
+                    "custom",
+                ):
+                    from mam.tools.class_discoverer import tool as discoverer
+
+                    record = session.get(m.MediaFile, review.media_file_id)
+                    result_msg = discoverer.decide_review(
+                        session,
+                        review,
+                        action=action,
+                        what=(form.get("what") or "").strip() or None,
+                        operator=operator,
+                        note=note,
+                    )
+                    if session.scalar(
+                        select(m.Job.id).where(
+                            m.Job.media_file_id == record.id,
+                            m.Job.tool == review.tool,
+                            m.Job.pipeline.is_(True),
+                        )
+                    ):
+                        resumed = resume_after_review(session, record, review.tool)
+                elif review.tool == "class-discoverer" and action == "reject":
+                    from datetime import UTC, datetime
+
+                    from mam.helpers.local_db.repo import set_status
+
+                    record = session.get(m.MediaFile, review.media_file_id)
+                    review.outcome, review.operator, review.note = "rejected", operator, note
+                    review.decided_at = datetime.now(UTC)
+                    meta = dict(record.meta or {})
+                    meta.pop("class_discoverer", None)
+                    record.meta = meta
+                    set_status(
+                        session,
+                        record,
+                        stable_status(session, record),
+                        "class-discoverer",
+                        "result rejected",
+                    )
+                    result_msg = "Result rejected: nothing was changed; the file can be run again"
                 elif review.tool == "kirtan-splitter" and action == "reject":
                     from datetime import UTC, datetime
 
