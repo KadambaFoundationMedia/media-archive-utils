@@ -269,6 +269,16 @@ class AppSetting(Base):
     )
 
 
+class VedabaseVerse(Base):
+    """A verse page from vedabase.io, parsed and cached indefinitely."""
+
+    __tablename__ = "vedabase_verse"
+
+    path: Mapped[str] = mapped_column(String(64), primary_key=True)  # e.g. "sb/9/20/20"
+    data: Mapped[dict[str, Any]]
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AliasRule(Base):
     """A learned filename correction, e.g. token 'noi' -> 'no' for WHERE."""
 
