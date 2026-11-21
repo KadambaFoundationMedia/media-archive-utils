@@ -63,6 +63,8 @@ When a file names no place or country, the Renamer may take the country from the
 ### WHAT from the folder
 When the filename gives no WHAT (`R09_0008.MP3`, `ZOOM0001.MP3`) but a parent folder matches a category in `category_terms_folder` (`Vyasa puja 2015` gives `Vyasa-puja`), that category is the WHAT: `2015-MM-DD_KKS_Vyasa-puja.mp3`. Several files of one folder get `-2`, `-3` (see clashes below). Scripture categories (`SB`, `BG`, `CC`) are not used this way, because they need a verse.
 
+Category words are matched against the `filename_terms` of the Baserow `category_terms_folder` table, in filenames and in parent folder names alike. To make a word such as `Lekce` mean a category, add it to that table; do not add it to the code.
+
 ### Summercamp
 A name or folder with `summercamp` in it (`Serbia-Summercamp`, `Swiss summercamp`, `Summer-camp`) is in the `Summercamp` category, unless the filename has a book and verse; the book's category then wins.
 
