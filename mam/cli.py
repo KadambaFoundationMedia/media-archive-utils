@@ -363,6 +363,9 @@ def reset(
     processed_files: Annotated[bool, typer.Option(help="Delete the processed copies.")] = True,
     learned: Annotated[bool, typer.Option(help="Also forget learned corrections.")] = False,
     caches: Annotated[bool, typer.Option(help="Also clear caches.")] = False,
+    old_backups: Annotated[
+        bool, typer.Option(help="Also delete all earlier database backups.")
+    ] = False,
     yes: Annotated[bool, typer.Option("--yes", help="Do not ask for confirmation.")] = False,
 ) -> None:
     """Reset the media manager: clear the local database and processed copies (backup first).
@@ -381,5 +384,5 @@ def reset(
     )
     if not yes:
         typer.confirm("Reset the media manager?", abort=True)
-    result = do_reset(ResetOptions(processed_files, learned, caches))
+    result = do_reset(ResetOptions(processed_files, learned, caches, old_backups))
     console.print(f"Reset done. Backup: {result.backup}")

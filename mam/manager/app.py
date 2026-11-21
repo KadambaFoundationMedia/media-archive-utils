@@ -822,6 +822,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
             processed_files=form.get("processed_files") == "on",
             learned=form.get("learned") == "on",
             caches=form.get("caches") == "on",
+            old_backups=form.get("old_backups") == "on",
         )
         try:
             result = reset(options, settings)
@@ -832,6 +833,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
             f"Reset done: {files} file record(s) and {result.files_deleted} processed file(s) "
             f"removed. Backup: {result.backup}"
         )
+        if options.old_backups:
+            msg += f" ({result.backups_deleted} earlier backup(s) deleted)"
         return RedirectResponse(f"/settings?msg={msg}", status_code=303)
 
     @app.get("/health")
