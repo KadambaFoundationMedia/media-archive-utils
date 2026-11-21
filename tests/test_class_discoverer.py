@@ -287,7 +287,8 @@ def test_job_names_the_file_and_queues_the_renamer(prepared, settings):
         record = s.get(m.MediaFile, rid)
         assert record.meta["class_discoverer"]["class_start"] == 0.0
         assert record.sha256  # the gained copy's hash
-    assert (settings.transcriptions_path / f"{copy.stem}.md").exists()
+    sub = copy.resolve().parent.relative_to(settings.media_processed_files_path.resolve())
+    assert (settings.transcriptions_path / sub / f"{copy.stem}.md").exists()
 
 
 def test_job_keeps_a_filename_that_agrees(prepared):

@@ -179,7 +179,7 @@ Decided by Edwin on 2026-11-21. Built in `mam/tools/class_discoverer/` (the tran
 - **Automation:** cuts automatically when every boundary scores above the learned threshold (see section 10). Otherwise the file goes to `Class-trimmer Review`.
 
 ## 5. Transcripts
-- **Files:** `transcriptions/<final-base-name>.md`, Markdown with a `[hh:mm:ss.mmm]` timestamp on each segment. The transcript is renamed whenever its audio file is renamed.
+- **Files:** `transcriptions/<category folder>/<final-base-name>.md` (the same category subfolder as the audio copy in processed-files, decided 2026-11-21), Markdown with a `[hh:mm:ss.mmm]` timestamp on each segment. The transcript is renamed whenever its audio file is renamed.
 - **Database:** full segment- and word-level data, plus the binding metadata, lives in the local DB for the tools and the waveform editor.
 
 ## 6. Baserow
