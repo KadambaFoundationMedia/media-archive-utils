@@ -41,7 +41,7 @@ kirtan_splitter:
     marker: reading from srimad bhagavatam
     kirtan_type: Jaya-radha-madhava
     kirtan_name: 2015-MM-DD_KKS_Jaya-radha-madhava.mp3
-    class_name: 2015-MM-DD_KKS.mp3            # device name ZOOM0004 dropped
+    class_name: 2015-MM-DD_KKS_Vyasa-puja.mp3   # device name ZOOM0004 dropped; WHAT from the folder
     spec_name: 2015-MM-DD_KKS_ZOOM0004.mp3
 
 class_discoverer:

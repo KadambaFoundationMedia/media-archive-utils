@@ -243,12 +243,17 @@ class Resolver:
         what = self._what(name)
         if what:
             ev.append(Evidence("what", what, "filename", 0.9, True, {"origin": f'"{path.stem}"'}))
-        if not name.descriptive:
+        category = self._category(what, name, ctx, media_row, ev, path.stem, place)
+        if not what:  # the folder's category (Vyasa puja 2015) names a file the name does not
+            folder_what = self._folder_what(category, ev)
+            if folder_what:
+                what = folder_what
+                notes.append(f"WHAT '{what}' taken from the folder name.")
+        if not what and not name.descriptive:
             flags.append(
                 "Non-descriptive filename: it gives no WHAT (scripture, verse or title)."
                 + (" It looks like a recorder file name." if name.recorder else "")
             )
-        category = self._category(what, name, ctx, media_row, ev, path.stem, place)
         languages = self._languages(name, ctx)
         speakers = list(dict.fromkeys(name.speakers))
         if speakers and not name.has_kks:
@@ -598,6 +603,22 @@ class Resolver:
         parts = [name.verse.code] if name.verse else []
         parts += name.what_words
         return "-".join(parts) or None
+
+    def _folder_what(self, category: str | None, ev: list[Evidence]) -> str | None:
+        """The WHAT for a file whose name gives none: the category found in a parent folder.
+
+        Not for the scripture categories (a book needs a verse) or the catch-alls."""
+        folder_ev = next((e for e in ev if e.field == "category" and e.source == "folder"), None)
+        if not category or not folder_ev or folder_ev.value != category:
+            return None
+        cat = self.ref.matcher.by_name(category)
+        if not cat or category in {"Unknown", "Various"}:
+            return None
+        if any(t and t[0] in {"bg", "sb", "cc"} for t in cat.terms):
+            return None
+        origin = (folder_ev.detail or {}).get("origin", "")
+        ev.append(Evidence("what", category, "folder", 0.7, True, {"origin": origin}))
+        return category
 
     def _summercamp(
         self, name, ctx, stem: str, place: Place | None = None
