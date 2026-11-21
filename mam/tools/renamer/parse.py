@@ -183,7 +183,7 @@ class NameParser:
         self.ref = ref
         a = ref.aliases
         self.noise = {norm_key(w) for w in a.get("noise", [])}
-        self.generic = {norm_key(w) for w in a.get("generic_with_verse", [])}
+        self.generic = ref.generic_words()  # the Class category's terms (Baserow)
         self.other_speakers = {w.upper() for w in a.get("other_speakers", [])}
 
     def parse(self, text: str, source: str = "filename") -> ParsedName:

@@ -3,9 +3,9 @@
 The country of each place is chosen from, in order:
 1. the media rows with that place, when they agree on one country;
 2. the travel schedule, only as a hint where no media row has a country;
-3. a short list of places with no data (GEOGRAPHY below).
+Places with no data get a row without a country, to be filled by hand.
 General places (aliases.yaml `no_country`, e.g. Zoom-livestream) get an empty country, and
-spelling variants of a place (same name apart from case, or `SPELLING_VARIANTS`) get no row.
+spelling variants of a place (same name apart from case) get no row.
 
 The media table is tidied at the same time (fill-empty only, plus one spelling fix):
 - a media row with a place and no country gets the place's country;
@@ -22,28 +22,13 @@ from typing import Any
 from mam.tools.renamer.countries import cc_for_name
 from mam.tools.renamer.knowledge import norm_key
 
-# Places without media rows or travel rows with a country (checked by hand, 2026-10-20).
-GEOGRAPHY = {
-    "Amsterdam": "nl",
-    "Netherlands": "nl",
-    "Amritsar": "in",
-    "Ucha-Gaon": "in",
-    "Bhakti-Center-NYC": "us",
-    "Farma-Krishna-Dvur": "cz",
-    "Pruhon": "cz",
-    "ISKCON-Malaga": "es",
-    "Surfers-Paradise": "au",
-}
-# Other spellings of a place option; they get no row (merge them in Baserow).
-SPELLING_VARIANTS = {"Sumercamp": "Summercamp"}
-
 
 @dataclass
 class PlaceRow:
     place: str
     country: str  # media country option, '' for a general place
     cc: str
-    source: str  # media | travel | geography | general | none
+    source: str  # media | travel | general | none
     row_id: int | None = None  # existing place_country row to fill
     action: str = "create"  # create | update | keep
 
@@ -94,7 +79,7 @@ def plan_sync(raw: dict[str, Any], no_country: list[str]) -> SyncPlan:
     seen: set[str] = set()
     for place in sorted(raw["options"].get("place_location", [])):
         key = norm_key(place)
-        if key in seen or place in SPELLING_VARIANTS:
+        if key in seen:
             plan.skipped.append(place)
             continue
         seen.add(key)
@@ -106,8 +91,6 @@ def plan_sync(raw: dict[str, Any], no_country: list[str]) -> SyncPlan:
             cc, source = "", "general"  # media rows disagree: a general place
         elif len(travel_cc[place]) >= 1:
             cc, source = travel_cc[place].most_common(1)[0][0], "travel"
-        elif place in GEOGRAPHY:
-            cc, source = GEOGRAPHY[place], "geography"
         else:
             cc, source = "", "none"
             plan.unknown.append(place)

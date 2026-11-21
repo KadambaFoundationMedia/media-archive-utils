@@ -100,8 +100,8 @@ Source names in the archive are often inconsistent. The tools check each part ag
 - **Parts with no meaning:** sequence numbers and recorder names from the source (`-2`, `ZOOM0004`, `R09_0003`) are not kept in the new name. The original name is always kept in the local database and in Baserow.
 - **Glued words are split:** `RadhastamiBhajanas` becomes `Radhastami-Bhajanas`, `RadhaMadhava` becomes `Radha-Madhava`.
 - **Honorifics and recorder words are dropped:** `HH`, `Kadamba Kanana Swami` (that is the WHO), `STEREO`, `clean`. Names of other people keep their honorific (`Suhotra-Maharaja`).
-- **Generic words next to a verse are dropped:** `SB 3.1.20 class` gives `SB-3-1-20`. Without a verse they stay (`Janmastami-evening-lecture`).
-- **Places use their short name:** the Baserow place `ISKCON-Ljubljana` is written `Ljubljana-si`; when the Renamer reads source names, known spellings are mapped (`Praha` to `Prague`, `Koln` to `Cologne`, `Rdesh` to `Radhadesh`).
+- **Generic words next to a verse are dropped:** `SB 3.1.20 class` gives `SB-3-1-20`. The words are the terms of the `Class` row in `category_terms_folder` (Lekce, Lecture, Class, Lezing, Vortrag, predavanje...). Without a verse they stay (`Janmastami-evening-lecture`).
+- **Places use their short name:** the Baserow place `ISKCON-Ljubljana` is written `Ljubljana-si`; when the Renamer reads source names, known spellings are mapped (`Praha` to `Prague`, `Koln` to `Cologne`, `Rdesh` to `Radhadesh`); they are the `Aliases` column of `place_country`.
 - **On the file page a place is chosen from the Baserow places:** `Amsterdam` and `ISKCON-Amsterdam` are separate options; a place Baserow does not know is marked "(not in Baserow)" with a suggestion for the place it may mean.
 - **Another speaker in the name** (`SNS`, `BVS` instead of `KKS`) is flagged for review, because WHO is always `KKS`.
 - **Repeated corrections:** a correction reviewers make the same way at least 3 times becomes a rule, so it is applied automatically from then on.

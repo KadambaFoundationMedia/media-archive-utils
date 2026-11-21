@@ -54,16 +54,14 @@ def test_saving_a_place_and_country_adds_a_place_country_row(client, imported, n
     file_id = imported["R09_0004.MP3"]
     response = client.post(
         f"/files/{file_id}/edit",
-        data=save_form(
-            "2012-07-12_KKS_Kirtan_Farma-Krishna-Dvur-cz.mp3", place="Farma-Krishna-Dvur", cc="cz"
-        ),
+        data=save_form("2012-07-12_KKS_Kirtan_Lutotin-cz.mp3", place="Lutotin", cc="cz"),
         follow_redirects=False,
     )
     assert no_baserow.place_country == [
         {
             "action": "create",
             "values": {
-                "place_location": "Farma-Krishna-Dvur",
+                "place_location": "Lutotin",
                 "country": "Czech-republic",
                 "ccTLD": "cz",
             },
@@ -77,18 +75,16 @@ def test_saving_a_place_and_country_adds_a_place_country_row(client, imported, n
 def test_saving_fills_an_empty_row_and_never_changes_another_country(
     client, imported, no_baserow, reference
 ):
-    reference.place_rows["farma krishna dvur"] = {
+    reference.place_rows["lutotin"] = {
         "id": 7,
-        "place": "Farma-Krishna-Dvur",
+        "place": "Lutotin",
         "country": "",
         "cc": None,
     }
     file_id = imported["R09_0004.MP3"]
     client.post(
         f"/files/{file_id}/edit",
-        data=save_form(
-            "2012-07-12_KKS_Kirtan_Farma-Krishna-Dvur-cz.mp3", place="Farma-Krishna-Dvur", cc="cz"
-        ),
+        data=save_form("2012-07-12_KKS_Kirtan_Lutotin-cz.mp3", place="Lutotin", cc="cz"),
     )
     assert no_baserow.place_country[-1]["action"] == "update"
     assert no_baserow.place_country[-1]["row_id"] == 7
@@ -149,10 +145,10 @@ def test_sync_plan_one_row_per_place():
     # the empty row is reused for the first place; the others are new rows
     assert (rows["Amsterdam"].row_id, rows["Amsterdam"].action) == (1, "update")
     assert (rows["Brno"].row_id, rows["Brno"].action) == (None, "create")
-    assert (rows["Amsterdam"].cc, rows["Amsterdam"].source) == ("nl", "geography")
+    assert (rows["Amsterdam"].cc, rows["Amsterdam"].source) == ("", "none")  # no data: by hand
     assert rows["Summercamp"].country == ""  # media rows disagree: a general place
     assert rows["WUSA-House"].cc == "za"
-    assert "Sumercamp" in plan.skipped and "WUSA-house" in plan.skipped
+    assert "WUSA-house" in plan.skipped  # same name apart from case
     fixes = {f.row_id: (f.old, f.new) for f in plan.media}
     assert fixes == {5: (None, "Czech-Republic"), 6: ("Czech-republic", "Czech-Republic")}
 
