@@ -32,6 +32,7 @@ class ResetOptions:
     processed_files: bool = True
     learned: bool = False  # alias rules, calibration, voice profile
     caches: bool = False  # vedabase, LLM, transcripts, Baserow reference data
+    old_backups: bool = False  # earlier database backups in the backups folder
 
 
 @dataclass
@@ -40,9 +41,29 @@ class ResetResult:
     rows_deleted: dict[str, int] = field(default_factory=dict)
     files_deleted: int = 0
     folders_deleted: int = 0
+    backups_deleted: int = 0
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+BACKUP_PREFIX = "mam-export-"
+
+
+def old_backups(settings: Settings, keep: Path | None = None) -> list[Path]:
+    """Earlier export folders in the backups folder (never the one in `keep`)."""
+    backup_dir = settings.local_db_path.parent / "backups"
+    if not backup_dir.is_dir():
+        return []
+    return sorted(
+        p
+        for p in backup_dir.iterdir()
+        if p.is_dir() and not p.is_symlink() and p.name.startswith(BACKUP_PREFIX) and p != keep
+    )
+
+
+def _dir_size(path: Path) -> int:
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
 
 def summary(settings: Settings | None = None) -> dict:
@@ -73,6 +94,9 @@ def summary(settings: Settings | None = None) -> dict:
             )
             or 0,
         }
+    backups = old_backups(settings)
+    data["backups"] = len(backups)
+    data["backup_bytes"] = sum(_dir_size(b) for b in backups)
     files, size = 0, 0
     for root in settings.managed_roots:
         if root.is_dir():
@@ -131,6 +155,10 @@ def reset(options: ResetOptions, settings: Settings | None = None) -> ResetResul
     backup_dir.mkdir(parents=True, exist_ok=True)
     backup = export_db(get_engine(), backup_dir)
     result = ResetResult(backup=str(backup))
+    if options.old_backups:
+        for old in old_backups(settings, keep=backup):
+            shutil.rmtree(old)
+            result.backups_deleted += 1
 
     keep = set()
     if not options.learned:

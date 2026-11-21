@@ -114,9 +114,13 @@
           <input class="form-check-input" type="checkbox" id="learned" name="learned">
           <label class="form-check-label" for="learned">Also forget what was learned from reviews ({{ info.learned }} alias rules, calibrations and voice profiles)</label>
         </div>
-        <div class="form-check mb-3">
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" id="caches" name="caches">
           <label class="form-check-label" for="caches">Also clear caches ({{ info.cached }} entries: transcripts, vedabase, LLM, Baserow reference data)</label>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="old_backups" name="old_backups">
+          <label class="form-check-label" for="old_backups">Also delete all earlier database backups (<strong>{{ info.backups }}</strong>, {{ info.backup_bytes | filesize }}); the backup made by this reset is kept</label>
         </div>
         <ul class="text-body-secondary">
           <li>Originals (sample files, trimming samples, inbox, NAS) are never touched.</li>

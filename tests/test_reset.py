@@ -1,5 +1,6 @@
 """Reset from the Settings page: clean start, originals and Baserow untouched."""
 
+import time
 from urllib.parse import unquote
 
 import pytest
@@ -97,3 +98,22 @@ def test_reset_refuses_when_processed_folder_overlaps_originals(worked, settings
     with pytest.raises(MamError, match="overlaps an originals folder"):
         reset(ResetOptions())
     assert count(m.MediaFile) == 2
+
+
+def test_reset_can_delete_earlier_backups_but_keeps_its_own(worked, settings):
+    backup_dir = settings.local_db_path.parent / "backups"
+    for name in ("mam-export-20200101-000000", "mam-export-20200102-000000"):
+        (backup_dir / name).mkdir(parents=True)
+        (backup_dir / name / "mam.sqlite").write_text("x")
+    (backup_dir / "mine.txt").write_text("keep")
+    kept = reset(ResetOptions(processed_files=False))
+    assert kept.backups_deleted == 0
+    time.sleep(1.1)  # backup folder names have a one-second resolution
+    assert (backup_dir / "mam-export-20200101-000000").exists()
+    result = reset(ResetOptions(processed_files=False, old_backups=True))
+    assert result.backups_deleted == 3  # the two old ones and the first reset's own backup
+    assert not (backup_dir / "mam-export-20200101-000000").exists()
+    from pathlib import Path
+
+    assert Path(result.backup).is_dir()
+    assert (backup_dir / "mine.txt").exists()
