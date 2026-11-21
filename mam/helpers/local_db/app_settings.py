@@ -47,3 +47,42 @@ def default_status_setting() -> str:
 
 def set_default_status(value: str) -> None:
     set_setting(DEFAULT_STATUS, value)
+
+
+# ----------------------------------------------------------------------- Renamer options
+RENAMER_MOVE = "renamer_move_files"
+RENAMER_POSTFIX = "renamer_postfix"
+POSTFIX_MAX_LEN = 30
+
+
+def clean_postfix(value: str | None) -> str:
+    """The postfix as it is added to a filename; raises ValueError if it cannot be used.
+
+    Empty means no postfix. Only letters, digits, `_` and `-` are allowed, so a postfix can never
+    add a dot (a second extension), a path separator or a character the filename rules forbid.
+    """
+    text = (value or "").strip()
+    if len(text) > POSTFIX_MAX_LEN:
+        raise ValueError(f"The postfix can be at most {POSTFIX_MAX_LEN} characters")
+    if text and not all(c.isascii() and (c.isalnum() or c in "_-") for c in text):
+        raise ValueError("The postfix can only have letters, digits, _ and -")
+    return text
+
+
+def renamer_move_files() -> bool:
+    """ "Move files instead of copying": off until switched on."""
+    return bool(get_setting(RENAMER_MOVE, False))
+
+
+def renamer_postfix() -> str:
+    """Postfix for the original that a copy leaves behind; empty (none) until set."""
+    try:
+        return clean_postfix(get_setting(RENAMER_POSTFIX, ""))
+    except ValueError:
+        return ""
+
+
+def set_renamer_options(move_files: bool, postfix: str) -> None:
+    postfix = clean_postfix(postfix)
+    set_setting(RENAMER_MOVE, bool(move_files))
+    set_setting(RENAMER_POSTFIX, postfix)

@@ -81,8 +81,23 @@ def summary(settings: Settings | None = None) -> dict:
                 files += 1
                 size += path.stat().st_size
     data["processed_files"] = files
+    data["sole_copies"] = sole_copies()
     data["processed_bytes"] = size
     return data
+
+
+def sole_copies() -> int:
+    """Files the Renamer moved: the copy in processed-files is the only one there is."""
+    from mam.helpers.file_organizer.trash import sole_copy
+
+    with session_scope() as s:
+        return sum(
+            1
+            for record in s.scalars(
+                select(m.MediaFile).where(m.MediaFile.processed_path.isnot(None))
+            )
+            if sole_copy(record)
+        )
 
 
 def _check_processed_root(settings: Settings) -> Path:
@@ -100,6 +115,12 @@ def _check_processed_root(settings: Settings) -> Path:
 def reset(options: ResetOptions, settings: Settings | None = None) -> ResetResult:
     settings = settings or get_settings()
     root = _check_processed_root(settings) if options.processed_files else None
+    if options.processed_files and (only := sole_copies()):
+        raise MamError(
+            f"{only} file(s) were moved by the Renamer, so their copy in processed-files is the "
+            "only one. Put them back first (Reject or Exclude in their review), or reset without "
+            "deleting the processed copies."
+        )
     with session_scope() as s:
         active = s.scalar(
             select(func.count()).select_from(m.Job).where(m.Job.state.in_(("queued", "running")))

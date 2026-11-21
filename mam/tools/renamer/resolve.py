@@ -152,7 +152,9 @@ def read_tags(path: Path) -> dict[str, str]:
 RECORDER_ALBUMS = ("tascam", "zoom", "roland", "olympus", "sony", "dr-")
 
 
-def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
+def build_context(
+    path: Path, parser: NameParser, roots: list[Path], tags_from: Path | None = None
+) -> Context:
     folders = [parser.parse(name, "folder") for name in folder_chain(path, roots)]
     siblings: Counter = Counter()
     sibling_places: dict[str, set[str]] = {}
@@ -170,7 +172,7 @@ def build_context(path: Path, parser: NameParser, roots: list[Path]) -> Context:
         for place in parsed.places:
             if place.known and place.cc:
                 sibling_ccs.setdefault(place.cc, set()).add(place.name)
-    tags = read_tags(path)
+    tags = read_tags(tags_from or path)
     useful = {
         k: v
         for k, v in tags.items()
@@ -224,10 +226,11 @@ class Resolver:
         self.parser = NameParser(ref)
         self.roots = [r.resolve() for r in roots]
 
-    def propose(self, path: Path) -> Proposal:
+    def propose(self, path: Path, tags_from: Path | None = None) -> Proposal:
+        """Propose a name from `path`; `tags_from` is where the file is now if it was moved."""
         path = Path(path)
         name = self.parser.parse(path.stem)
-        ctx = build_context(path, self.parser, self.roots)
+        ctx = build_context(path, self.parser, self.roots, tags_from)
         ev: list[Evidence] = []
         flags: list[str] = []
         notes: list[str] = []

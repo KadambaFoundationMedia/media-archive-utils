@@ -16,7 +16,11 @@ from mam.config import Settings, get_settings
 from mam.errors import MamError
 from mam.helpers.file_organizer import FileOrganizer
 from mam.helpers.local_db import models as m
-from mam.helpers.local_db.app_settings import baserow_writes_enabled
+from mam.helpers.local_db.app_settings import (
+    baserow_writes_enabled,
+    renamer_move_files,
+    renamer_postfix,
+)
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.manager.tools import JobContext, ToolOutcome
@@ -46,6 +50,14 @@ def source_path(record: m.MediaFile) -> Path:
     """The file to rename: the processed copy if there is one, otherwise the original."""
     if record.processed_path and Path(record.processed_path).exists():
         return Path(record.processed_path)
+    return current_original(record)
+
+
+def current_original(record: m.MediaFile) -> Path:
+    """Where the original is now: its import path, or the postfix name after a copy marked it."""
+    renamed = (record.meta or {}).get("original_now")
+    if renamed and Path(renamed).exists():
+        return Path(renamed)
     return Path(record.original_path)
 
 
@@ -330,7 +342,9 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         if approved is not None:
             confirmed = {**approved.final, "by": approved.operator}
     res = resolver(settings)
-    proposal = res.propose(Path(record.original_path))
+    # The name evidence comes from the import path; the file itself (ID3 tags) is read from
+    # wherever it is now, because a move or the postfix may have changed its location.
+    proposal = res.propose(Path(record.original_path), tags_from=source_path(record))
     # Other tools pass what they discovered, e.g. {"what": "BG-2-51", "source": "class-discoverer"}.
     evidence = dict(ctx.params.get("evidence") or {})
     apply_tool_evidence(proposal, evidence, res.ref)
@@ -350,6 +364,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
     # Release the session before helpers write through their own sessions (SQLite locking).
     ctx.session.commit()
     organizer = FileOrganizer(res.ref.matcher, settings)
+    move_files, postfix = renamer_move_files(), renamer_postfix()
     folder, _ = organizer.target_folder(proposal.what, proposal.category)
     unique, other = reserve_name(record.id, folder, proposal.new_name)
     if other:
@@ -366,7 +381,11 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         dry_run=ctx.dry_run,
         media_file_id=record.id,
         category=proposal.category,
+        move_original=move_files,
+        postfix=postfix,
     )
+    for warning in placed.warnings:
+        proposal.notes.append(warning)
     if placed.clash:
         proposal.flags.append(
             f"Another file already has the name {proposal.new_name}; saved as {placed.dst.name}."
@@ -385,6 +404,25 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
                 .where(m.MediaFile.id == record.id)
                 .values(processed_path=str(placed.dst), current_name=placed.dst.name)
             )
+            if placed.moved_original or placed.marked_original:
+                moved = placed.moved_original and not any(
+                    "could not be removed" in w for w in placed.warnings
+                )
+                s.execute(
+                    update(m.MediaFile)
+                    .where(m.MediaFile.id == record.id)
+                    .values(
+                        meta=func.json_set(
+                            func.json_set(
+                                func.coalesce(m.MediaFile.meta, "{}"),
+                                "$.original_moved",
+                                moved,
+                            ),
+                            "$.original_now",
+                            str(placed.marked_original) if placed.marked_original else None,
+                        )
+                    )
+                )
         if not proposal.flags:
             data["baserow"] = write_baserow(record, data, placed.dst, settings, dry_run=False)
     else:
@@ -394,10 +432,28 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         }
 
     meta = dict(record.meta or {})
+    if not ctx.dry_run:
+        with session_scope() as s:  # keep what the persist step above wrote
+            meta.update(
+                {
+                    k: v
+                    for k, v in (s.get(m.MediaFile, record.id).meta or {}).items()
+                    if k in ("original_moved", "original_now")
+                }
+            )
     meta["proposal"] = data
     meta["reserved"] = str(placed.dst)
     record.meta = meta
-    summary = f"{'Would rename' if ctx.dry_run else 'Renamed'} to {placed.dst.name}"
+    verb = "Would rename" if ctx.dry_run else "Renamed"
+    if placed.moved_original:
+        verb = "Would move and rename" if ctx.dry_run else "Moved and renamed"
+    summary = f"{verb} to {placed.dst.name}"
+    if placed.marked_original:
+        summary += (
+            f"; original {'would be ' if ctx.dry_run else ''}renamed {placed.marked_original.name}"
+        )
+    for warning in placed.warnings:
+        summary += f"; {warning}"
     if proposal.flags and ctx.dry_run:
         summary += (
             f" — would need a review ({len(proposal.flags)} item(s)); "
@@ -510,10 +566,17 @@ def reject_review(session: Session, review: m.Review, operator: str, note: str |
     """Discard the Renamer result: remove the processed copy and return to Not processed."""
     record = session.get(m.MediaFile, review.media_file_id)
     settings = get_settings()
+    from mam.helpers.file_organizer.trash import put_original_back, sole_copy
+
     copy = Path(record.processed_path) if record.processed_path else None
     root = settings.media_processed_files_path.resolve()
-    if copy and copy.exists() and root in copy.resolve().parents:
-        copy.unlink()  # a processed copy, never an original
+    if sole_copy(record):
+        # The original was moved: the processed file is the only copy, so it goes back.
+        put_original_back(session, record, tool="renamer-review", settings=settings)
+    else:
+        if copy and copy.exists() and root in copy.resolve().parents:
+            copy.unlink()  # a processed copy, never an original
+        put_original_back(session, record, tool="renamer-review", settings=settings)
     record.processed_path = None
     record.current_name = None
     record.meta = {k: v for k, v in (record.meta or {}).items() if k != "reserved"}
@@ -529,8 +592,16 @@ def exclude_file(session: Session, review: m.Review, operator: str, note: str | 
     review.decided_at = datetime.now(UTC)
     # The original stays where it was imported. A copy the Renamer already made goes to the
     # Trash, so an excluded file is not left in processed-files (decided 2026-11-19).
-    from mam.helpers.file_organizer.trash import trash_processed_copy
+    from mam.helpers.file_organizer.trash import (
+        put_original_back,
+        sole_copy,
+        trash_processed_copy,
+    )
 
-    trash_processed_copy(session, record, tool="renamer-review")
+    if sole_copy(record):  # the original was moved: put it back, never trash the only copy
+        put_original_back(session, record, tool="renamer-review")
+    else:
+        trash_processed_copy(session, record, tool="renamer-review")
+        put_original_back(session, record, tool="renamer-review")
     record.current_name = None
     set_status(session, record, "Excluded", "renamer-review", note or f"excluded by {operator}")

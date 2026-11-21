@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mam.config import Settings, get_settings
+from mam.errors import MamError
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.repo import record_event, set_status
 
@@ -48,6 +49,71 @@ def processed_copy(record: m.MediaFile, settings: Settings | None = None) -> Pat
     if not path.resolve().is_relative_to(settings.media_processed_files_path.resolve()):
         raise ValueError(f"Refusing to remove a file outside processed-files: {path}")
     return path if path.exists() else None
+
+
+def sole_copy(record: m.MediaFile) -> bool:
+    """True when the Renamer moved the original, so the processed file is the only copy."""
+    meta = record.meta or {}
+    return bool(meta.get("original_moved")) and not Path(record.original_path or "").exists()
+
+
+def forget_original_changes(record: m.MediaFile) -> None:
+    meta = dict(record.meta or {})
+    for key in ("original_moved", "original_now"):
+        meta.pop(key, None)
+    record.meta = meta
+
+
+def put_original_back(
+    session: Session, record: m.MediaFile, *, tool: str, settings: Settings | None = None
+) -> None:
+    """Undo what the Renamer did to the original, so a rejected or excluded file is as imported.
+
+    - A moved original: the processed file (the only copy) goes back to where it was imported,
+      with a verified copy if that is another volume. It is never trashed.
+    - An original renamed with the postfix gets its own name back.
+    If the way back is blocked (the folder is gone, or another file has that name) the file stays
+    where it is and a MamError says so; nothing is deleted.
+    """
+    from mam.helpers.file_organizer.organizer import _move
+
+    original = Path(record.original_path or "")
+    meta = record.meta or {}
+    if sole_copy(record):
+        path = processed_copy(record, settings)
+        if path is None:
+            raise MamError("The moved file is missing from processed-files; nothing to put back")
+        if original.exists() or not original.parent.is_dir():
+            raise MamError(
+                f"Cannot put the file back at {original}: that place is taken or the folder is "
+                "gone. It stays in processed-files."
+            )
+        if not _move(path, original):
+            raise MamError(f"Put back at {original}, but could not remove {path}")
+        record_event(
+            session,
+            action="restore",
+            tool=tool,
+            dry_run=False,
+            media_file_id=record.id,
+            src=path,
+            dst=original,
+        )
+        record.processed_path = None
+    elif meta.get("original_now"):
+        marked = Path(meta["original_now"])
+        if marked.exists() and not original.exists():
+            marked.rename(original)
+            record_event(
+                session,
+                action="unmark_original",
+                tool=tool,
+                dry_run=False,
+                media_file_id=record.id,
+                src=marked,
+                dst=original,
+            )
+    forget_original_changes(record)
 
 
 def trash_processed_copy(
@@ -96,6 +162,7 @@ def delete_file(
     if dry_run:
         return DeleteResult(False, trashed, "Dry run: nothing deleted")
 
+    was_sole_copy = sole_copy(record)
     trash_processed_copy(session, record, tool="media-manager", settings=settings)
     for review in session.scalars(
         select(m.Review).where(m.Review.media_file_id == record.id, m.Review.outcome == "pending")
@@ -104,4 +171,7 @@ def delete_file(
         review.operator = settings.operator_name
     set_status(session, record, DELETED, "media-manager", f"deleted by {settings.operator_name}")
     log.info("Deleted file %s (%s)", record.id, record.current_name)
-    return DeleteResult(True, trashed, "Moved to the Trash" if trashed else "Marked as deleted")
+    message = "Moved to the Trash" if trashed else "Marked as deleted"
+    if trashed and was_sole_copy:
+        message += " (the Renamer had moved the original, so this was the only copy)"
+    return DeleteResult(True, trashed, message)

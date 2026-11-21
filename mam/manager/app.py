@@ -21,7 +21,13 @@ from mam.config import get_settings
 from mam.errors import MamError
 from mam.helpers.local_db import migrate, session_scope
 from mam.helpers.local_db import models as m
-from mam.helpers.local_db.app_settings import default_status_setting, set_default_status
+from mam.helpers.local_db.app_settings import (
+    default_status_setting,
+    renamer_move_files,
+    renamer_postfix,
+    set_default_status,
+    set_renamer_options,
+)
 from mam.helpers.local_db.repo import media_kind
 from mam.manager import queries
 from mam.manager.queue import JobQueue, enqueue
@@ -735,7 +741,18 @@ def create_app(start_queue: bool = True) -> FastAPI:
             places=place_country_status(),
             status_choices=queries.status_choices(),
             default_status=default_status_setting(),
+            renamer_move_files=renamer_move_files(),
+            renamer_postfix=renamer_postfix(),
         )
+
+    @app.post("/settings/renamer")
+    async def settings_renamer(request: Request):
+        form = await request.form()
+        try:
+            set_renamer_options(form.get("move_files") == "on", str(form.get("postfix") or ""))
+        except ValueError as error:
+            return RedirectResponse(f"/settings?error={error}", status_code=303)
+        return RedirectResponse("/settings?msg=Renamer settings saved", status_code=303)
 
     @app.post("/settings/default-status")
     async def settings_default_status(request: Request):

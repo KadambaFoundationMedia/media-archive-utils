@@ -18,7 +18,7 @@ Semi or fully processed files will be moved to their final location. The .env de
 
 For example, the filename contains "SB". This is matched to the category "Srimad Bhagavatam" and the subfolder name is "Srimad-bhagavatam". See the Baserow table "category_terms_folder" and columns for matching purposes.
 
-Originals on the NAS are never moved: the organizer copies files into the processed root. Files without a WHAT are copied to `<processed root>/_unresolved/` and moved to their category folder when a later tool or reviewer discovers the WHAT. The history is kept in the local DB.
+Originals on the NAS are never moved by default: the organizer copies files into the processed root. Only when the Renamer option "Move files instead of copying" is on (decided 2026-11-21) is the original moved, with a verified copy across volumes (size and SHA-256 read back before the original is removed; nothing is overwritten). With the Renamer option "Add postfix to processed filenames", the original left behind by a copy is renamed with the postfix. Files without a WHAT are copied to `<processed root>/_unresolved/` and moved to their category folder when a later tool or reviewer discovers the WHAT. The history is kept in the local DB.
 
 ## Name clashes
 When a different file (different size/content) already exists with the same final name, append `-2`, `-3`, ... before the extension and flag the file for review.
