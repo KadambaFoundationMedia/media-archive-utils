@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import random
+import contextlib
 import threading
 import time
 from datetime import UTC, datetime
@@ -243,12 +244,11 @@ def _prefetch(client: VedabaseClient, ref: VerseRef | None) -> threading.Thread 
 
 
 def transcript_path(settings: Settings, record: m.MediaFile, audio: Path) -> Path:
-    """`transcriptions/<category folder>/<name>.md`: the folder of the audio below processed-files."""
+    """`transcriptions/<category folder>/<name>.md`, the audio's folder below processed-files."""
     folder = Path()
-    try:
-        folder = audio.resolve().parent.relative_to(settings.media_processed_files_path.resolve())
-    except ValueError:  # a file outside processed-files (a dry run on a sample) keeps the root
-        pass
+    root = settings.media_processed_files_path.resolve()
+    with contextlib.suppress(ValueError):  # outside processed-files (a dry run): the root
+        folder = audio.resolve().parent.relative_to(root)
     return settings.transcriptions_path / folder / f"{audio.stem}.md"
 
 
