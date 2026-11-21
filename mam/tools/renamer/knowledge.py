@@ -30,6 +30,7 @@ from mam.tools.renamer.dates import fold
 log = logging.getLogger(__name__)
 
 ALIASES_FILE = Path(__file__).with_name("aliases.yaml")
+GENERIC_CLASS_CATEGORY = "Class"  # the category_terms_folder row for plain classes
 CACHE_TTL_S = 600
 PLACEMENT_MAX_AGE_S = 60  # files are filed with category terms at most this old
 
@@ -106,6 +107,12 @@ class Reference:
         """The category whose `category_terms_folder` terms match `text`."""
         match = self.matcher.match(text)
         return match.category.name if match else None
+
+    def generic_words(self) -> set[str]:
+        """Words dropped from the WHAT next to a verse ("SB 3.1.20 class"): the words of the
+        terms of the `Class` category in category_terms_folder (Lekce, Lecture, Class...)."""
+        cat = self.matcher.by_name(GENERIC_CLASS_CATEGORY)
+        return {norm_key(token) for term in (cat.terms if cat else ()) for token in term}
 
     def language(self, token: str) -> str | None:
         return self.aliases["languages"].get(norm_key(token))

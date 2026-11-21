@@ -1,28 +1,7 @@
-# Seed knowledge for the Renamer. Reviewers' repeated corrections are added automatically as
-# alias rules in the local DB (SPEC.md section 10); this file holds the starting set.
+# Seed knowledge for the Renamer. Place spellings (place_country.Aliases) and category words
+# (category_terms_folder) live in Baserow. Reviewers' repeated corrections are added automatically
+# as alias rules in the local DB (SPEC.md section 10); this file holds the rest of the starting set.
 # Keys are matched case-insensitively, without accents, with spaces/hyphens/underscores equal.
-
-# Spellings and local names of places -> place name as used in Baserow.
-places:
-  # other spellings of a Baserow place option
-  sumercamp: Summercamp
-  praha: Prague
-  koln: ISKCON-Cologne
-  cologne: ISKCON-Cologne
-  ljublana: ISKCON-Ljubljana
-  ljubljana: ISKCON-Ljubljana
-  rdesh: Radhadesh
-  farma kd: Farma-Krishna-Dvur
-  krishna dvur: Farma-Krishna-Dvur
-  manor: Bhaktivedanta-Manor
-  livestream: Zoom-livestream
-  zoom: Zoom-livestream
-  durban: ISKCON-Durban
-  cape town: ISKCON-Cape-Town
-  amsterdam: ISKCON-Amsterdam
-  london: ISKCON-London
-  new york: ISKCON-NYC
-  nyc: ISKCON-NYC
 
 # Places in Baserow that are not real locations or collide with other words.
 not_places:
@@ -67,5 +46,3 @@ other_speakers: [SNS, BVS, KKD, KVS, BVPS, RNS]
 # Words dropped from the WHAT (honorifics, recorder and format words).
 noise: [hh, his, holiness, mp3, wav, stereo, jet, clean, copy, unedited]
 
-# Generic words dropped from the WHAT when a verse is present ("SB 3.1.20 class").
-generic_with_verse: [class, lecture, lekce, lecture-class, predavanje, vortrag, lezing]

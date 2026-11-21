@@ -115,3 +115,11 @@ def test_glued_words_are_split(parser):
         "Bhajanas",
     ]
     assert parser.parse("KKS_RadhaMadhava_05-09-11_Berlin").categories == ["Jaya-Radha-Madhava"]
+
+
+@pytest.mark.parametrize("word", ["class", "Lecture", "Lekce", "Lezing", "Vortrag", "predavanje"])
+def test_class_words_next_to_a_verse_come_from_the_class_category(parser, reference, word):
+    """The words are the terms of the Class row in category_terms_folder (not a code list)."""
+    row = next(c for c in reference.matcher.categories if c.name == "Class")
+    assert any(word.lower() in term for term in row.terms)
+    assert parser.parse(f"SB 3.1.20 {word}").what_words == []
