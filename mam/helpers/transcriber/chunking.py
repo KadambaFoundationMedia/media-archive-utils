@@ -80,13 +80,13 @@ def collapse_loops(text: str, max_ngram: int = 8) -> str:
 
 
 # Lines Whisper invents over music and silence (seen over a kirtan: 'Shabbat Shalom').
-INVENTED = {"thank you", "thanks for watching", "shabbat shalom", "shalom", "bye", "you"}
+INVENTED = {"thank you", "thanks for watching", "shabbat shalom", "shalom", "bye", "you", "please"}
 
 
 # Credits and sign-offs Whisper writes over music or silence (never part of a class).
 CREDIT_MARKERS = (
     "altyazı", "izlediğiniz", "subtitles by", "subtitled by", "amara.org", "thanks for watching",
-    "thank you for watching", "shabbat shalom", "transcribed by",
+    "thank you for watching", "shabbat shalom", "transcribed by", "satsang with mooji",
 )  # fmt: skip
 
 

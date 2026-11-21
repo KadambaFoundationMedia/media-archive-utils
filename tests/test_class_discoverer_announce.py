@@ -102,3 +102,20 @@ def test_announcement_before_the_translation_still_counts():
     )
     best, _ = best_announcement(find_announcements(t))
     assert best.ref.what == "BG-2-51"
+
+
+def test_real_sweden_announcement_with_kanto_and_a_chapter_title():
+    """The SB 3.6.6 class on the Mac: Whisper wrote 'Kanto', '3rd', and a chapter title."""
+    t = real_segments(
+        (25, "Srimad Bhagavatam, 3rd Kanto, Chapter 6, Untitled, Creation of the Universal "
+             "Form, Text No. 6."),
+    )  # fmt: skip
+    best, _ = best_announcement(find_announcements(t))
+    assert best is not None and best.ref.what == "SB-3-6-6"
+
+
+def test_other_spellings_of_canto():
+    for spoken in ("third Kanchu chapter six text six", "3rd kantam chapter 6 verse 6"):
+        t = real_segments((10, f"Srimad Bhagavatam {spoken}"))
+        best, _ = best_announcement(find_announcements(t))
+        assert best is not None and best.ref.what == "SB-3-6-6", spoken

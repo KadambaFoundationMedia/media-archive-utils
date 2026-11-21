@@ -19,12 +19,16 @@ from mam.tools.class_discoverer.numbers import ORDINALS, parse_number, tokenize
 
 BOOKS = {
     "BG": re.compile(r"bh?agavad[\s\-]?g[iī]t[aā]|\bgita\b|\bb\.?\s?g\b"),
-    "SB": re.compile(r"bh[aā]gavatam|bh[aā]gavata\b|bhagavatham|\bs\.?\s?b\b|\bcanto\b|\bkanta\b"),
+    "SB": re.compile(
+        r"bh[aā]gavatam|bh[aā]gavata\b|bhagavatham|\bs\.?\s?b\b|\bcanto\b|\bkant[ao]m?\b"
+    ),
     "CC": re.compile(
         r"cait?anya[\s\-]?carit[aā]m[rṛ]?ta|chaitanya[\s\-]?charit|\bc\.?\s?c\b"
         r"|\b(?:adi|madhya|antya)[\s\-]?l[iī]l[aā]"
     ),
 }
+# Whisper writes the canto as 'canto', 'kanto', 'kanchu', 'kantam'...
+CANTO_WORDS = {"canto", "cantos", "kanto", "kanta", "kantam", "kanchu", "cantu", "kandha"}
 LILA_RE = re.compile(r"\b(adi|madhya|antya)\b")
 NOISE = {"number", "no", "the", "is", "it", "its", "of", "in"}
 
@@ -75,6 +79,8 @@ def _numbers_after(tokens: list[str], keywords: set[str]) -> list[tuple[str, int
             found.append((tok, number[0], i))
         elif i > 0 and tokens[i - 1] in ORDINALS:  # 'first canto'
             found.append((tok, ORDINALS[tokens[i - 1]], i))
+        elif i > 0 and tok in CANTO_WORDS and tokens[i - 1].isdigit():  # '3rd kanto'
+            found.append((tok, int(tokens[i - 1]), i))
     return found
 
 
@@ -102,11 +108,12 @@ def read_window(book: str, text: str) -> tuple[VerseRef | None, dict[str, Any], 
     dotted = re.search(r"\b(\d{1,3}(?:\.\d{1,3}){1,3})\b", lower)
     if dotted:
         heard["dotted"] = dotted.group(1)
-    kw = _numbers_after(tokens, {"canto", "chapter", "text", "texts", "verse", "verses"})
+    keywords = CANTO_WORDS | {"chapter", "text", "texts", "verse", "verses"}
+    kw = _numbers_after(tokens, keywords)
     values: dict[str, int] = {}
     ends: dict[str, int | None] = {}
     for word, value, pos in kw:
-        key = {"canto": "canto", "chapter": "chapter"}.get(word, "verse")
+        key = "canto" if word in CANTO_WORDS else "chapter" if word == "chapter" else "verse"
         if key not in values:
             values[key] = value
             if key == "verse":
