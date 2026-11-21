@@ -240,8 +240,11 @@ def prepared(settings, monkeypatch, reference, no_baserow):
         folder.mkdir(parents=True, exist_ok=True)
         copy = folder / name
         shutil.copy2(original, copy)
+        # the real transcribe(): it writes the transcript through the job's session, which must
+        # not stay open when vedabase.io caches a page (database is locked, seen on the Mac)
         monkeypatch.setattr(
-            discoverer, "transcribe", lambda s, a, sha, st: (fake_transcript(*texts), False)
+            "mam.helpers.transcriber.store.run_backend",
+            lambda audio, settings, language: fake_transcript(*texts),
         )
         with session_scope() as s:
             record = register_original(s, original)

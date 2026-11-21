@@ -247,6 +247,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     prefetch = _prefetch(client, file_ref)
     ctx.session.commit()  # the transcription takes minutes; do not hold the database
     transcript, cached = transcribe(ctx.session, audio, sha, settings)
+    ctx.session.commit()  # vedabase.io caches pages through its own session: no lock may be held
     if prefetch is not None:
         prefetch.join()
     try:
