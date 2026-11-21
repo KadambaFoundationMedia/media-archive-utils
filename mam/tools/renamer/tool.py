@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from mam.config import Settings, get_settings
 from mam.errors import MamError
 from mam.helpers.file_organizer import FileOrganizer
+from mam.helpers.file_organizer.organizer import DuplicateResult
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import (
     baserow_writes_enabled,
@@ -331,6 +332,28 @@ def _rebuild_name(proposal: Proposal) -> None:
 
 
 # ------------------------------------------------------------------- the job
+def place_duplicates(
+    ctx: JobContext, organizer: FileOrganizer, record: m.MediaFile, move: bool
+) -> list[DuplicateResult]:
+    """Copy or move the file's byte-identical copies (its aliases) to duplicate_files/.
+
+    Each copy is handled once (it is remembered in `meta["duplicates"]`), and a copy that is no
+    longer at its path (moved earlier, or the share is gone) is skipped.
+    """
+    done = {d["from"] for d in (record.meta or {}).get("duplicates") or []}
+    placed: list[DuplicateResult] = []
+    for alias in sorted(record.aliases, key=lambda a: a.path):
+        src = Path(alias.path)
+        if alias.path in done or not src.is_file():
+            continue
+        placed.append(
+            organizer.place_duplicate(
+                src, tool=TOOL, dry_run=ctx.dry_run, move=move, media_file_id=record.id
+            )
+        )
+    return placed
+
+
 def run_renamer(ctx: JobContext) -> ToolOutcome:
     record = ctx.media_file
     if record is None or not record.original_path:
@@ -395,6 +418,13 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
             f"Same name and size as an existing file; saved as {placed.dst.name}."
         )
     data = proposal.to_dict(dry_run=ctx.dry_run, final_name=placed.dst.name, target=str(placed.dst))
+    dupes = place_duplicates(ctx, organizer, record, move_files)
+    if dupes:
+        data["duplicates"] = [
+            {"from": str(d.src), "to": str(d.dst), "moved": d.moved_original} for d in dupes
+        ]
+        for d in dupes:
+            proposal.notes.extend(d.warnings)
 
     if not ctx.dry_run:
         # Persist the new location at once, so a retry after a Baserow error renames in place.
@@ -404,6 +434,15 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
                 .where(m.MediaFile.id == record.id)
                 .values(processed_path=str(placed.dst), current_name=placed.dst.name)
             )
+            if dupes:  # remember each copy at once, so Reject can put moved ones back
+                row = s.get(m.MediaFile, record.id)
+                row.meta = {
+                    **(row.meta or {}),
+                    "duplicates": [
+                        *((row.meta or {}).get("duplicates") or []),
+                        *data["duplicates"],
+                    ],
+                }
             if placed.moved_original or placed.marked_original:
                 moved = placed.moved_original and not any(
                     "could not be removed" in w for w in placed.warnings
@@ -438,7 +477,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
                 {
                     k: v
                     for k, v in (s.get(m.MediaFile, record.id).meta or {}).items()
-                    if k in ("original_moved", "original_now")
+                    if k in ("original_moved", "original_now", "duplicates")
                 }
             )
     meta["proposal"] = data
@@ -454,6 +493,16 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         )
     for warning in placed.warnings:
         summary += f"; {warning}"
+    if dupes:
+        verb = "move" if move_files else "copy"
+        past = verb[:-1] + "ed" if verb == "move" else "copied"
+        would = f"would {verb}" if ctx.dry_run else past
+        summary += (
+            f"; {len(dupes)} identical cop{'y' if len(dupes) == 1 else 'ies'} {would} "
+            "to duplicate_files"
+        )
+        for d in dupes:
+            summary += "".join(f"; {w}" for w in d.warnings)
     if proposal.flags and ctx.dry_run:
         summary += (
             f" — would need a review ({len(proposal.flags)} item(s)); "

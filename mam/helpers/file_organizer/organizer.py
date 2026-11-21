@@ -7,7 +7,9 @@ Rules (SPEC.md section 2):
   folders.
 - With the Renamer's postfix option the original left behind by a copy is renamed with the
   postfix (`name_processed.mp3`) to mark it done.
-- No WHAT (or no matching category) -> processed/_unresolved/.
+- No WHAT (or no matching category) -> processed/unprocessed/.
+- Byte-identical copies of a file go to processed/duplicate_files/ under their own name (copied, or
+  moved with the same "Move files instead of copying" option as the file itself).
 - Same final name + same size -> saved with a `_duplicate` suffix.
 - Same final name + different size -> `-2`, `-3`, ... before the extension, flagged for review.
 """
@@ -29,7 +31,8 @@ from mam.helpers.local_db.repo import record_event
 
 log = logging.getLogger(__name__)
 
-UNRESOLVED = "_unresolved"
+UNRESOLVED = "unprocessed"
+DUPLICATES = "duplicate_files"
 
 
 @dataclass
@@ -169,6 +172,16 @@ def resolve_destination(folder: Path, name: str, src: Path) -> tuple[Path, bool,
         n += 1
 
 
+@dataclass
+class DuplicateResult:
+    src: Path
+    dst: Path
+    action: str  # copy | move
+    dry_run: bool
+    moved_original: bool = False
+    warnings: list[str] = field(default_factory=list)
+
+
 class FileOrganizer:
     def __init__(self, matcher: CategoryMatcher, settings: Settings | None = None) -> None:
         self.matcher = matcher
@@ -290,3 +303,50 @@ class FileOrganizer:
                 dst=new,
                 detail={"postfix": postfix},
             )
+
+    def place_duplicate(
+        self,
+        src: Path,
+        *,
+        tool: str,
+        dry_run: bool = True,
+        move: bool = False,
+        media_file_id: int | None = None,
+    ) -> DuplicateResult:
+        """Copy (or move) a byte-identical copy into processed/duplicate_files/.
+
+        The file keeps its own name; a taken name gets `-2`, `-3`, ... and nothing is overwritten.
+        """
+        folder = self.root / DUPLICATES
+        assert_writable(folder, self.settings)
+        dst = folder / src.name
+        n = 2
+        while dst.exists():
+            dst = folder / _with_suffix(src.name, f"-{n}")
+            n += 1
+        action = "move" if move else "copy"
+        result = DuplicateResult(
+            src=src, dst=dst, action=action, dry_run=dry_run, moved_original=move
+        )
+        if not dry_run:
+            folder.mkdir(parents=True, exist_ok=True)
+            if move:
+                if not _move(src, dst):
+                    result.warnings.append(
+                        f"Moved to {dst.name}, but the original {src} could not be removed."
+                    )
+            else:
+                _atomic_copy(src, dst)
+        with session_scope() as session:
+            record_event(
+                session,
+                action=action,
+                tool=tool,
+                dry_run=dry_run,
+                media_file_id=media_file_id,
+                src=src,
+                dst=dst,
+                detail={"duplicate": True, "original_moved": move},
+            )
+        log.info("%s%s duplicate %s -> %s", action, " (dry-run)" if dry_run else "", src, dst)
+        return result

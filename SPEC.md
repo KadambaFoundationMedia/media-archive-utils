@@ -53,7 +53,8 @@ Items under "Open decisions" are not decided: ask instead of guessing.
 - **Copying into processed-files:**
   - The Renamer copies the file to `processed/<category-folder>/` immediately, and later tools write new versions there.
   - The category folder is found by matching the WHAT against the Baserow `category_terms_folder` table.
-  - With no WHAT the file goes to `processed/_unresolved/`. It moves to its category folder once a later tool or a reviewer finds the WHAT; the history is kept.
+  - With no WHAT the file goes to `processed/unprocessed/`. It moves to its category folder once a later tool or a reviewer finds the WHAT; the history is kept.
+- **Identical copies (decided 2026-11-21):** byte-identical copies of a file (found by a scan, recorded as aliases) go to their own folder `processed/duplicate_files/`, separate from `unprocessed/` (no nesting). They are handled when the Renamer runs on the file they duplicate, with the same Renamer option as the file itself: copied, or moved (verified copy, original removed only after the check) when *Move files instead of copying* is on. They keep their own filename (`-2`, `-3` on a clash), never get the postfix, are handled once, and each move or copy is a `file_event`. Dry runs say "would copy/move". Reject and Exclude put moved copies back; the Settings reset refuses while moved copies exist.
 - **Name clashes:**
   - Same final name, different content: append `-2`, `-3` before the extension and flag the file for review.
   - Same name and same size (a duplicate): copy it with a `_duplicate` suffix, as the file-organizer spec requires.
@@ -102,7 +103,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - the filename names another speaker (e.g. `SNS`, `BVS`) and not KKS, since WHO is always KKS
   - the country code contradicts a known place (`Oslo_fi`) and cannot be corrected safely
   - a different file already has the final name (it is saved with `-2`)
-- **Missing WHAT:** the file goes to `_unresolved/`, and later tools may fill in the WHAT.
+- **Missing WHAT:** the file goes to `unprocessed/`, and later tools may fill in the WHAT.
 - **Dates:** European day-month-year is the default reading; other orders need supporting evidence. Dates in the ID3 title or date tag are taken as correct unless other evidence conflicts (a conflict with the folder name is flagged). See docs/references/filenaming-convention.md.
 - **More evidence used:**
   - sibling files in the same folder decide ambiguous dates (`08-04-10` among April 2008 files is 2008-04-10) and give the place of files recorded the same day
@@ -120,7 +121,7 @@ Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-d
   - **Move files instead of copying** (off by default). The original is moved to processed-files instead of copied. Dry runs say "Would move". A move is never lossy: on one volume it is a single rename; across volumes (NAS to local disk) the file is copied, read back and compared (size and SHA-256), and only then is the original removed. If the check fails, the destination is not created and the original stays. If the original cannot be removed (read-only share, permissions) both files stay and the run says so. A name that is taken is never overwritten (`-2`, `_duplicate` as for a copy). The record keeps the original path for name evidence and marks `original_moved`; because the processed file is then the only copy, **Reject** and **Exclude** put it back where it was imported (verified, never trashed; refused with a message if that place is taken), **Delete** still goes to the Trash but says it was the only copy, and the Settings **Reset** refuses to delete processed copies while such files exist. The postfix is not used when moving, because no original is left behind.
   - **Add postfix to processed filenames** (empty by default, so no postfix; example `_processed`). Applies to a copy, and only to the *original left behind*, which is renamed `name<postfix>.ext` once the copy is complete (`2008-01-04.mp3` becomes `2008-01-04_processed.mp3`). The new copy keeps its clean name. It is added once (a name that already ends with it is left alone), never overwrites (`-2`), and a refused rename (read-only share) is only a warning; the copy is kept. Reject and Exclude give the original its own name back. Letters, digits, `_` and `-` only, at most 30 characters. A re-run of the Renamer reads the ID3 tags from the renamed file and keeps using the import path for the name evidence. Rescanning a folder finds the renamed original as a byte-identical alias, not a new file.
   - Every move and every rename of an original is recorded as a `file_event` (`move`, `mark_original`, `restore`, `unmark_original`).
-- **Every run is copied:** a flagged file is still copied and renamed (into its category folder or `_unresolved/`), so the review edits a real copy. Running the Renamer again on a processed file moves that copy; it never makes a second one.
+- **Every run is copied:** a flagged file is still copied and renamed (into its category folder or `unprocessed/`), so the review edits a real copy. Running the Renamer again on a processed file moves that copy; it never makes a second one.
 - **Dry run:** shows the proposed name in the file list without copying files, changing the status or writing to Baserow. It never opens a review; the file page says so and offers to run the Renamer for real.
 
 ### Kirtan-splitter

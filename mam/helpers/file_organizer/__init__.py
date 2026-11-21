@@ -2,6 +2,7 @@
 
 from mam.helpers.file_organizer.categories import Category, CategoryMatch, CategoryMatcher
 from mam.helpers.file_organizer.organizer import (
+    DUPLICATES,
     UNRESOLVED,
     FileOrganizer,
     OrganizeResult,
@@ -9,6 +10,7 @@ from mam.helpers.file_organizer.organizer import (
 )
 
 __all__ = [
+    "DUPLICATES",
     "UNRESOLVED",
     "Category",
     "CategoryMatch",

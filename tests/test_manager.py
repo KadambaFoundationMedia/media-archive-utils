@@ -169,7 +169,7 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
     run_queue()
     processed = settings.media_processed_files_path
     clean = processed / "Srimad-bhagavatam" / "2011-08-28_KKS_SB-1-19-30_Oslo-no.mp3"
-    flagged = processed / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    flagged = processed / "unprocessed" / "2012-07-DD_KKS_rs.mp3"
     assert clean.exists() and flagged.exists()
     assert (
         archive / "From JVD (8.9.11)/KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"
@@ -291,7 +291,7 @@ def test_reject_removes_copy_and_exclude_stops(
         file_id = ids(s)["R09_0004.MP3"]
     client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
     run_queue()
-    copy = settings.media_processed_files_path / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    copy = settings.media_processed_files_path / "unprocessed" / "2012-07-DD_KKS_rs.mp3"
     assert copy.exists()
     with session_scope() as s:
         review_id = s.scalars(select(m.Review.id)).one()
@@ -304,7 +304,7 @@ def test_reject_removes_copy_and_exclude_stops(
     run_queue()
     with session_scope() as s:
         review_id = s.scalars(select(m.Review.id).where(m.Review.outcome == "pending")).one()
-    copy = settings.media_processed_files_path / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    copy = settings.media_processed_files_path / "unprocessed" / "2012-07-DD_KKS_rs.mp3"
     assert copy.exists()
     trashed = []
     monkeypatch.setattr("mam.helpers.file_organizer.trash._send_to_trash", trashed.append)
@@ -898,7 +898,7 @@ def _renamed_copy(client, settings):
         ).one()
     client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
     run_queue()
-    copy = settings.media_processed_files_path / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    copy = settings.media_processed_files_path / "unprocessed" / "2012-07-DD_KKS_rs.mp3"
     assert copy.exists()
     return file_id, copy
 

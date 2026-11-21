@@ -57,9 +57,15 @@ def sole_copy(record: m.MediaFile) -> bool:
     return bool(meta.get("original_moved")) and not Path(record.original_path or "").exists()
 
 
+def moved_duplicates(record: m.MediaFile) -> list[dict]:
+    """Identical copies the Renamer moved to duplicate_files/ that are still there."""
+    found = (record.meta or {}).get("duplicates") or []
+    return [d for d in found if d.get("moved") and Path(d["to"]).exists()]
+
+
 def forget_original_changes(record: m.MediaFile) -> None:
     meta = dict(record.meta or {})
-    for key in ("original_moved", "original_now"):
+    for key in ("original_moved", "original_now", "duplicates"):
         meta.pop(key, None)
     record.meta = meta
 
@@ -79,6 +85,25 @@ def put_original_back(
 
     original = Path(record.original_path or "")
     meta = record.meta or {}
+    for dup in moved_duplicates(record):
+        place, kept = Path(dup["from"]), Path(dup["to"])
+        if place.exists() or not place.parent.is_dir():
+            raise MamError(
+                f"Cannot put the identical copy back at {place}: that place is taken or the "
+                f"folder is gone. It stays at {kept}."
+            )
+        if not _move(kept, place):
+            raise MamError(f"Put back at {place}, but could not remove {kept}")
+        record_event(
+            session,
+            action="restore",
+            tool=tool,
+            dry_run=False,
+            media_file_id=record.id,
+            src=kept,
+            dst=place,
+            detail={"duplicate": True},
+        )
     if sole_copy(record):
         path = processed_copy(record, settings)
         if path is None:

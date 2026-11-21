@@ -88,15 +88,13 @@ def summary(settings: Settings | None = None) -> dict:
 
 def sole_copies() -> int:
     """Files the Renamer moved: the copy in processed-files is the only one there is."""
-    from mam.helpers.file_organizer.trash import sole_copy
+    from mam.helpers.file_organizer.trash import moved_duplicates, sole_copy
 
     with session_scope() as s:
         return sum(
             1
-            for record in s.scalars(
-                select(m.MediaFile).where(m.MediaFile.processed_path.isnot(None))
-            )
-            if sole_copy(record)
+            for record in s.scalars(select(m.MediaFile))
+            if (record.processed_path and sole_copy(record)) or moved_duplicates(record)
         )
 
 

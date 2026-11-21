@@ -186,7 +186,7 @@ def test_run_in_move_mode_and_reject_puts_the_file_back(
     set_renamer_options(True, "_processed")
     file_id = run_renamer_on(client, FLAGGED)
     original = archive / FLAGGED
-    copy = settings.media_processed_files_path / "_unresolved" / "2012-07-DD_KKS_rs.mp3"
+    copy = settings.media_processed_files_path / "unprocessed" / "2012-07-DD_KKS_rs.mp3"
     assert copy.exists() and not original.exists()
     assert not list(original.parent.glob("*_processed*"))  # no postfix on a move
     with session_scope() as s:
@@ -273,3 +273,45 @@ def test_rerun_after_marking_still_finds_the_file(
         assert record.status in ("Renamer Done", "Renamer Review")
     processed = list(settings.media_processed_files_path.rglob("*.mp3"))
     assert len(processed) == 1  # a re-run moves the copy, it never makes a second one
+
+
+def _duplicate_of_clean(archive):
+    twin = archive / "Zz copies" / "KKS_copy.mp3"
+    twin.parent.mkdir()
+    twin.write_bytes((archive / CLEAN).read_bytes())
+    return twin
+
+
+def test_identical_copy_is_copied_to_duplicate_files(
+    client,
+    archive,
+    reference,
+    no_baserow,
+    settings,  # noqa: F811
+):
+    twin = _duplicate_of_clean(archive)
+    run_renamer_on(client, CLEAN)
+    folder = settings.media_processed_files_path / "duplicate_files"
+    assert (folder / "KKS_copy.mp3").exists() and twin.exists()  # copy mode keeps it
+    assert not (settings.media_processed_files_path / "unprocessed" / "KKS_copy.mp3").exists()
+
+
+def test_identical_copy_is_moved_in_move_mode_and_reject_puts_it_back(
+    client,
+    archive,
+    reference,
+    no_baserow,
+    settings,  # noqa: F811
+):
+    set_renamer_options(True, "")
+    twin = _duplicate_of_clean(archive)
+    run_renamer_on(client, CLEAN)
+    moved = settings.media_processed_files_path / "duplicate_files" / "KKS_copy.mp3"
+    assert moved.exists() and not twin.exists()
+    with session_scope() as s:
+        record = s.scalars(select(m.MediaFile)).first()
+        from mam.helpers.file_organizer.trash import moved_duplicates, put_original_back
+
+        assert len(moved_duplicates(record)) == 1
+        put_original_back(s, record, tool="t")
+    assert twin.exists() and not moved.exists()
