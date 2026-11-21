@@ -92,3 +92,38 @@ def test_an_unreliable_transcript_is_not_a_sure_no_verse():
     assert got["action"] == "none" and not got["sure"] and "unreliable" in got["reasons"][0]
     good = transcript_quality([Segment(0, 5, "Reading from the Gita")] * 10, None)
     assert decide({"found": None, "file": None, "quality": good})["sure"]
+
+
+def test_a_chunk_heard_as_turkish_is_decoded_again_in_english():
+    class Runner(FakeRunner):
+        def run_chunk(self, idx, start, end, options, timeout):
+            self.calls.append((idx, options.get("language")))
+            lang = options.get("language") or "tr"
+            return {"language": lang, "segments": [{"start": 1.0, "end": 2.0, "text": "x"}]}
+
+    runner = Runner()
+    results, events = run_chunks(lambda: runner, 10.0, None, {"en", "nl"}, "en")
+    assert [r["language"] for r in results] == ["en", "en"]
+    assert runner.calls == [(0, None), (0, "en"), (1, None), (1, "en")]
+    assert events[0]["wrong_language"] == "tr"
+
+
+def test_zero_length_segments_are_dropped():
+    from mam.helpers.transcriber.backends import _mlx_segments
+
+    segs = _mlx_segments(
+        {"segments": [{"start": 5.0, "end": 5.0, "text": "Bir dey"},
+                      {"start": 6.0, "end": 8.0, "text": "real"}]},
+        False,
+    )  # fmt: skip
+    assert [s.text for s in segs] == ["real"]
+
+
+def test_invented_credits_are_recognised_and_counted():
+    from mam.helpers.transcriber import Segment, transcript_quality
+    from mam.helpers.transcriber.chunking import is_invented_credit
+
+    assert is_invented_credit("Altyazı M.K.") and is_invented_credit("Shabbat Shalom")
+    assert not is_invented_credit("Reading from Srimad Bhagavatam")
+    q = transcript_quality([Segment(0, 1, "text")], {"invented_dropped": 3})
+    assert q["bad_share"] == 0.75 and q["unreliable"]

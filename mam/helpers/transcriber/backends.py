@@ -48,8 +48,8 @@ def _mlx_segments(result: dict[str, Any], with_words: bool) -> list[Segment]:
     segments = []
     for seg in result.get("segments", []):
         text = (seg.get("text") or "").strip()
-        if not text:
-            continue
+        if not text or float(seg["end"]) - float(seg["start"]) < 0.02:
+            continue  # empty, or a zero-length segment of a stuck decode
         logprob = seg.get("avg_logprob")
         words = None
         if with_words and seg.get("words"):
@@ -103,7 +103,11 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
         raise MamError("mlx-whisper is not installed. Run `uv sync` on the Mac.") from exc
     from importlib.metadata import PackageNotFoundError, version
 
-    from mam.helpers.transcriber.chunking import collapse_loops, looks_looped
+    from mam.helpers.transcriber.chunking import (
+        collapse_loops,
+        is_invented_credit,
+        looks_looped,
+    )
     from mam.helpers.transcriber.mlx_runner import MlxRunner, run_chunks
 
     repo = settings.whisper_mlx_model
@@ -113,15 +117,20 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
         ),
         float(settings.transcribe_chunk_timeout_s),
         _cpp_fallback_for(audio, settings, language),
+        None if language else settings.language_set(),
+        "en",
     )
     segments: list[Segment] = []
     spans: dict[str, float] = {}
-    loops = 0
+    loops = dropped = 0
     for chunk in results:
         offset = chunk["offset"]
         language_here = chunk.get("language")
         part = _mlx_segments(chunk, settings.transcribe_words)
         for seg in part:
+            if is_invented_credit(seg.text):
+                dropped += 1  # 'Altyazı M.K.', 'Shabbat Shalom': invented over music
+                continue
             seg.start += offset
             seg.end += offset
             for w in seg.words or []:
@@ -139,7 +148,12 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
         engine_version = version("mlx-whisper")
     except PackageNotFoundError:
         engine_version = None
-    notes = {"chunks": len(results), "loops_collapsed": loops, "events": events}
+    notes = {
+        "chunks": len(results),
+        "loops_collapsed": loops,
+        "invented_dropped": dropped,
+        "events": events,
+    }
     return Transcript(
         segments=segments,
         language=detected,
@@ -148,7 +162,7 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
         model=repo,
         model_hash=None,
         backend="mlx",
-        fallback=notes if (events or loops) else None,
+        fallback=notes if (events or loops or dropped) else None,
     )
 
 

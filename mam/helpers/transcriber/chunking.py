@@ -83,6 +83,18 @@ def collapse_loops(text: str, max_ngram: int = 8) -> str:
 INVENTED = {"thank you", "thanks for watching", "shabbat shalom", "shalom", "bye", "you"}
 
 
+# Credits and sign-offs Whisper writes over music or silence (never part of a class).
+CREDIT_MARKERS = (
+    "altyazı", "izlediğiniz", "subtitles by", "subtitled by", "amara.org", "thanks for watching",
+    "thank you for watching", "shabbat shalom", "transcribed by",
+)  # fmt: skip
+
+
+def is_invented_credit(text: str) -> bool:
+    low = text.lower()
+    return any(marker in low for marker in CREDIT_MARKERS)
+
+
 def transcript_quality(segments, notes: dict | None) -> dict:
     """How far to trust a transcript: the share of lines that are repeated loops or phrases
     Whisper invents, and whether a chunk had to be retried."""
@@ -90,10 +102,12 @@ def transcript_quality(segments, notes: dict | None) -> dict:
     total = len(segments)
     invented = sum(1 for s in segments if s.text.strip().strip(".!?, ").lower() in INVENTED)
     loops = int(notes.get("loops_collapsed") or 0)
-    bad = round((invented + loops) / total, 3) if total else 0.0
+    dropped = int(notes.get("invented_dropped") or 0)
+    seen = total + dropped
+    bad = round((invented + loops + dropped) / seen, 3) if seen else 0.0
     retried = sum(1 for e in notes.get("events") or [] if "problem" in e)
     return {
         "bad_share": bad,
         "retried_chunks": retried,
-        "unreliable": total == 0 or bad > 0.25,
+        "unreliable": seen == 0 or bad > 0.25,
     }

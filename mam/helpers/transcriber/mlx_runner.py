@@ -60,11 +60,13 @@ def _worker(conn, audio_path: str, repo: str, language: str | None, words: bool,
             if job is None:
                 return
             idx, start, end, options = job
+            options = dict(options)
+            lang = options.pop("language", language)
             part = audio[int(start * SAMPLE_RATE) : int(end * SAMPLE_RATE)]
             result = mlx_whisper.transcribe(
                 part,
                 path_or_hf_repo=repo,
-                language=language,
+                language=lang,
                 condition_on_previous_text=False,  # no carried context: no runaway repetition
                 word_timestamps=words,
                 verbose=None,
@@ -139,12 +141,18 @@ def run_chunks(
     make_runner: Callable[[], Any],
     chunk_timeout: float,
     fallback_chunk: Callable[[float, float], dict[str, Any]] | None = None,
+    allowed_languages: set[str] | None = None,
+    default_language: str = "en",
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Transcribe every chunk; returns (chunk results with their offsets, events).
 
     Per chunk: attempt 1 (greedy); on a stall or failure the child is restarted and the chunk
     is retried with the temperature fallback; if that fails too, `fallback_chunk` (whisper.cpp)
     gets it; without one the run fails with a message naming the chunk.
+
+    A chunk whose detected language is not in `allowed_languages` (Whisper hears Turkish or
+    Hebrew in kirtan and then decodes everything as that language) is decoded again in
+    `default_language`.
     """
     events: list[dict[str, Any]] = []
     runner = make_runner()
@@ -168,6 +176,21 @@ def run_chunks(
                         {"chunk": idx, "start": start, "attempt": attempt, "problem": str(exc)}
                     )
                     log.warning("Chunk %d (%.0f s) attempt %d: %s", idx, start, attempt, exc)
+            if (
+                result is not None
+                and allowed_languages
+                and result.get("language") not in allowed_languages
+            ):
+                events.append(
+                    {"chunk": idx, "start": start, "wrong_language": result.get("language")}
+                )
+                try:
+                    result = runner.run_chunk(
+                        idx, start, end, {**ATTEMPT_OPTIONS[0], "language": default_language},
+                        chunk_timeout * 2,
+                    )  # fmt: skip
+                except MamError as exc:
+                    events.append({"chunk": idx, "start": start, "problem": str(exc)})
             if result is None and fallback_chunk is not None:
                 result = fallback_chunk(start, end)
                 events.append({"chunk": idx, "start": start, "used": "whisper.cpp"})
