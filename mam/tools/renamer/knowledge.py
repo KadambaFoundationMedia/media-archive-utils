@@ -103,7 +103,9 @@ class Reference:
         return [s for s in self.stays if s.covers(d)]
 
     def category_hint(self, text: str) -> str | None:
-        return self.aliases["categories"].get(norm_key(text))
+        """The category whose `category_terms_folder` terms match `text`."""
+        match = self.matcher.match(text)
+        return match.category.name if match else None
 
     def language(self, token: str) -> str | None:
         return self.aliases["languages"].get(norm_key(token))
@@ -191,7 +193,6 @@ def _place_country_rows(client) -> list[dict[str, Any]]:
 def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) -> Reference:
     aliases = yaml.safe_load(ALIASES_FILE.read_text(encoding="utf-8"))
     aliases["places"] = {norm_key(k): v for k, v in (aliases.get("places") or {}).items()}
-    aliases["categories"] = {norm_key(k): v for k, v in (aliases.get("categories") or {}).items()}
     aliases["languages"] = {norm_key(k): v for k, v in (aliases.get("languages") or {}).items()}
     for token, replacement in (learned or {}).items():
         aliases["places"][norm_key(token)] = replacement

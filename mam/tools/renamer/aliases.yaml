@@ -39,28 +39,6 @@ no_country:
   - Summercamp
   - Govindas
 
-# Words that point to a category (used for folders and names without a verse).
-categories:
-  kirtany: Kirtan
-  kirtana: Kirtan
-  kirtans: Kirtan
-  bhajans: Kirtan
-  bhajanas: Kirtan
-  bahjanas: Kirtan
-  maha mantra: Kirtan
-  radha madhava: Jaya-Radha-Madhava
-  radhamadhava: Jaya-Radha-Madhava
-  janmastami: Janmastami
-  radhastami: Radhastami
-  vyasa puja: Vyasa-puja
-  gaurapurnima: Gaura-purnima
-  gaura purnima: Gaura-purnima
-  krsnabook: Krsna-book
-  home program: Home-program
-  homeprogram: Home-program
-  sunday feast: Sunday-program
-  sunday class: Sunday-program
-
 # Language words in names -> Baserow language option.
 languages:
   ger: German

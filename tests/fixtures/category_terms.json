@@ -43,13 +43,13 @@
  },
  {
   "category": "Festivals",
-  "filename_terms": "summer camp, festival",
+  "filename_terms": "summer camp, summercamp, festival, Govardhana, govardhana, Govardhan, govardhan",
   "folder_name": "Festivals",
   "color": "dark-blue"
  },
  {
   "category": "Gaura-purnima",
-  "filename_terms": "Gaur purnima",
+  "filename_terms": "Gaur purnima, gaurapurnima, gaura purnima",
   "folder_name": "Gaura-purnima",
   "color": "dark-brown"
  },
@@ -79,7 +79,7 @@
  },
  {
   "category": "Kirtan",
-  "filename_terms": "Kirtan, kirtana, bhajan, mellows, maha mantra, kirtany, Gaura arati, Samsara, guru puja, bhajana, bhajanas, bahjanas",
+  "filename_terms": "Kirtan, kirtana, bhajan, mellows, maha mantra, kirtany, Gaura arati, Samsara, guru puja, bhajana, bhajanas, bahjanas,kirtans, bhajans",
   "folder_name": "Kirtan",
   "color": "darker-red"
  },
@@ -91,7 +91,7 @@
  },
  {
   "category": "Nrsimha-caturdasi",
-  "filename_terms": "Nrsimha caturdasi",
+  "filename_terms": "Nrsimha caturdasi, nrsimha festival, nrsimha-catur",
   "folder_name": "Nrsimha-caturdasi",
   "color": "dark-cyan"
  },
@@ -145,14 +145,20 @@
  },
  {
   "category": "Vyasa-puja",
-  "filename_terms": "VP, vyasapuja, vyasa-puja",
+  "filename_terms": "VP, vyasapuja, vyasa-puja, vyasa puja, VP Festival",
   "folder_name": "Vyasa-puja",
   "color": "darker-orange"
  },
  {
   "category": "Jaya-Radha-Madhava",
-  "filename_terms": "JRM, Jaya Radha Madhava",
+  "filename_terms": "JRM, Jaya Radha Madhava, radha madhava, radhamadhava",
   "folder_name": "Jaya-Radha-Madhava",
   "color": "darker-red"
+ },
+ {
+  "category": "Class",
+  "filename_terms": "Lekce, Lecture, Class, Lezing",
+  "folder_name": "class",
+  "color": "darker-yellow"
  }
 ]

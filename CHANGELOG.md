@@ -11,6 +11,8 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Settings page: options now save by themselves when you change them (a check mark shows, or the problem if a value is refused), so there are no Save buttons any more.
 
 ### Renamer
+- New **Class** category (from the `category_terms_folder` table): a file in a `Lekce`, `Lecture`, `Class` or `Lezing` folder with no other clue is named `..._KKS_Class.mp3` and filed in the `class` folder, until the class-discoverer finds the real type.
+- Category words now come only from the `category_terms_folder` table (the built-in word list in `aliases.yaml` is gone).
 - A file whose name gives no WHAT (`R09_0008.MP3`, `ZOOM0001.MP3`) now takes it from the category of its parent folder: files in `vyasa puja 2015` become `2015-MM-DD_KKS_Vyasa-puja.mp3` (then `-2`, `-3` for files with the same name). Not used for the scripture categories (SB, BG, CC), which need a verse.
 - New **Renamer** block on the Settings page with two options, for processing the archive automatically:
   - **Move files instead of copying** (off by default): the file is moved to processed-files and no longer stays in the archive. A move across disks (the NAS to this computer) is copied, read back and compared before the original is removed; if anything fails the original stays, and nothing is overwritten. Reject and Exclude put a moved file back where it came from; the Settings Reset will not delete processed copies that are the only copy.

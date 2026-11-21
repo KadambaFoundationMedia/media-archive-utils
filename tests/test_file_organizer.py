@@ -30,7 +30,7 @@ def test_category_matching(matcher, what, category):
     assert matcher.match(what).category.name == category
 
 
-@pytest.mark.parametrize("what", [None, "", "ZOOM0004", "class", "Unknown"])
+@pytest.mark.parametrize("what", [None, "", "ZOOM0004", "Unknown"])
 def test_no_category(matcher, what):
     assert matcher.match(what) is None
 
