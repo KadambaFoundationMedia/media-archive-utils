@@ -52,7 +52,7 @@
           {% for t in menu %}<option value="{{ t.name }}">{{ t.label }}</option>{% endfor %}
         </select>
         <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" aria-label="Preview (dry run)" data-bs-toggle="tooltip" data-bs-title="Preview (dry run): shows what would happen. Nothing is copied and no review is opened."><i class="fa-regular fa-eye"></i></button>
-        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" aria-label="Run" data-bs-toggle="tooltip" data-bs-title="Run: copies and renames into processed-files and opens a review when needed. Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals are never changed."><i class="fa-solid fa-play"></i></button>
+        <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" aria-label="Run" data-bs-toggle="tooltip" data-bs-title="Run: copies and renames into processed-files and opens a review when needed (or moves, if Settings has Move files instead of copying on). Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals stay as they are unless the Renamer options in Settings move them or add a postfix."><i class="fa-solid fa-play"></i></button>
       </div>
 </form>
 {% endif %}

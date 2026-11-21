@@ -88,7 +88,10 @@ def register_original(session: Session, path: Path) -> m.MediaFile | None:
 
 def ensure_sha256(session: Session, record: m.MediaFile) -> str:
     if not record.sha256:
-        source = record.original_path or record.processed_path
+        # The original may have been moved or renamed by the Renamer's options.
+        candidates = [(record.meta or {}).get("original_now"), record.original_path]
+        candidates.append(record.processed_path)
+        source = next((c for c in candidates if c and Path(c).exists()), None)
         if source is None:
             raise ValueError(f"media_file {record.id} has no path to hash")
         record.sha256 = sha256(Path(source))

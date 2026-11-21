@@ -7,6 +7,11 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Renamer
+- New **Renamer** block on the Settings page with two options, for processing the archive automatically:
+  - **Move files instead of copying** (off by default): the file is moved to processed-files and no longer stays in the archive. A move across disks (the NAS to this computer) is copied, read back and compared before the original is removed; if anything fails the original stays, and nothing is overwritten. Reject and Exclude put a moved file back where it came from; the Settings Reset will not delete processed copies that are the only copy.
+  - **Add postfix to processed filenames** (empty by default, for example `_processed`): after a copy, the original left behind is renamed with the postfix (`2008-01-04_processed.mp3`) so processed files are easy to see. The new copy keeps its clean name; the postfix is not used when moving. Reject gives the original its name back.
+
 ### Kirtan splitter
 - New tool: finds where the kirtan ends in a recording that is kirtan followed by a class, from the audio alone (a local voice-activity model for the speech, loudness and treble for where the music stops, and silences; no transcription), and splits it into a kirtan file (named by mantra type) and the class. Runs after the Renamer; in the Action menu and as `mam kirtan-split <file>` (dry run by default, prints a timeline).
 - Music throughout or no kirtan: not split. Unsure cuts open a review with a page to edit the time; sure ones (the music clearly stops, then speech; a kirtan of 1.5 to 35 minutes) are cut automatically, with 5% spot checks. The score is shown but no longer decides.

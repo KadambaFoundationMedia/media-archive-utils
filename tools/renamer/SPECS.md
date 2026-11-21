@@ -17,7 +17,7 @@ The main goal is to rename files in the media archive according to our filenamin
 
 ## Requirements
 - Use local utilities for mp3 tag scanning
-- Rename the file at their the original location
+- Rename the file at their the original location (see "Move and postfix options" below for what happens to the original)
 - Add a dry-run option
 
 ## Non standard filenames
@@ -72,3 +72,8 @@ Evidence fields: `when`, `what`, `place`, `place_name`, `cc`, `category`, `verse
 ## Multiple languages
 The speaker, Kadamba Kanana Swami, speaks multiple languages; English, Dutch, German, Spanish, Hindi. French. And some recordings have live translations in languages; Czech, Slovak, French, German, Spanish and others). Some filenames also are in different languages, like Czech and others. 
 
+
+## Move and postfix options
+Two options in the Renamer block of the Settings page (decided 2026-11-21; details in SPEC.md, "Renamer options"):
+- **Move files instead of copying** (off by default): the original is moved to processed-files after a verified copy, so most of the 15 TB archive can be processed automatically without keeping two copies.
+- **Add postfix to processed filenames** (empty by default): when a file is copied, the original left behind is renamed with the postfix (for example `_processed`) so it can be recognised as done. The new copy keeps its clean name. Not used when moving.

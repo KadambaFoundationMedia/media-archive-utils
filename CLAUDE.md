@@ -65,7 +65,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Lint/format: `uv run ruff check .` and `uv run ruff format .`
 
 ## Rules (always follow)
-- Never overwrite or delete original media files; write new files or use staging.
+- Never overwrite or delete original media files; write new files or use staging. The only exception is the Renamer's two Settings options (move instead of copy; postfix on the original), both off by default (SPEC.md section 2).
 - Every tool/helper that changes files must support a dry-run mode.
 - Never run tools/hlpers against the real NAS during development; use test fixtures in /sample-files/].
 - Every rename or file change is recorded in the local database and in the media table (baserow)
