@@ -70,36 +70,85 @@ def _mlx_segments(result: dict[str, Any], with_words: bool) -> list[Segment]:
     return segments
 
 
+def _cpp_fallback_for(audio: Path, settings: Settings, language: str | None):
+    """A function that gives one chunk to whisper.cpp, or None when it is not set up."""
+    cli = settings.whisper_cli or shutil.which("whisper-cli")
+    model = settings.whisper_cpp_model
+    if not cli or model is None or not Path(model).is_file():
+        return None
+    from mam.helpers.audio_optimizer.ffmpeg import binary, run
+
+    def chunk(start: float, end: float) -> dict[str, Any]:
+        with tempfile.TemporaryDirectory(dir=settings.work_dir) as tmp:
+            part = Path(tmp) / "chunk.wav"
+            run([binary("ffmpeg"), "-hide_banner", "-nostats", "-y", "-ss", str(start),
+                 "-t", str(end - start), "-i", str(audio), "-vn", "-ac", "1", "-ar", "16000",
+                 "-c:a", "pcm_s16le", str(part)])  # fmt: skip
+            t = transcribe_whispercpp(part, settings, language)
+        return {
+            "language": t.language,
+            "segments": [
+                {"start": x.start, "end": x.end, "text": x.text, "avg_logprob": None}
+                for x in t.segments
+            ],
+        }
+
+    return chunk
+
+
 def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Transcript:
     try:
-        import mlx_whisper
+        import mlx_whisper  # noqa: F401
     except ImportError as exc:
         raise MamError("mlx-whisper is not installed. Run `uv sync` on the Mac.") from exc
     from importlib.metadata import PackageNotFoundError, version
 
+    from mam.helpers.transcriber.chunking import collapse_loops, looks_looped
+    from mam.helpers.transcriber.mlx_runner import MlxRunner, run_chunks
+
     repo = settings.whisper_mlx_model
-    result = mlx_whisper.transcribe(
-        str(audio),
-        path_or_hf_repo=repo,
-        language=language,
-        temperature=0.0,
-        condition_on_previous_text=False,  # no carried context: no runaway repetition
-        word_timestamps=settings.transcribe_words,
-        verbose=None,
+    results, events = run_chunks(
+        lambda: MlxRunner(
+            audio, repo, language, settings.transcribe_words, float(settings.transcribe_chunk_s)
+        ),
+        float(settings.transcribe_chunk_timeout_s),
+        _cpp_fallback_for(audio, settings, language),
     )
+    segments: list[Segment] = []
+    spans: dict[str, float] = {}
+    loops = 0
+    for chunk in results:
+        offset = chunk["offset"]
+        language_here = chunk.get("language")
+        part = _mlx_segments(chunk, settings.transcribe_words)
+        for seg in part:
+            seg.start += offset
+            seg.end += offset
+            for w in seg.words or []:
+                for key in ("s", "e"):
+                    if w.get(key) is not None:
+                        w[key] += offset
+            if looks_looped(seg.text):
+                loops += 1
+                seg.text = collapse_loops(seg.text)
+            segments.append(seg)
+            if language_here:
+                spans[language_here] = spans.get(language_here, 0.0) + (seg.end - seg.start)
+    detected = language or (max(spans, key=spans.get) if spans else None)
     try:
         engine_version = version("mlx-whisper")
     except PackageNotFoundError:
         engine_version = None
-    segments = _mlx_segments(result, settings.transcribe_words)
+    notes = {"chunks": len(results), "loops_collapsed": loops, "events": events}
     return Transcript(
         segments=segments,
-        language=result.get("language") or language,
+        language=detected,
         engine="mlx-whisper",
         engine_version=engine_version,
         model=repo,
         model_hash=None,
         backend="mlx",
+        fallback=notes if (events or loops) else None,
     )
 
 
@@ -147,13 +196,18 @@ def transcribe_whispercpp(audio: Path, settings: Settings, language: str | None)
              "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(wav)])  # fmt: skip
         out = Path(tmp) / "out"
         threads = max(2, min(8, (os.cpu_count() or 4) - 2))
+        limit = float(settings.transcribe_chunk_timeout_s) * 4 + 600  # a whole recording
 
         def attempt(extra: list[str]) -> subprocess.CompletedProcess:
-            return subprocess.run(
-                [cli, "-m", str(model), "-f", str(wav), "-oj", "-of", str(out),
-                 "-l", language or "auto", "-t", str(threads), "-tp", "0.0", "-mc", "0", *extra],
-                capture_output=True, text=True, check=False,
-            )  # fmt: skip
+            try:
+                return subprocess.run(
+                    [cli, "-m", str(model), "-f", str(wav), "-oj", "-of", str(out),
+                     "-l", language or "auto", "-t", str(threads), "-tp", "0.0", "-mc", "0",
+                     *extra],
+                    capture_output=True, text=True, check=False, timeout=limit,
+                )  # fmt: skip
+            except subprocess.TimeoutExpired as exc:
+                raise MamError(f"whisper-cli made no result in {limit:.0f} s") from exc
 
         fallback = None
         proc = attempt([])

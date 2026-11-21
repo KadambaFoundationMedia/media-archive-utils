@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     whisper_cli: str | None = None  # path of whisper-cli when it is not on PATH
     whisper_cpp_model: Path | None = None  # ggml-large-v3-turbo.bin
     whisper_device: str = "auto"  # auto: Metal/GPU first, local CPU when that fails
+    transcribe_chunk_s: int = 300  # the recording is transcribed in chunks of about this length
+    transcribe_chunk_timeout_s: int = 240  # a chunk taking longer is stopped and retried
     transcribe_words: bool = False  # word timestamps cost speed; segment timestamps suffice
 
     # Vedabase (robots.txt asks for a 10 s crawl delay; verse pages are cached for good)

@@ -5,6 +5,7 @@ and caches it in the local database by the content hash of the audio, so a re-ru
 class-discoverer and the later tools never transcribe the same content twice.
 """
 
+from mam.helpers.transcriber.chunking import transcript_quality
 from mam.helpers.transcriber.models import Segment, Transcript, format_timestamp
 from mam.helpers.transcriber.store import (
     follow_audio,
@@ -16,6 +17,7 @@ from mam.helpers.transcriber.store import (
 )
 
 __all__ = [
+    "transcript_quality",
     "follow_audio",
     "transcript_file",
     "Segment",
