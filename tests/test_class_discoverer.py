@@ -416,3 +416,12 @@ def test_review_page_and_approval_through_the_portal(prepared):
         assert s.get(m.Review, review_id).outcome == "approved"
         assert s.get(m.MediaFile, rid).status == "Queued Renamer"  # the Renamer is next
         assert s.scalar(select(m.Job).where(m.Job.tool == "renamer")) is not None
+
+
+def test_result_shows_where_the_time_went(prepared):
+    rid, _ = prepared(translation_texts(), "2008-01-04_KKS.mp3")
+    out = run(rid)
+    t = out.data["timings"]
+    assert t["total_s"] >= t["gain_s"] + t["verse_s"] and t["total_s"] > 0
+    assert "Took " in out.summary and "transcription" in out.summary
+    assert discoverer.duration_text(252) == "4 min 12 s" and discoverer.duration_text(9) == "9 s"

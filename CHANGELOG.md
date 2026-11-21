@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Class-discoverer
+- A verse only counts as the class verse when it is announced in the first 10 minutes and before the Translation or Purport is read, so a verse quoted in the purport can no longer win.
 
 ### Media manager
 - Jobs page: a Scan folder result now has collapsible lists. **Identical copies** are grouped by folder and show which registered file each one duplicates; **other files ignored** are grouped by file type with counts. The lists keep the first 2000 of each (the counts stay complete).
@@ -25,6 +26,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Byte-identical copies of a file (found by a scan) now go to their own folder `identical-files/` (next to `processed-files/`, not inside it) when the Renamer runs on the file they duplicate: copied, or moved when *Move files instead of copying* is on. They keep their own name (`-2`, `-3` on a clash), are handled once, and Reject/Exclude put moved copies back. Files without a WHAT now go to `unprocessed-files/`, also next to `processed-files/` (was `processed-files/_unresolved/`; copies already there are not moved automatically). New `.env` settings `MEDIA_UNPROCESSED_FILES_PATH` and `MEDIA_IDENTICAL_FILES_PATH`; Reset, Delete and `mam doctor` cover all three folders.
 
 ### Class discoverer
+- The result now says where the time went: `Took 4 min 12 s (volume 3 s, transcription 3 min 58 s, verse check 11 s)`, also stored per step in the job result. First measure on the Mac: a 100 minute recording takes about 3 minutes (about 31 times real time).
 - New tool: evens out the volume of the class (-18 LUFS, only when needed), transcribes it (mlx-whisper on Apple Silicon, whisper.cpp elsewhere; the transcript is cached and written to `transcriptions/`), finds the verse the speaker announces and confirms it on vedabase.io (verse pages cached for good, 10 s between requests). In the Action menu and as `mam class-discover <file>`.
 - A confirmed verse that the filename lacks is given to the Renamer at once (and to the video's row when the class came from a video); a different verse than the filename's goes to review with both candidates and an excerpt; so do unconfirmed verses and files with no verse and no category. 5% spot checks. Detected languages go to the `language` field. No title (the content-discoverer adds it) and no trimming.
 - `uv sync` now installs mlx-whisper on Apple Silicon Macs (it brings torch, a large download). New optional `.env` settings: `TRANSCRIBER_BACKEND`, `WHISPER_MLX_MODEL`, `WHISPER_CLI`, `WHISPER_CPP_MODEL`, `WHISPER_DEVICE`, `TRANSCRIBE_WORDS`, `VEDABASE_URL`, `VEDABASE_DELAY_S`. The unused `vedabase_verse` table (migration 0004) stays empty: verse pages are cached in `vedabase_cache`.

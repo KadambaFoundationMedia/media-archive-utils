@@ -62,3 +62,43 @@ def test_best_announcement_takes_most_repeated():
     found = find_announcements(t)
     best, votes = best_announcement(found)
     assert best.ref.what == "BG-2-51" and votes["BG-2-51"] >= 2
+
+
+def real_segments(*lines):
+    """(start seconds, text) lines copied from a real transcript."""
+    return Transcript(
+        [Segment(t, t + 4, text) for t, text in lines],
+        "en", "test", None, "test", None, "cpu",
+    )  # fmt: skip
+
+
+def test_a_verse_quoted_in_the_purport_is_not_the_class_verse():
+    """2008-01-04-2.mp3 on the Mac: the class verse (BG 2.51) was not announced in words, its
+    translation was read after 'Translation', and the purport quotes 'Bhagavatam 10.14.58 says'."""
+    t = real_segments(
+        (1745, "Paranga Chantyana Amajan Kayaan"),
+        (1780, "Translation"),
+        (1782, "By thus engaging in devotional service to the Lord,"),
+        (1809, "Bhagavatam 10.14.58 says,"),
+        (1812, "Samasri-tāya-pade-palāva-pāvam, ahat-pādham-punyūvya-sau-murga-ave,"),
+    )
+    found = find_announcements(t)
+    assert found and all(a.quoted for a in found if a.ref)
+    best, _ = best_announcement(found)
+    assert best is None
+
+
+def test_a_mention_late_in_the_recording_is_not_the_class_verse():
+    t = real_segments((1500, "Krishna tells in Srimad Bhagavatam canto 3 chapter 6 text 6"))
+    assert best_announcement(find_announcements(t))[0] is None
+
+
+def test_announcement_before_the_translation_still_counts():
+    t = real_segments(
+        (5, "Reading from Bhagavad-gita as it is, chapter two, text fifty-one"),
+        (30, "Translation"),
+        (31, "By thus engaging in devotional service to the Lord,"),
+        (90, "Bhagavatam 10.14.58 says,"),
+    )
+    best, _ = best_announcement(find_announcements(t))
+    assert best.ref.what == "BG-2-51"
