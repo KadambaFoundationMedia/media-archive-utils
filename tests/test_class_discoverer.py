@@ -426,3 +426,18 @@ def test_result_shows_where_the_time_went(prepared):
     assert t["total_s"] >= t["gain_s"] + t["verse_s"] and t["total_s"] > 0
     assert "Took " in out.summary and "transcription" in out.summary
     assert discoverer.duration_text(252) == "4 min 12 s" and discoverer.duration_text(9) == "9 s"
+
+
+def test_transcript_follows_its_audio(settings, tmp_path):
+    settings = settings.model_copy(update={"transcriptions_path": tmp_path / "transcriptions"})
+    from mam.helpers.transcriber import follow_audio, transcript_file
+
+    old = settings.media_processed_files_path / "class" / "2008-01-04_KKS_Class.mp3"
+    new = settings.media_processed_files_path / "Bhagavad-gita" / "2008-01-04_KKS_BG-2-51.mp3"
+    src = transcript_file(settings, old)
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text("[00:00:00.000] hello\n", encoding="utf-8")
+    moved = follow_audio(settings, old, new)
+    assert moved == transcript_file(settings, new) and moved.exists() and not src.exists()
+    assert transcript_file(settings, new).parent.name == "Bhagavad-gita"
+    assert follow_audio(settings, old, new) is None  # nothing left to move
