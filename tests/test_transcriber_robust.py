@@ -142,7 +142,8 @@ def test_a_gap_at_the_start_is_decoded_again_without_the_no_speech_check():
         def run_chunk(self, idx, start, end, options, timeout):
             self.calls.append((idx, options.get("no_speech_threshold", "default")))
             if idx >= 1000:
-                assert options == REPAIR_OPTIONS and (start, end) == (10.0, 52.0)
+                assert options == {**REPAIR_OPTIONS, "language": "en"}
+                assert (start, end) == (7.0, 52.0)
                 return {"language": "en", "segments": [{"start": 3.0, "end": 8.0, "text": "tr"}]}
             segs = [
                 {"start": 10.0, "end": 12.0, "text": "a"},
@@ -153,4 +154,13 @@ def test_a_gap_at_the_start_is_decoded_again_without_the_no_speech_check():
     runner = Runner()
     results, events = run_chunks(lambda: runner, 10.0)
     assert any("gap_repaired" in e for e in events)
-    assert results[-1]["offset"] == 10.0 and results[-1]["segments"][0]["text"] == "tr"
+    assert results[-1]["offset"] == 7.0 and results[-1]["segments"][0]["text"] == "tr"
+
+
+def test_repeated_segment_with_different_punctuation_is_dropped():
+    from mam.helpers.transcriber import Segment
+    from mam.helpers.transcriber.backends import _without_repeats
+
+    segs = [Segment(383.0, 384.0, "Translation."), Segment(383.2, 384.5, "Translation"),
+            Segment(390.0, 392.0, "Translation of the verse")]  # fmt: skip
+    assert [s.text for s in _without_repeats(segs)] == ["Translation.", "Translation of the verse"]

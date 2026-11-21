@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -96,11 +97,15 @@ def _cpp_fallback_for(audio: Path, settings: Settings, language: str | None):
     return chunk
 
 
+def _plain(text: str) -> str:
+    return re.sub(r"\W+", " ", text).strip().lower()
+
+
 def _without_repeats(segments: list[Segment]) -> list[Segment]:
     """A repaired gap overlaps its neighbours by 2 s: drop a segment the previous one repeats."""
     out: list[Segment] = []
     for seg in segments:
-        if out and seg.start < out[-1].end - 0.5 and seg.text.strip() == out[-1].text.strip():
+        if out and seg.start < out[-1].end - 0.5 and _plain(seg.text) == _plain(out[-1].text):
             continue
         out.append(seg)
     return out

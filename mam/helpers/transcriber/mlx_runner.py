@@ -41,6 +41,7 @@ REPAIR_OPTIONS: dict[str, Any] = {
     "temperature": 0.0,
     "no_speech_threshold": None,
     "logprob_threshold": None,
+    "compression_ratio_threshold": None,
 }
 REPAIR_MIN_GAP_S = 20.0
 REPAIR_MAX_GAP_S = 90.0  # a longer silence is real (a pause, applause)
@@ -150,6 +151,16 @@ class MlxRunner:
             self.conn = None
 
 
+def dominant_language(results: list[dict[str, Any]], default: str = "en") -> str:
+    """The language most of the transcribed speech is in."""
+    seconds: dict[str, float] = {}
+    for r in results:
+        if r.get("language"):
+            spoken = sum(max(0.0, g["end"] - g["start"]) for g in r["segments"])
+            seconds[r["language"]] = seconds.get(r["language"], 0.0) + spoken
+    return max(seconds, key=seconds.get) if seconds else default
+
+
 def find_gaps(results: list[dict[str, Any]]) -> list[tuple[float, float]]:
     """Stretches without any text between two segments, at the start of the recording."""
     spans = sorted(
@@ -241,8 +252,11 @@ def run_chunks(
             try:
                 if runner.proc is None:
                     runner.start(timeout=max(120.0, chunk_timeout))
-                start, end = max(0.0, gap_start - 2.0), gap_end + 2.0
-                fixed = runner.run_chunk(1000 + n, start, end, REPAIR_OPTIONS, chunk_timeout)
+                # a window of its own gets its language detected again (and can be wrong):
+                # the language of the rest of the recording is given
+                start, end = max(0.0, gap_start - 5.0), gap_end + 2.0
+                options = {**REPAIR_OPTIONS, "language": dominant_language(results)}
+                fixed = runner.run_chunk(1000 + n, start, end, options, chunk_timeout)
             except MamError as exc:
                 events.append({"gap": gap_start, "problem": str(exc)})
                 continue
