@@ -83,6 +83,8 @@
           </dd>
           <dt class="col-5">Operator</dt><dd class="col-7">{{ settings.operator_name }}</dd>
           <dt class="col-5">Processed files</dt><dd class="col-7 text-break">{{ settings.media_processed_files_path }}</dd>
+          <dt class="col-5">Unprocessed files</dt><dd class="col-7 text-break">{{ settings.media_unprocessed_files_path }}</dd>
+          <dt class="col-5">Identical files</dt><dd class="col-7 text-break">{{ settings.media_identical_files_path }}</dd>
           {% for label, path in settings.import_roots %}
           <dt class="col-5">{{ label }} (originals)</dt><dd class="col-7 text-break">{{ path }}</dd>
           {% endfor %}

@@ -63,13 +63,14 @@ def current_original(record: m.MediaFile) -> Path:
 
 
 def archive_path(path: Path, settings: Settings) -> str:
-    try:
-        return (
-            "/"
-            + path.resolve().relative_to(settings.media_processed_files_path.resolve()).as_posix()
-        )
-    except ValueError:
-        return str(path)
+    resolved = path.resolve()
+    for root in (settings.media_processed_files_path, settings.media_unprocessed_files_path):
+        try:
+            rel = resolved.relative_to(root.resolve()).as_posix()
+        except ValueError:
+            continue
+        return "/" + (rel if root == settings.media_processed_files_path else f"{root.name}/{rel}")
+    return str(path)
 
 
 # ------------------------------------------------------------------ Baserow
@@ -335,7 +336,7 @@ def _rebuild_name(proposal: Proposal) -> None:
 def place_duplicates(
     ctx: JobContext, organizer: FileOrganizer, record: m.MediaFile, move: bool
 ) -> list[DuplicateResult]:
-    """Copy or move the file's byte-identical copies (its aliases) to duplicate_files/.
+    """Copy or move the file's byte-identical copies (its aliases) to the identical-files folder.
 
     Each copy is handled once (it is remembered in `meta["duplicates"]`), and a copy that is no
     longer at its path (moved earlier, or the share is gone) is skipped.
@@ -499,7 +500,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         would = f"would {verb}" if ctx.dry_run else past
         summary += (
             f"; {len(dupes)} identical cop{'y' if len(dupes) == 1 else 'ies'} {would} "
-            "to duplicate_files"
+            "to identical-files"
         )
         for d in dupes:
             summary += "".join(f"; {w}" for w in d.warnings)
@@ -618,12 +619,15 @@ def reject_review(session: Session, review: m.Review, operator: str, note: str |
     from mam.helpers.file_organizer.trash import put_original_back, sole_copy
 
     copy = Path(record.processed_path) if record.processed_path else None
-    root = settings.media_processed_files_path.resolve()
     if sole_copy(record):
         # The original was moved: the processed file is the only copy, so it goes back.
         put_original_back(session, record, tool="renamer-review", settings=settings)
     else:
-        if copy and copy.exists() and root in copy.resolve().parents:
+        if (
+            copy
+            and copy.exists()
+            and any(r in copy.resolve().parents for r in settings.managed_roots)
+        ):
             copy.unlink()  # a processed copy, never an original
         put_original_back(session, record, tool="renamer-review", settings=settings)
     record.processed_path = None

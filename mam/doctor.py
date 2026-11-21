@@ -59,15 +59,20 @@ def run_checks(settings: Settings) -> list[Check]:
     except OSError as exc:
         checks.append(Check("Local DB folder writable", False, str(exc)))
 
-    processed = settings.media_processed_files_path.resolve()
-    inside_ro = [r for r in settings.read_only_roots if r == processed or r in processed.parents]
-    checks.append(
-        Check(
-            "Processed path outside originals",
-            not inside_ro,
-            str(processed) if not inside_ro else f"{processed} is inside {inside_ro[0]}",
+    for label, folder in (
+        ("Processed", settings.media_processed_files_path),
+        ("Unprocessed", settings.media_unprocessed_files_path),
+        ("Identical files", settings.media_identical_files_path),
+    ):
+        folder = folder.resolve()
+        inside_ro = [r for r in settings.read_only_roots if r == folder or r in folder.parents]
+        checks.append(
+            Check(
+                f"{label} path outside originals",
+                not inside_ro,
+                str(folder) if not inside_ro else f"{folder} is inside {inside_ro[0]}",
+            )
         )
-    )
     checks.append(
         Check(
             "Sample files folder",

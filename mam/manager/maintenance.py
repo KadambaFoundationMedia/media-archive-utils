@@ -74,12 +74,12 @@ def summary(settings: Settings | None = None) -> dict:
             or 0,
         }
     files, size = 0, 0
-    root = settings.media_processed_files_path
-    if root.is_dir():
-        for path in root.rglob("*"):
-            if path.is_file() and path.name not in KEEP_FILES:
-                files += 1
-                size += path.stat().st_size
+    for root in settings.managed_roots:
+        if root.is_dir():
+            for path in root.rglob("*"):
+                if path.is_file() and path.name not in KEEP_FILES:
+                    files += 1
+                    size += path.stat().st_size
     data["processed_files"] = files
     data["sole_copies"] = sole_copies()
     data["processed_bytes"] = size
@@ -98,21 +98,22 @@ def sole_copies() -> int:
         )
 
 
-def _check_processed_root(settings: Settings) -> Path:
-    root = settings.media_processed_files_path.resolve()
-    for original in settings.read_only_roots:
-        if root == original or original in root.parents or root in original.parents:
-            raise MamError(
-                f"Refusing to clear {root}: it overlaps an originals folder ({original})"
-            )
-    if root == Path(root.anchor) or root == Path.home().resolve():
-        raise MamError(f"Refusing to clear {root}")
-    return root
+def _check_processed_roots(settings: Settings) -> list[Path]:
+    roots = settings.managed_roots
+    for root in roots:
+        for original in settings.read_only_roots:
+            if root == original or original in root.parents or root in original.parents:
+                raise MamError(
+                    f"Refusing to clear {root}: it overlaps an originals folder ({original})"
+                )
+        if root == Path(root.anchor) or root == Path.home().resolve():
+            raise MamError(f"Refusing to clear {root}")
+    return roots
 
 
 def reset(options: ResetOptions, settings: Settings | None = None) -> ResetResult:
     settings = settings or get_settings()
-    root = _check_processed_root(settings) if options.processed_files else None
+    roots = _check_processed_roots(settings) if options.processed_files else []
     if options.processed_files and (only := sole_copies()):
         raise MamError(
             f"{only} file(s) were moved by the Renamer, so their copy in processed-files is the "
@@ -152,7 +153,9 @@ def reset(options: ResetOptions, settings: Settings | None = None) -> ResetResul
 
         reset_cache()
 
-    if root is not None and root.is_dir():
+    for root in roots:
+        if not root.is_dir():
+            continue
         for child in root.iterdir():
             if child.name in KEEP_FILES:
                 continue

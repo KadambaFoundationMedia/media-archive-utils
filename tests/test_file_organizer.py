@@ -3,7 +3,7 @@ import shutil
 import pytest
 
 from mam.errors import ReadOnlyViolation
-from mam.helpers.file_organizer import UNRESOLVED, CategoryMatcher, FileOrganizer
+from mam.helpers.file_organizer import CategoryMatcher, FileOrganizer
 from mam.helpers.local_db.hashing import sha256
 
 
@@ -53,7 +53,7 @@ def test_missing_what_goes_to_unresolved(matcher, tone, settings):
     result = FileOrganizer(matcher).organize(
         tone, "2008-01-04_KKS.mp3", None, tool="t", dry_run=False
     )
-    assert result.dst.parent == settings.media_processed_files_path / UNRESOLVED
+    assert result.dst.parent == settings.media_unprocessed_files_path
 
 
 def test_same_name_same_size_is_duplicate(matcher, tone, settings):

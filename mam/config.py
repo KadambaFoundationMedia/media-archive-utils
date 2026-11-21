@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Folders
     media_sample_files_path: Path = REPO_ROOT / "sample-files"
     media_processed_files_path: Path = REPO_ROOT / "processed-files"
+    # Files without a WHAT wait here (not in processed-files), and byte-identical copies of a
+    # file are collected in their own folder. Three sibling folders, no nesting.
+    media_unprocessed_files_path: Path = REPO_ROOT / "unprocessed-files"
+    media_identical_files_path: Path = REPO_ROOT / "identical-files"
     # Root of the mounted NAS archive. Originals under this path are never written to.
     nas_root: Path | None = None
     # Folder for uploads and the watched inbox (treated as originals).
@@ -81,6 +85,18 @@ class Settings(BaseSettings):
     def ensure_dirs(self) -> None:
         for path in (self.local_db_path.parent, self.work_dir, self.log_dir, self.inbox_path):
             path.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def managed_roots(self) -> list[Path]:
+        """Folders the tools write to: processed, unprocessed and identical files."""
+        return [
+            p.resolve()
+            for p in (
+                self.media_processed_files_path,
+                self.media_unprocessed_files_path,
+                self.media_identical_files_path,
+            )
+        ]
 
     @property
     def read_only_roots(self) -> list[Path]:

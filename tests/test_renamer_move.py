@@ -186,7 +186,7 @@ def test_run_in_move_mode_and_reject_puts_the_file_back(
     set_renamer_options(True, "_processed")
     file_id = run_renamer_on(client, FLAGGED)
     original = archive / FLAGGED
-    copy = settings.media_processed_files_path / "unprocessed" / "2012-07-DD_KKS_rs.mp3"
+    copy = settings.media_unprocessed_files_path / "2012-07-DD_KKS_rs.mp3"
     assert copy.exists() and not original.exists()
     assert not list(original.parent.glob("*_processed*"))  # no postfix on a move
     with session_scope() as s:
@@ -291,9 +291,9 @@ def test_identical_copy_is_copied_to_duplicate_files(
 ):
     twin = _duplicate_of_clean(archive)
     run_renamer_on(client, CLEAN)
-    folder = settings.media_processed_files_path / "duplicate_files"
+    folder = settings.media_identical_files_path
     assert (folder / "KKS_copy.mp3").exists() and twin.exists()  # copy mode keeps it
-    assert not (settings.media_processed_files_path / "unprocessed" / "KKS_copy.mp3").exists()
+    assert not (settings.media_unprocessed_files_path / "KKS_copy.mp3").exists()
 
 
 def test_identical_copy_is_moved_in_move_mode_and_reject_puts_it_back(
@@ -306,7 +306,7 @@ def test_identical_copy_is_moved_in_move_mode_and_reject_puts_it_back(
     set_renamer_options(True, "")
     twin = _duplicate_of_clean(archive)
     run_renamer_on(client, CLEAN)
-    moved = settings.media_processed_files_path / "duplicate_files" / "KKS_copy.mp3"
+    moved = settings.media_identical_files_path / "KKS_copy.mp3"
     assert moved.exists() and not twin.exists()
     with session_scope() as s:
         record = s.scalars(select(m.MediaFile)).first()

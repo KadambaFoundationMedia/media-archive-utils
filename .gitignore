@@ -43,6 +43,10 @@ sample-files/*
 !sample-files/.gitkeep
 processed-files/*
 !processed-files/.gitkeep
+unprocessed-files/*
+!unprocessed-files/.gitkeep
+identical-files/*
+!identical-files/.gitkeep
 transcriptions/*
 !transcriptions/.gitkeep
 trimming-samples/*

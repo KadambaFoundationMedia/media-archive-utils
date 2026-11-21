@@ -46,6 +46,8 @@ The goal is to build those tools and the media manager to discover and properly 
 - transcriptions/       folder where transcriptions are stored
 - sample-files/         sample media files to be processed
 - processed-files/<sublfolder>/      processed media files organised in subfolders
+- unprocessed-files/    renamed copies without a WHAT (sibling of processed-files)
+- identical-files/      byte-identical copies of files, copied or moved by the Renamer
 - trimming-samples/     sample files for the tools/kirtan-splitter/ and tools/class-discoverer/ tools
 
 ## Tech stack

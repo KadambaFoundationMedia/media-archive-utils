@@ -46,7 +46,7 @@ def processed_copy(record: m.MediaFile, settings: Settings | None = None) -> Pat
     if not record.processed_path:
         return None
     path = Path(record.processed_path)
-    if not path.resolve().is_relative_to(settings.media_processed_files_path.resolve()):
+    if not any(path.resolve().is_relative_to(root) for root in settings.managed_roots):
         raise ValueError(f"Refusing to remove a file outside processed-files: {path}")
     return path if path.exists() else None
 
@@ -58,7 +58,7 @@ def sole_copy(record: m.MediaFile) -> bool:
 
 
 def moved_duplicates(record: m.MediaFile) -> list[dict]:
-    """Identical copies the Renamer moved to duplicate_files/ that are still there."""
+    """Identical copies the Renamer moved to identical-files/ that are still there."""
     found = (record.meta or {}).get("duplicates") or []
     return [d for d in found if d.get("moved") and Path(d["to"]).exists()]
 

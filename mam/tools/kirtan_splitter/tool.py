@@ -58,7 +58,7 @@ def _processed_root(settings: Settings) -> Path:
 
 
 def _in_processed(path: Path, settings: Settings) -> bool:
-    return _processed_root(settings) in path.resolve().parents
+    return any(root in path.resolve().parents for root in settings.managed_roots)
 
 
 def combined_source(record: m.MediaFile, *, dry_run: bool = False) -> Path:

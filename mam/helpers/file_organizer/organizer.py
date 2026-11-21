@@ -7,8 +7,8 @@ Rules (SPEC.md section 2):
   folders.
 - With the Renamer's postfix option the original left behind by a copy is renamed with the
   postfix (`name_processed.mp3`) to mark it done.
-- No WHAT (or no matching category) -> processed/unprocessed/.
-- Byte-identical copies of a file go to processed/duplicate_files/ under their own name (copied, or
+- No WHAT (or no matching category) -> the unprocessed-files folder (a sibling of processed-files).
+- Byte-identical copies of a file go to the identical-files folder under their own name (copied, or
   moved with the same "Move files instead of copying" option as the file itself).
 - Same final name + same size -> saved with a `_duplicate` suffix.
 - Same final name + different size -> `-2`, `-3`, ... before the extension, flagged for review.
@@ -30,9 +30,6 @@ from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import record_event
 
 log = logging.getLogger(__name__)
-
-UNRESOLVED = "unprocessed"
-DUPLICATES = "duplicate_files"
 
 
 @dataclass
@@ -199,8 +196,9 @@ class FileOrganizer:
         if match is None and category:
             found = self.matcher.by_name(category)
             match = CategoryMatch(found, category, 0) if found else None
-        folder = match.category.folder if match else UNRESOLVED
-        return self.root / folder, match
+        if match is None:
+            return self.settings.media_unprocessed_files_path, None
+        return self.root / match.category.folder, match
 
     def organize(
         self,
@@ -218,7 +216,7 @@ class FileOrganizer:
         folder, match = self.target_folder(what, category)
         assert_writable(folder, self.settings)
         # Anything outside the processed root is treated as an original and only copied.
-        is_original = not _is_below(src, [self.root.resolve()])
+        is_original = not _is_below(src, self.settings.managed_roots)
         dst, duplicate, clash = resolve_destination(folder, new_name, src)
         moving_original = move_original and is_original
         if dst.resolve() == src.resolve():
@@ -313,11 +311,11 @@ class FileOrganizer:
         move: bool = False,
         media_file_id: int | None = None,
     ) -> DuplicateResult:
-        """Copy (or move) a byte-identical copy into processed/duplicate_files/.
+        """Copy (or move) a byte-identical copy into the identical-files folder.
 
         The file keeps its own name; a taken name gets `-2`, `-3`, ... and nothing is overwritten.
         """
-        folder = self.root / DUPLICATES
+        folder = self.settings.media_identical_files_path
         assert_writable(folder, self.settings)
         dst = folder / src.name
         n = 2
