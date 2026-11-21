@@ -22,9 +22,11 @@ from mam.errors import MamError
 from mam.helpers.local_db import migrate, session_scope
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import (
+    default_size_setting,
     default_status_setting,
     renamer_move_files,
     renamer_postfix,
+    set_default_size,
     set_default_status,
     set_renamer_options,
 )
@@ -263,7 +265,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
     # ------------------------------------------------------------- file list
     @app.get("/", response_class=HTMLResponse)
     def files_page(request: Request):
-        flt = queries.FileFilter.from_params(request.query_params, default_status_setting())
+        flt = queries.FileFilter.from_params(
+            request.query_params, default_status_setting(), default_size_setting()
+        )
         with session_scope() as session:
             rows, total = queries.list_files(session, flt)
             facets = queries.facet_values(session)
@@ -280,7 +284,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
 
     @app.get("/files/rows", response_class=HTMLResponse)
     def files_rows(request: Request):
-        flt = queries.FileFilter.from_params(request.query_params, default_status_setting())
+        flt = queries.FileFilter.from_params(
+            request.query_params, default_status_setting(), default_size_setting()
+        )
         with session_scope() as session:
             rows, total = queries.list_files(session, flt)
         return render(
@@ -294,7 +300,9 @@ def create_app(start_queue: bool = True) -> FastAPI:
     @app.get("/files/more", response_class=HTMLResponse)
     def files_more(request: Request, last_folder: str = "", stripe: int = 0):
         """The next batch of rows, appended to the table by the Load more button."""
-        flt = queries.FileFilter.from_params(request.query_params, default_status_setting())
+        flt = queries.FileFilter.from_params(
+            request.query_params, default_status_setting(), default_size_setting()
+        )
         with session_scope() as session:
             rows, total = queries.list_files(session, flt)
         return render(
@@ -743,6 +751,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
             places=place_country_status(),
             status_choices=queries.status_choices(),
             default_status=default_status_setting(),
+            default_size=default_size_setting(),
+            page_sizes=queries.PAGE_SIZES,
             renamer_move_files=renamer_move_files(),
             renamer_postfix=renamer_postfix(),
         )
@@ -776,6 +786,18 @@ def create_app(start_queue: bool = True) -> FastAPI:
             return saved(request, "Default Status filter", "Unknown status")
         set_default_status(value)
         return saved(request, "Default Status filter")
+
+    @app.post("/settings/default-size")
+    async def settings_default_size(request: Request):
+        form = await request.form()
+        try:
+            value = int(str(form.get("default_size") or ""))
+        except ValueError:
+            value = 0
+        if value not in queries.PAGE_SIZES:
+            return saved(request, "Default Show", "Unknown number of files")
+        set_default_size(value)
+        return saved(request, "Default Show")
 
     @app.post("/settings/baserow-writes")
     async def toggle_baserow_writes(request: Request):
