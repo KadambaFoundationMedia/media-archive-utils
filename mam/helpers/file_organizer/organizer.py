@@ -169,6 +169,23 @@ def resolve_destination(folder: Path, name: str, src: Path) -> tuple[Path, bool,
         n += 1
 
 
+def origin_subfolder(origin: Path | None, settings: Settings) -> Path:
+    """The folders an original sat in, below the import root (`2012/Radhadesh Jan 2012`).
+
+    unprocessed-files/ and identical-files/ keep them, because the folder names are clues for
+    whoever sorts these files later. A file straight in the import root gets no subfolder; a file
+    outside every import root keeps its parent folder's name.
+    """
+    if origin is None:
+        return Path()
+    parent = origin.parent.resolve()
+    for _, root in settings.import_roots:
+        root = root.resolve()
+        if parent == root or root in parent.parents:
+            return parent.relative_to(root)
+    return Path(parent.name)
+
+
 @dataclass
 class DuplicateResult:
     src: Path
@@ -189,15 +206,20 @@ class FileOrganizer:
         return self.settings.media_processed_files_path
 
     def target_folder(
-        self, what: str | None, category: str | None = None
+        self, what: str | None, category: str | None = None, origin: Path | None = None
     ) -> tuple[Path, CategoryMatch | None]:
-        """Folder for a WHAT; a known `category` name wins when the WHAT does not match."""
+        """Folder for a WHAT; a known `category` name wins when the WHAT does not match.
+
+        With no match the file goes to unprocessed-files/, below the folders `origin` (the
+        original path) sat in.
+        """
         match = self.matcher.match(what)
         if match is None and category:
             found = self.matcher.by_name(category)
             match = CategoryMatch(found, category, 0) if found else None
         if match is None:
-            return self.settings.media_unprocessed_files_path, None
+            folder = self.settings.media_unprocessed_files_path
+            return folder / origin_subfolder(origin, self.settings), None
         return self.root / match.category.folder, match
 
     def organize(
@@ -212,8 +234,9 @@ class FileOrganizer:
         category: str | None = None,
         move_original: bool = False,
         postfix: str = "",
+        origin: Path | None = None,
     ) -> OrganizeResult:
-        folder, match = self.target_folder(what, category)
+        folder, match = self.target_folder(what, category, origin)
         assert_writable(folder, self.settings)
         # Anything outside the processed root is treated as an original and only copied.
         is_original = not _is_below(src, self.settings.managed_roots)
@@ -313,9 +336,10 @@ class FileOrganizer:
     ) -> DuplicateResult:
         """Copy (or move) a byte-identical copy into the identical-files folder.
 
-        The file keeps its own name; a taken name gets `-2`, `-3`, ... and nothing is overwritten.
+        The file keeps its own name and the folders it sat in (below the import root); a taken
+        name gets `-2`, `-3`, ... and nothing is overwritten.
         """
-        folder = self.settings.media_identical_files_path
+        folder = self.settings.media_identical_files_path / origin_subfolder(src, self.settings)
         assert_writable(folder, self.settings)
         dst = folder / src.name
         n = 2
