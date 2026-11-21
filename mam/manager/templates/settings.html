@@ -107,7 +107,7 @@
         </ul>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="processed_files" name="processed_files" {% if not info.sole_copies %}checked{% else %}disabled{% endif %}>
-          <label class="form-check-label" for="processed_files">Delete the processed copies: <strong>{{ info.processed_files }}</strong> file(s), {{ info.processed_bytes | filesize }} in processed-files</label>
+          <label class="form-check-label" for="processed_files">Delete the processed copies: <strong>{{ info.processed_files }}</strong> file(s), {{ info.processed_bytes | filesize }} in processed-files, unprocessed-files and identical-files, plus <strong>{{ info.transcript_files }}</strong> transcript file(s), {{ info.transcript_bytes | filesize }}, in transcriptions</label>
           {% if info.sole_copies %}<div class="text-danger small"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ info.sole_copies }} of them were moved by the Renamer and are the only copy. They cannot be deleted by a reset.</div>{% endif %}
         </div>
         <div class="form-check">

@@ -31,6 +31,7 @@ def settings(tmp_path, monkeypatch):
         "MEDIA_PROCESSED_FILES_PATH": str(processed),
         "MEDIA_UNPROCESSED_FILES_PATH": str(tmp_path / "unprocessed"),
         "MEDIA_IDENTICAL_FILES_PATH": str(tmp_path / "identical"),
+        "TRANSCRIPTIONS_PATH": str(tmp_path / "transcriptions"),
         "NAS_ROOT": "",
         "BASEROW_API_URL": "https://baserow.test",
         "BASEROW_API_TOKEN": "test-token",

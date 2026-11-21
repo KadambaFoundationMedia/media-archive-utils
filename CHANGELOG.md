@@ -14,6 +14,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ### Media manager
 - Settings page, Reset block: new checkbox **Also delete all earlier database backups** (also `uv run mam reset --old-backups`). It removes the older `mam-export-*` folders in `~/.mam/backups`; the backup made by that reset is always kept. Off by default.
+- Settings, Reset: with "Delete the processed copies" the reset also removes the transcript files in `transcriptions/` (the page shows how many). Cached transcripts in the database stay unless "Also clear caches" is ticked, so a re-run does not transcribe again.
 - Jobs page: a Scan folder result now has collapsible lists. **Identical copies** are grouped by folder and show which registered file each one duplicates; **other files ignored** are grouped by file type with counts. The lists keep the first 2000 of each (the counts stay complete).
 - Settings page: options now save by themselves when you change them (a check mark shows, or the problem if a value is refused), so there are no Save buttons any more.
 

@@ -55,6 +55,9 @@ def test_reset_clears_records_and_copies_but_not_originals(client, worked, setti
     originals = sorted(p.name for p in worked.rglob("*") if p.is_file())
     assert any(settings.media_processed_files_path.rglob("*.mp3"))
     (settings.media_processed_files_path / ".gitkeep").write_text("")
+    transcript = settings.transcriptions_path / "class" / "x.md"
+    transcript.parent.mkdir(parents=True, exist_ok=True)
+    transcript.write_text("[00:00:00.000] hello\n")
 
     response = client.post(
         "/settings/reset",
@@ -69,6 +72,7 @@ def test_reset_clears_records_and_copies_but_not_originals(client, worked, setti
         p for p in settings.media_processed_files_path.rglob("*") if p.name != ".gitkeep"
     )
     assert (settings.media_processed_files_path / ".gitkeep").exists()
+    assert not transcript.exists() and not transcript.parent.exists()  # transcripts go too
     assert sorted(p.name for p in worked.rglob("*") if p.is_file()) == originals
     backups = list((settings.local_db_path.parent / "backups").glob("mam-export-*/mam.sqlite"))
     assert len(backups) == 1
