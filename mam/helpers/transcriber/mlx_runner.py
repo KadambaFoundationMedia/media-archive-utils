@@ -35,6 +35,19 @@ ATTEMPT_OPTIONS: list[dict[str, Any]] = [
 ]
 
 
+# A window Whisper skipped as 'no speech' although someone read (seen on the Oslo class: the
+# translation of the verse, 30 s, missing) is decoded again with those checks switched off.
+REPAIR_OPTIONS: dict[str, Any] = {
+    "temperature": 0.0,
+    "no_speech_threshold": None,
+    "logprob_threshold": None,
+}
+REPAIR_MIN_GAP_S = 20.0
+REPAIR_MAX_GAP_S = 90.0  # a longer silence is real (a pause, applause)
+REPAIR_UNTIL_S = 900.0  # the verse is read at the start of the class
+REPAIR_MAX_GAPS = 8
+
+
 class ChunkStalled(MamError):
     """A chunk did not finish within its time limit."""
 
@@ -137,6 +150,20 @@ class MlxRunner:
             self.conn = None
 
 
+def find_gaps(results: list[dict[str, Any]]) -> list[tuple[float, float]]:
+    """Stretches without any text between two segments, at the start of the recording."""
+    spans = sorted(
+        (r["offset"] + seg["start"], r["offset"] + seg["end"])
+        for r in results
+        for seg in r["segments"]
+    )
+    gaps = []
+    for (_, end), (start, _) in zip(spans, spans[1:], strict=False):
+        if REPAIR_MIN_GAP_S <= start - end <= REPAIR_MAX_GAP_S and end < REPAIR_UNTIL_S:
+            gaps.append((end, start))
+    return gaps[:REPAIR_MAX_GAPS]
+
+
 def run_chunks(
     make_runner: Callable[[], Any],
     chunk_timeout: float,
@@ -210,6 +237,18 @@ def run_chunks(
                 time.monotonic() - began,
                 time.monotonic() - started,
             )
+        for n, (gap_start, gap_end) in enumerate(find_gaps(results)):
+            try:
+                if runner.proc is None:
+                    runner.start(timeout=max(120.0, chunk_timeout))
+                start, end = max(0.0, gap_start - 2.0), gap_end + 2.0
+                fixed = runner.run_chunk(1000 + n, start, end, REPAIR_OPTIONS, chunk_timeout)
+            except MamError as exc:
+                events.append({"gap": gap_start, "problem": str(exc)})
+                continue
+            if fixed["segments"]:
+                results.append({"offset": start, **fixed})
+                events.append({"gap_repaired": gap_start, "seconds": round(gap_end - gap_start)})
     finally:
         runner.stop()
     return results, events

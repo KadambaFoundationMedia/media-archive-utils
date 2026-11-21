@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Class-discoverer
+- Transcription: a stretch of 20 to 90 s without text in the first 15 minutes (Whisper skipped it as "no speech", so the read translation of the verse was missing) is decoded again with the no-speech check off.
 - The verse announcement is read when Whisper writes "3rd Kanto" or "Kanchu", and when the speaker corrects a number ("chapter 9, no, chapter 19"): the later number wins and the earlier reading is tried on vedabase.io if the later one is not confirmed.
 - Transcription is now chunked and watched: a stalled chunk is stopped and retried (temperature fallback, then whisper.cpp), repetition loops are collapsed, each chunk is logged, and a transcript full of repeated or invented lines sends "no verse heard" to review instead of Done. New settings `TRANSCRIBE_CHUNK_S` and `TRANSCRIBE_CHUNK_TIMEOUT_S`.
 - A transcript now follows its audio: when the Renamer renames the copy or files it in another category folder (also after a Save in the portal), the transcript moves and is renamed with it.

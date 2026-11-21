@@ -127,3 +127,30 @@ def test_invented_credits_are_recognised_and_counted():
     assert not is_invented_credit("Reading from Srimad Bhagavatam")
     q = transcript_quality([Segment(0, 1, "text")], {"invented_dropped": 3})
     assert q["bad_share"] == 0.75 and q["unreliable"]
+
+
+def test_a_gap_at_the_start_is_decoded_again_without_the_no_speech_check():
+    from mam.helpers.transcriber.mlx_runner import REPAIR_OPTIONS, find_gaps
+
+    results = [
+        {"offset": 0.0, "segments": [{"start": 10.0, "end": 12.0}, {"start": 50.0, "end": 52.0}]},
+        {"offset": 300.0, "segments": [{"start": 5.0, "end": 6.0}]},
+    ]
+    assert find_gaps(results) == [(12.0, 50.0)]  # 38 s of nothing; the 250 s after is too late
+
+    class Runner(FakeRunner):
+        def run_chunk(self, idx, start, end, options, timeout):
+            self.calls.append((idx, options.get("no_speech_threshold", "default")))
+            if idx >= 1000:
+                assert options == REPAIR_OPTIONS and (start, end) == (10.0, 52.0)
+                return {"language": "en", "segments": [{"start": 3.0, "end": 8.0, "text": "tr"}]}
+            segs = [
+                {"start": 10.0, "end": 12.0, "text": "a"},
+                {"start": 50.0, "end": 52.0, "text": "b"},
+            ]
+            return {"language": "en", "segments": segs if idx == 0 else []}
+
+    runner = Runner()
+    results, events = run_chunks(lambda: runner, 10.0)
+    assert any("gap_repaired" in e for e in events)
+    assert results[-1]["offset"] == 10.0 and results[-1]["segments"][0]["text"] == "tr"

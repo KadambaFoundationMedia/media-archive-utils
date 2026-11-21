@@ -96,6 +96,16 @@ def _cpp_fallback_for(audio: Path, settings: Settings, language: str | None):
     return chunk
 
 
+def _without_repeats(segments: list[Segment]) -> list[Segment]:
+    """A repaired gap overlaps its neighbours by 2 s: drop a segment the previous one repeats."""
+    out: list[Segment] = []
+    for seg in segments:
+        if out and seg.start < out[-1].end - 0.5 and seg.text.strip() == out[-1].text.strip():
+            continue
+        out.append(seg)
+    return out
+
+
 def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Transcript:
     try:
         import mlx_whisper  # noqa: F401
@@ -143,6 +153,7 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
             segments.append(seg)
             if language_here:
                 spans[language_here] = spans.get(language_here, 0.0) + (seg.end - seg.start)
+    segments = _without_repeats(sorted(segments, key=lambda x: (x.start, x.end)))
     detected = language or (max(spans, key=spans.get) if spans else None)
     try:
         engine_version = version("mlx-whisper")
