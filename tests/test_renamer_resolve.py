@@ -76,7 +76,10 @@ def propose(reference, settings, tree):
             "HH Kadamba Kanana Swami - SB 3.6.6 - Sweden - 27_8_15.mp3",
             "2015-08-27_KKS_SB-3-6-6_se.mp3",
         ),
-        ("JANMASTAMI  LJUBLANA 2015/150905_0124_D.mp3", "2015-09-05_KKS_Janmastami_Ljubljana-si.mp3"),
+        (
+            "JANMASTAMI  LJUBLANA 2015/150905_0124_D.mp3",
+            "2015-09-05_KKS_Janmastami_Ljubljana-si.mp3",
+        ),
     ],
 )
 def test_names(propose, name, expected):
@@ -331,8 +334,10 @@ def test_a_place_that_is_summercamp_by_alias_gives_the_summercamp_category(
 
 
 def test_folder_category_gives_the_what_when_the_filename_has_none(propose):
-    for rel in ("Sample files/vyasa puja 2015/R09_0008.MP3",
-                "Sample files/vyasa puja 2015/Nama-rupa/ZOOM0001.MP3"):
+    for rel in (
+        "Sample files/vyasa puja 2015/R09_0008.MP3",
+        "Sample files/vyasa puja 2015/Nama-rupa/ZOOM0001.MP3",
+    ):
         p = propose(rel)
         assert p.category == "Vyasa-puja" and p.what == "Vyasa-puja"
         assert p.new_name == "2015-MM-DD_KKS_Vyasa-puja.mp3"
