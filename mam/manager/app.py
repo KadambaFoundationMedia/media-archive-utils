@@ -745,23 +745,35 @@ def create_app(start_queue: bool = True) -> FastAPI:
             renamer_postfix=renamer_postfix(),
         )
 
-    @app.post("/settings/renamer")
-    async def settings_renamer(request: Request):
+    def saved(request: Request, what: str, error: str | None = None):
+        """The little status next to an autosaved setting: a check, or the problem."""
+        return templates.TemplateResponse(
+            request, "_setting_saved.html", {"what": what, "error": error}
+        )
+
+    @app.post("/settings/renamer/move")
+    async def settings_renamer_move(request: Request):
+        form = await request.form()
+        set_renamer_options(form.get("move_files") == "on", renamer_postfix())
+        return saved(request, "Move files instead of copying")
+
+    @app.post("/settings/renamer/postfix")
+    async def settings_renamer_postfix(request: Request):
         form = await request.form()
         try:
-            set_renamer_options(form.get("move_files") == "on", str(form.get("postfix") or ""))
+            set_renamer_options(renamer_move_files(), str(form.get("postfix") or ""))
         except ValueError as error:
-            return RedirectResponse(f"/settings?error={error}", status_code=303)
-        return RedirectResponse("/settings?msg=Renamer settings saved", status_code=303)
+            return saved(request, "Postfix", str(error))
+        return saved(request, "Postfix")
 
     @app.post("/settings/default-status")
     async def settings_default_status(request: Request):
         form = await request.form()
         value = str(form.get("default_status") or "")
         if value not in {v for v, _, _ in queries.status_choices()}:
-            return RedirectResponse("/settings?error=Unknown status", status_code=303)
+            return saved(request, "Default Status filter", "Unknown status")
         set_default_status(value)
-        return RedirectResponse("/settings?msg=Default status saved", status_code=303)
+        return saved(request, "Default Status filter")
 
     @app.post("/settings/baserow-writes")
     async def toggle_baserow_writes(request: Request):

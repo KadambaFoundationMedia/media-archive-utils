@@ -1,0 +1,3 @@
+{# Status shown next to an autosaved setting: an icon when it saved, the problem when it did not. #}
+{% if error %}<span class="text-danger small" role="alert"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ error }}</span>
+{% else %}<span class="setting-saved text-success" role="status" title="{{ what }} saved" aria-label="{{ what }} saved"><i class="fa-solid fa-circle-check"></i></span>{% endif %}

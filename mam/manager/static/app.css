@@ -251,3 +251,8 @@
 .help-tip { color: var(--bs-secondary-color); cursor: help; margin-left: .35rem; font-size: .85em; }
 .help-tip:hover, .help-tip:focus { color: var(--bs-primary); outline: none; }
 [data-bs-theme] .text-bg-light { background-color: var(--md-surface-container-highest) !important; color: var(--md-on-surface) !important; }
+
+/* Autosaved settings: the check mark shows for a moment, then fades. */
+.setting-saved { animation: setting-saved-fade 2.5s ease-out forwards; }
+@keyframes setting-saved-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .setting-saved { animation: none; } }
