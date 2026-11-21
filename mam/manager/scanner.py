@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import asdict, dataclass
+from collections import defaultdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -23,9 +24,27 @@ class ScanResult:
     duplicates: int = 0
     ignored: int = 0
     errors: int = 0
+    # Detail lists for the Jobs page (counts above are always exact; the lists are capped).
+    ignored_by_type: list[dict] = field(default_factory=list)  # [{ext, count, files: [rel path]}]
+    duplicates_by_folder: list[dict] = field(
+        default_factory=list
+    )  # [{folder, items: [{name, of}]}]
+    details_truncated: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+# The detail lists are stored in the job result, so they are capped (thousands of files).
+MAX_LISTED = 2000
+
+
+def _rel(path: Path, root: Path) -> str:
+    base = root.parent if root.is_file() else root
+    try:
+        return path.relative_to(base).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def iter_media(root: Path):
@@ -47,9 +66,15 @@ def scan_folder(session: Session, root: Path, commit_every: int = 50) -> ScanRes
 
     result = ScanResult(root=str(root))
     known_ids = {i for (i,) in session.query(m.MediaFile.id).all()}
+    ignored: dict[str, list[str]] = defaultdict(list)
+    dupes: dict[str, list[dict]] = defaultdict(list)
+    listed_ignored = listed_dupes = 0
     for path in iter_media(root):
         if media_kind(path) is None:
             result.ignored += 1
+            if listed_ignored < MAX_LISTED:
+                ignored[path.suffix.lower() or "(no extension)"].append(_rel(path, root))
+                listed_ignored += 1
             continue
         result.found += 1
         try:
@@ -58,6 +83,13 @@ def scan_folder(session: Session, root: Path, commit_every: int = 50) -> ScanRes
                 continue
             if record.original_path != str(path.resolve()):
                 result.duplicates += 1  # byte-identical to a file registered elsewhere
+                if listed_dupes < MAX_LISTED:
+                    rel = _rel(path, root)
+                    folder, _, name = rel.rpartition("/")
+                    dupes[folder or "(top folder)"].append(
+                        {"name": name, "of": record.original_path}
+                    )
+                    listed_dupes += 1
             elif record.id in known_ids:
                 result.known += 1
             else:
@@ -69,5 +101,13 @@ def scan_folder(session: Session, root: Path, commit_every: int = 50) -> ScanRes
         if result.found % commit_every == 0:
             session.commit()
     session.commit()
-    log.info("Scanned %s: %s", root, result.to_dict())
+    result.details_truncated = result.ignored > listed_ignored or result.duplicates > listed_dupes
+    result.ignored_by_type = [
+        {"ext": ext, "count": len(files), "files": files}
+        for ext, files in sorted(ignored.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+    ]
+    result.duplicates_by_folder = [
+        {"folder": folder, "items": items} for folder, items in sorted(dupes.items())
+    ]
+    log.info("Scanned %s: %s", root, (result.root, result.found, result.new, result.known))
     return result

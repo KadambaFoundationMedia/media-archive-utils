@@ -90,6 +90,24 @@ def test_import_scan_and_list(client, archive, settings):
     assert "R09_0004.MP3" in page and "S.B. 1.19.30" not in page
 
 
+def test_scan_job_lists_ignored_and_identical_files(client, archive, settings):
+    root = settings.media_sample_files_path
+    shutil.copy2(root / "Serbia-summercamp-6-13-jul-2012/R09_0004.MP3", root / "copy.mp3")
+    (root / "Serbia-summercamp-6-13-jul-2012/cover.JPG").write_text("x")
+    client.post("/import", data={"root": 0, "path": ""}, follow_redirects=False)
+    run_queue()
+    with session_scope() as s:
+        job = s.scalars(select(m.Job).where(m.Job.tool == "scan")).one()
+        data = job.result
+    assert (
+        data["duplicates"] == 1
+        and data["duplicates_by_folder"][0]["items"][0]["name"] == "R09_0004.MP3"
+    )
+    assert {t["ext"]: t["count"] for t in data["ignored_by_type"]} == {".txt": 1, ".jpg": 1}
+    page = client.get("/jobs").text
+    assert "1 identical copy" in page and "R09_0004.MP3" in page and "cover.JPG" in page
+
+
 def test_import_page_lists_media_files(client, archive):
     page = client.get("/import", params={"root": 0, "path": "Serbia-summercamp-6-13-jul-2012"}).text
     assert "R09_0004.MP3" in page and "1 media file(s)" in page
