@@ -75,15 +75,23 @@ def summary(settings: Settings | None = None) -> dict:
         }
     files, size = 0, 0
     for root in settings.managed_roots:
-        if root.is_dir():
-            for path in root.rglob("*"):
-                if path.is_file() and path.name not in KEEP_FILES:
-                    files += 1
-                    size += path.stat().st_size
+        files, size = _count_files(root, files, size)
     data["processed_files"] = files
+    data["transcript_files"], data["transcript_bytes"] = _count_files(
+        settings.transcriptions_path.resolve(), 0, 0
+    )
     data["sole_copies"] = sole_copies()
     data["processed_bytes"] = size
     return data
+
+
+def _count_files(root: Path, files: int, size: int) -> tuple[int, int]:
+    if root.is_dir():
+        for path in root.rglob("*"):
+            if path.is_file() and path.name not in KEEP_FILES:
+                files += 1
+                size += path.stat().st_size
+    return files, size
 
 
 def sole_copies() -> int:
@@ -99,7 +107,8 @@ def sole_copies() -> int:
 
 
 def _check_processed_roots(settings: Settings) -> list[Path]:
-    roots = settings.managed_roots
+    # the transcripts are derived from the processed copies and go with them
+    roots = [*settings.managed_roots, settings.transcriptions_path.resolve()]
     for root in roots:
         for original in settings.read_only_roots:
             if root == original or original in root.parents or root in original.parents:
