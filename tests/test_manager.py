@@ -443,6 +443,15 @@ def test_file_list_opens_on_all_files_until_settings_choose_a_default(
         ).text
     )
     client.post("/settings/default-status", data={"default_status": "__all"})
+    # the default Show number comes from Settings too; the URL still wins
+    assert 'name="default_size"' in client.get("/settings").text
+    client.post("/settings/default-size", data={"default_size": "100"})
+    assert '<option value="100" selected>' in client.get("/").text
+    assert '<option value="200" selected>' in client.get("/?size=200").text
+    assert (
+        "Unknown number" in client.post("/settings/default-size", data={"default_size": "7"}).text
+    )
+    client.post("/settings/default-size", data={"default_size": "50"})
     # grouped by folder, relative to the import root
     assert "Sample files / Serbia-summercamp-6-13-jul-2012" in page
     everything = client.get("/?status=__all").text

@@ -50,7 +50,9 @@ class FileFilter:
     extra: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_params(cls, params: Any, default_status: str = DEFAULT_STATUS) -> FileFilter:
+    def from_params(
+        cls, params: Any, default_status: str = DEFAULT_STATUS, default_size: int = PAGE_SIZE
+    ) -> FileFilter:
         def get(name: str, default: str = "") -> str:
             return (params.get(name) or default).strip()
 
@@ -70,7 +72,7 @@ class FileFilter:
             folder=get("folder"),
             sort=sort if sort in SORTS else "path",
             desc=get("desc") in ("1", "true", "on"),
-            size=size if size in PAGE_SIZES else PAGE_SIZE,
+            size=size if size in PAGE_SIZES else default_size,
             offset=number("offset"),
             limit=number("limit"),
         )
