@@ -24,7 +24,7 @@ from mam.config import get_settings
 from mam.helpers.file_organizer import CategoryMatcher
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.db import session_scope
-from mam.tools.renamer.countries import cc_for_name
+from mam.tools.renamer.countries import cc_for_name, set_country_terms
 from mam.tools.renamer.dates import fold
 
 log = logging.getLogger(__name__)
@@ -170,7 +170,37 @@ def fetch_raw() -> dict[str, Any]:
                 if name in media_fields
             },
             "place_country": _place_country_rows(client),
+            "languages": _term_rows(client, "language_terms", "language"),
+            "countries": _term_rows(client, "country_terms", "country"),
         }
+
+
+def _term_rows(client, method: str, key: str) -> list[dict[str, Any]]:
+    """Rows of a words table (language_terms, country_terms): name, aliases, ccTLD."""
+    from mam.errors import BaserowError
+
+    try:
+        rows = getattr(client, method)()
+    except BaserowError as exc:  # table id not set yet
+        log.warning("%s table not read: %s", method, exc)
+        return []
+    out = []
+    for r in rows:
+        low = {str(k).lower(): v for k, v in r.items()}
+        name = _value(low.get(key)) or ""
+        if str(name).strip():
+            out.append(
+                {
+                    "name": str(name).strip(),
+                    "aliases": (low.get("aliases") or "").strip(),
+                    "cc": (low.get("cctld") or "").strip().lower(),
+                }
+            )
+    return out
+
+
+def _split_aliases(text: Any) -> list[str]:
+    return [a.strip() for a in str(text or "").split(";") if a.strip()]
 
 
 def _place_country_rows(client) -> list[dict[str, Any]]:
@@ -192,6 +222,8 @@ def _place_country_rows(client) -> list[dict[str, Any]]:
                 "country": (low.get("country") or "").strip(),
                 "cc": (low.get("cctld") or "").strip().lower(),
                 "aliases": (low.get("aliases") or "").strip(),
+                "not_place": bool(low.get("not_place")),
+                "no_country": bool(low.get("no_country")),
             }
         )
     return out
@@ -200,10 +232,28 @@ def _place_country_rows(client) -> list[dict[str, Any]]:
 def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) -> Reference:
     aliases = yaml.safe_load(ALIASES_FILE.read_text(encoding="utf-8"))
     aliases["places"] = {norm_key(k): v for k, v in (aliases.get("places") or {}).items()}
-    aliases["languages"] = {norm_key(k): v for k, v in (aliases.get("languages") or {}).items()}
+    # Language words and country words come from the Baserow tables language_terms and
+    # country_terms; the language name itself counts as a word too.
+    aliases["languages"] = {}
+    for row in raw.get("languages", []):
+        for word in [row["name"], *_split_aliases(row.get("aliases"))]:
+            aliases["languages"].setdefault(norm_key(word), row["name"])
+    country_terms: dict[str, str] = {}
+    for row in raw.get("countries", []):
+        cc = row.get("cc") or cc_for_name(row["name"])
+        if cc:
+            for word in [row["name"], *_split_aliases(row.get("aliases"))]:
+                country_terms[word] = cc
+    set_country_terms(country_terms)
+    # Places that are no real location, and places without one country (online, general):
+    # the `not_place` and `no_country` checkboxes of place_country.
+    aliases["not_places"] = [r["place"] for r in raw.get("place_country", []) if r.get("not_place")]
+    aliases["no_country"] = [
+        r["place"] for r in raw.get("place_country", []) if r.get("no_country")
+    ]
     for token, replacement in (learned or {}).items():
         aliases["places"][norm_key(token)] = replacement
-    not_places = {norm_key(p) for p in aliases.get("not_places") or []}
+    not_places = {norm_key(p) for p in aliases["not_places"]}
 
     options = raw.get("options", {})
     country_options: dict[str, str] = {}
@@ -232,7 +282,7 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
     place_names = [n for n in options.get("place_location", []) if isinstance(n, str)]
     option_by_key = {norm_key(n): n for n in sorted(place_names)}
     place_rows, problems = read_place_country(raw.get("place_country", []), option_by_key)
-    no_country = {norm_key(p) for p in aliases.get("no_country") or []}
+    no_country = {norm_key(p) for p in aliases["no_country"]}
     places: dict[str, Place] = {}
     built: list[Place] = []
     targets: dict[str, Place] = {}  # every place option, also the ones `not_places` hides by name

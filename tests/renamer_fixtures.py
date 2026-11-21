@@ -93,7 +93,15 @@ def reference_raw() -> dict:
         },
         # Baserow place_country: the only source of a place's country.
         "place_country": [
-            {"id": i, "place": place, "country": country, "cc": cc, "aliases": aliases}
+            {
+                "id": i,
+                "place": place,
+                "country": country,
+                "cc": cc,
+                "aliases": aliases,
+                "not_place": False,
+                "no_country": place == "Zoom-livestream",
+            }
             for i, (place, country, cc, aliases) in enumerate(
                 [
                     ("Oslo", "Norway", "no", ""),
@@ -108,5 +116,23 @@ def reference_raw() -> dict:
                 ],
                 start=1,
             )
+        ],
+        # Baserow language_terms and country_terms (words in names).
+        "languages": [
+            {"name": "German", "aliases": "ger;deutsch", "cc": ""},
+            {"name": "Dutch", "aliases": "nl;nederlands", "cc": ""},
+            {"name": "Czech", "aliases": "cz", "cc": ""},
+            {"name": "Spanish", "aliases": "esp", "cc": ""},
+        ],
+        "countries": [
+            {"name": "Czech-Republic", "aliases": "Czech;Czechia;Cesko", "cc": "cz"},
+            {"name": "United-Kingdom", "aliases": "England;Great-Britain;Britain;UK", "cc": "uk"},
+            {"name": "Netherlands", "aliases": "Holland;Nederland", "cc": "nl"},
+            {"name": "Germany", "aliases": "Deutschland", "cc": "de"},
+            {"name": "Sweden", "aliases": "Sverige", "cc": "se"},
+            {"name": "Norway", "aliases": "Norge", "cc": "no"},
+            {"name": "Finland", "aliases": "Suomi", "cc": "fi"},
+            {"name": "Slovenia", "aliases": "Slovenija", "cc": "si"},
+            {"name": "Emirates", "aliases": "UAE", "cc": "ae"},
         ],
     }

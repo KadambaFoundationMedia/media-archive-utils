@@ -52,6 +52,8 @@ PLACE_ROWS: dict[int, dict] = {
         "place_location": r["place"],
         "country": r["country"],
         "ccTLD": r["cc"],
+        "not_place": r.get("not_place", False),
+        "no_country": r.get("no_country", False),
     }
     for r in RAW["place_country"]
 }
@@ -69,6 +71,8 @@ PLACE_ROWS[101] = {
     "country": "",
     "ccTLD": "",
     "Aliases": "Serbia-Summercamp;Fruska-Gora;Fruska-Goranga;Swiss-summercamp",
+    "not_place": True,
+    "no_country": True,
 }
 BY_ID = {o["id"]: o["value"] for f in FIELDS for o in f["select_options"]}
 SELECTS = {f["name"]: f["type"] for f in FIELDS if f["type"].endswith("select")}
@@ -121,6 +125,20 @@ def rows(table_id: int):
         return page(RAW["categories"])
     if table_id == 4:
         return page(list(PLACE_ROWS.values()))
+    if table_id == 5:
+        return page(
+            [
+                {"id": i, "language": r["name"], "aliases": r["aliases"]}
+                for i, r in enumerate(RAW["languages"], 1)
+            ]
+        )
+    if table_id == 6:
+        return page(
+            [
+                {"id": i, "country": r["name"], "aliases": r["aliases"], "ccTLD": r["cc"]}
+                for i, r in enumerate(RAW["countries"], 1)
+            ]
+        )
     return page(list(ROWS.values()))
 
 

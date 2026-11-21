@@ -1,43 +1,8 @@
-# Seed knowledge for the Renamer. Place spellings (place_country.Aliases) and category words
-# (category_terms_folder) live in Baserow. Reviewers' repeated corrections are added automatically
+# Seed knowledge for the Renamer. Place spellings and flags (place_country), category words
+# (category_terms_folder), language words (language_terms) and country words (country_terms)
+# live in Baserow. Reviewers' repeated corrections are added automatically
 # as alias rules in the local DB (SPEC.md section 10); this file holds the rest of the starting set.
 # Keys are matched case-insensitively, without accents, with spaces/hyphens/underscores equal.
-
-# Places in Baserow that are not real locations or collide with other words.
-not_places:
-  - Home-program
-  - Summercamp
-  - Sumercamp
-  - Netherlands
-
-# Places that have no country (online recordings).
-no_country:
-  # general places, used in many countries: the file's own evidence decides the country
-  - Zoom-livestream
-  - Home-program
-  - Summercamp
-  - Govindas
-
-# Language words in names -> Baserow language option.
-languages:
-  ger: German
-  german: German
-  deutsch: German
-  dutch: Dutch
-  nl: Dutch
-  nederlands: Dutch
-  czech: Czech
-  cz: Czech
-  slovak: Slovak
-  spanish: Spanish
-  esp: Spanish
-  french: French
-  hindi: Hindi
-  russian: Russian
-  serbian: Serbian
-  croatian: Croatian
-  hungarian: Hungarian
-  bulgarian: Bulgarian
 
 # Speaker acronyms. WHO is always KKS; another speaker in a name is flagged for review.
 kks: [KKS, Kadamba Kanana Swami, Kadambakanana Swami, Kadamba Kanana, Kadamba S]

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     baserow_travel_schedule_table_id: int | None = None
     baserow_category_terms_table_id: int | None = None
     baserow_place_country_table_id: int | None = None
+    baserow_language_terms_table_id: int | None = None
+    baserow_country_terms_table_id: int | None = None
 
     # Folders
     media_sample_files_path: Path = REPO_ROOT / "sample-files"

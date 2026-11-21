@@ -327,7 +327,15 @@ def test_a_place_that_is_summercamp_by_alias_gives_the_summercamp_category(
     raw["options"]["place_location"] = [*raw["options"]["place_location"], "Summercamp"]
     raw["place_country"] = [
         *raw["place_country"],
-        {"id": 97, "place": "Summercamp", "country": "", "cc": "", "aliases": "Fruska-Goranga"},
+        {
+            "id": 97,
+            "place": "Summercamp",
+            "country": "",
+            "cc": "",
+            "aliases": "Fruska-Goranga",
+            "not_place": True,
+            "no_country": True,
+        },
     ]
     path = tree / "2012-07-12_KKS_Fruska-Goranga_rs.mp3"
     path.write_bytes(b"")

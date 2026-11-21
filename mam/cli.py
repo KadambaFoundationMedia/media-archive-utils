@@ -217,16 +217,14 @@ def place_country_sync(
 
     Without --apply nothing is written: the rows are only listed.
     """
-    import yaml
-
     from mam.helpers.baserow import BaserowClient
-    from mam.tools.renamer.knowledge import ALIASES_FILE, fetch_raw
+    from mam.tools.renamer.knowledge import fetch_raw
     from mam.tools.renamer.place_country import apply_sync, plan_sync
 
     _ready_db()
     raw = fetch_raw()
-    aliases = yaml.safe_load(ALIASES_FILE.read_text(encoding="utf-8"))
-    plan = plan_sync(raw, aliases.get("no_country") or [])
+    general = [r["place"] for r in raw.get("place_country", []) if r.get("no_country")]
+    plan = plan_sync(raw, general)
     out = Table("Place", "Country", "ccTLD", "From", "Action")
     for row in plan.rows:
         out.add_row(row.place, row.country or "–", row.cc or "–", row.source, row.action)

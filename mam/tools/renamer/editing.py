@@ -200,7 +200,7 @@ def remember_place_country(place: Place | None, cc: str | None, ref: Reference) 
 
     No row yet: create it. A row without a country: fill it in. A row with another country
     is never changed (the warning at the Country field said so). General places
-    (aliases.yaml no_country, e.g. Zoom-livestream) keep an empty country on purpose.
+    (the place_country no_country checkbox, e.g. Zoom-livestream) keep an empty country on purpose.
     """
     from mam.helpers.baserow import BaserowClient
 
