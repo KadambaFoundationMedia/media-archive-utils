@@ -34,6 +34,8 @@ def tree(settings):
         "Sample files/vyasa puja 2015/R09_0008.MP3",
         "Sample files/vyasa puja 2015/Nama-rupa/ZOOM0001.MP3",
         "Sample files/Srimad Bhagavatam 2015/R09_0001.MP3",
+        "KKS DUBEN 2008 MP3/Lekce/R09_0001.MP3",
+        "Oslo 2011/Lecture/R09_0003.MP3",
     ]
     for name in names:
         path = root / name
@@ -347,3 +349,16 @@ def test_folder_category_gives_the_what_when_the_filename_has_none(propose):
 def test_folder_scripture_category_is_not_used_as_the_what(propose):
     p = propose("Sample files/Srimad Bhagavatam 2015/R09_0001.MP3")
     assert p.category == "Srimad-bhagavatam" and p.what is None
+
+
+def test_class_folder_gives_the_class_category_and_what(propose):
+    """Lekce / Lecture / Class are terms of the Class row in category_terms_folder."""
+    p = propose("KKS DUBEN 2008 MP3/Lekce/R09_0001.MP3")
+    assert p.category == "Class" and p.what == "Class"
+    assert p.new_name == "2008-04-DD_KKS_Class.mp3"
+    assert propose("Oslo 2011/Lecture/R09_0003.MP3").new_name.endswith("_KKS_Class_Oslo-no.mp3")
+
+
+def test_a_verse_in_the_filename_beats_the_class_folder(propose):
+    p = propose("KKS DUBEN 2008 MP3/06 KKS SB 3.1.25.mp3")
+    assert p.category == "Srimad-bhagavatam" and p.what == "SB-3-1-25"

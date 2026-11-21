@@ -74,12 +74,12 @@ def test_filing_work_refreshes_cached_terms_older_than_the_limit(disk_cache, mon
     raw = reference_raw()
     for row in raw["categories"]:
         if row["category"] == "Festivals":
-            row["filename_terms"] += ", Govardhana"
+            row["filename_terms"] += ", Rathayatra"
     monkeypatch.setattr(knowledge, "fetch_raw", lambda: raw)
     stale = knowledge.get_reference()
-    assert stale.matcher.match("Govardhana-lekce") is None  # pages still use the cached copy
+    assert stale.matcher.match("Rathayatra-day") is None  # pages still use the cached copy
     ref = knowledge.get_reference(max_age=knowledge.PLACEMENT_MAX_AGE_S)
-    assert ref.matcher.match("Govardhana-lekce").category.name == "Festivals"
+    assert ref.matcher.match("Rathayatra-day").category.name == "Festivals"
 
 
 def test_filing_work_falls_back_to_the_cache_when_baserow_is_down(disk_cache, monkeypatch):
