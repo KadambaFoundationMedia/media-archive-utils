@@ -4,7 +4,7 @@ The country of each place is chosen from, in order:
 1. the media rows with that place, when they agree on one country;
 2. the travel schedule, only as a hint where no media row has a country;
 Places with no data get a row without a country, to be filled by hand.
-General places (aliases.yaml `no_country`, e.g. Zoom-livestream) get an empty country, and
+General places (the `no_country` checkbox, e.g. Zoom-livestream) get an empty country, and
 spelling variants of a place (same name apart from case) get no row.
 
 The media table is tidied at the same time (fill-empty only, plus one spelling fix):

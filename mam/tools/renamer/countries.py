@@ -9,36 +9,9 @@ import pycountry
 
 # ccTLDs that differ from the ISO 3166 alpha-2 code.
 CCTLD_OVERRIDES = {"gb": "uk"}
-# Names and abbreviations seen in the archive that pycountry does not resolve.
-COUNTRY_ALIASES = {
-    "emirates": "ae",
-    "uae": "ae",
-    "czech republic": "cz",
-    "czech": "cz",
-    "czechia": "cz",
-    "cesko": "cz",
-    "england": "uk",
-    "great britain": "uk",
-    "britain": "uk",
-    "uk": "uk",
-    "holland": "nl",
-    "nederland": "nl",
-    "deutschland": "de",
-    "germany": "de",
-    "sverige": "se",
-    "norge": "no",
-    "suomi": "fi",
-    "slovenija": "si",
-    "hrvatska": "hr",
-    "srbija": "rs",
-    "slovensko": "sk",
-    "belgie": "be",
-    "belgique": "be",
-    "usa": "us",
-    "america": "us",
-    "south africa": "za",
-    "russia": "ru",
-}
+# Names and abbreviations pycountry does not resolve: the Baserow `country_terms` table,
+# loaded by `set_country_terms` (key without accents/case, value ccTLD).
+_COUNTRY_TERMS: dict[str, str] = {}
 # ISO 3166 alpha-3 codes accepted in filenames (others collide with ordinary words).
 ALPHA3_ALLOWED = {
     "swe",
@@ -84,14 +57,21 @@ def to_cctld(alpha2: str) -> str:
     return CCTLD_OVERRIDES.get(code, code)
 
 
+def set_country_terms(terms: dict[str, str]) -> None:
+    """Replace the country words (from `country_terms`) and drop cached lookups."""
+    _COUNTRY_TERMS.clear()
+    _COUNTRY_TERMS.update({_norm(k): v.lower() for k, v in terms.items() if _norm(k) and v})
+    cc_for_name.cache_clear()
+
+
 @lru_cache(maxsize=2048)
 def cc_for_name(name: str) -> str | None:
     """ccTLD for a country name, alias or alpha-3 code ('Czech-republic' -> 'cz')."""
     key = _norm(name)
     if not key:
         return None
-    if key in COUNTRY_ALIASES:
-        return COUNTRY_ALIASES[key]
+    if key in _COUNTRY_TERMS:
+        return _COUNTRY_TERMS[key]
     if len(key) == 3 and key in ALPHA3_ALLOWED:
         country = pycountry.countries.get(alpha_3=key.upper())
         return to_cctld(country.alpha_2) if country else None

@@ -125,6 +125,18 @@ class BaserowClient:
             self.settings.baserow_place_country_table_id, "BASEROW_PLACE_COUNTRY_TABLE_ID"
         )
 
+    @property
+    def language_terms_table(self) -> int:
+        return self._table_id(
+            self.settings.baserow_language_terms_table_id, "BASEROW_LANGUAGE_TERMS_TABLE_ID"
+        )
+
+    @property
+    def country_terms_table(self) -> int:
+        return self._table_id(
+            self.settings.baserow_country_terms_table_id, "BASEROW_COUNTRY_TERMS_TABLE_ID"
+        )
+
     @staticmethod
     def _table_id(value: int | None, name: str) -> int:
         if value is None:
@@ -261,6 +273,14 @@ class BaserowClient:
     def place_country(self) -> list[dict[str, Any]]:
         """The place -> country table (one row per media place_location option)."""
         return list(self.iter_rows(self.place_country_table))
+
+    def language_terms(self) -> list[dict[str, Any]]:
+        """Language words (language, aliases) used to read languages from names."""
+        return list(self.iter_rows(self.language_terms_table))
+
+    def country_terms(self) -> list[dict[str, Any]]:
+        """Country words (country, aliases, ccTLD) used to read countries from names."""
+        return list(self.iter_rows(self.country_terms_table))
 
     # ---------------------------------------------------------------- writes
     def _log(self, **kwargs: Any) -> int:

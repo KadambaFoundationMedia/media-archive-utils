@@ -11,6 +11,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Settings page: options now save by themselves when you change them (a check mark shows, or the problem if a value is refused), so there are no Save buttons any more.
 
 ### Renamer
+- Language words (`GER`, `deutsch`, `nederlands`...) and country words (`Holland`, `UAE`, `Cesko`...) now come from the new Baserow tables `language_terms` and `country_terms`, and the places that are no real location or have no country from the `not_place` and `no_country` checkboxes of `place_country`. The built-in lists are gone. Add `BASEROW_LANGUAGE_TERMS_TABLE_ID` and `BASEROW_COUNTRY_TERMS_TABLE_ID` to `.env` (see `.env.example`).
 - Place spellings (`Praha`, `Koln`, `Rdesh`, `NYC`...) now come from the `Aliases` column of `place_country`, and the class words dropped next to a verse (`SB 3.1.20 class`) from the terms of the `Class` category. The built-in lists are gone, and so is the one-off place data of `mam place-country sync`.
 - New **Class** category (from the `category_terms_folder` table): a file in a `Lekce`, `Lecture`, `Class` or `Lezing` folder with no other clue is named `..._KKS_Class.mp3` and filed in the `class` folder, until the class-discoverer finds the real type.
 - Category words now come only from the `category_terms_folder` table (the built-in word list in `aliases.yaml` is gone).

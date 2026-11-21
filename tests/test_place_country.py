@@ -209,13 +209,15 @@ def test_aliases_can_point_at_a_general_place_and_beat_a_real_place():
             "country": "",
             "cc": "",
             "aliases": "Serbia-Summercamp;Fruska-Gora;Fruska-Goranga;Swiss-summercamp",
+            "not_place": True,
+            "no_country": True,
         },
     ]
     ref = build_reference(raw)
     for text in ("Serbia-Summercamp", "Fruska-Gora", "Fruska-Goranga", "swiss summercamp"):
         place = ref.find_place(text)
         assert place.name == "Summercamp" and place.cc is None, text
-    # the bare word is still not a place by itself (aliases.yaml not_places)
+    # the bare word is still not a place by itself (the `not_place` checkbox)
     assert ref.find_place("Summercamp") is None
 
 
