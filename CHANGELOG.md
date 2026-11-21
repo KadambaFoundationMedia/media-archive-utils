@@ -8,7 +8,6 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Class-discoverer
-- Verse look-up on vedabase.io (groundwork, no tool yet): reads `SB-9-20-20-27`-style references (a range is fetched verse by verse), parses the transliteration, synonyms, translation and purport from the page, and caches each verse in the local DB for good. Requests keep the 10 second crawl delay from vedabase.io's robots.txt. New table `vedabase_verse` (migration 0004).
 
 ### Media manager
 - Jobs page: a Scan folder result now has collapsible lists. **Identical copies** are grouped by folder and show which registered file each one duplicates; **other files ignored** are grouped by file type with counts. The lists keep the first 2000 of each (the counts stay complete).
@@ -27,7 +26,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ### Class discoverer
 - New tool: evens out the volume of the class (-18 LUFS, only when needed), transcribes it (mlx-whisper on Apple Silicon, whisper.cpp elsewhere; the transcript is cached and written to `transcriptions/`), finds the verse the speaker announces and confirms it on vedabase.io (verse pages cached for good, 10 s between requests). In the Action menu and as `mam class-discover <file>`.
 - A confirmed verse that the filename lacks is given to the Renamer at once (and to the video's row when the class came from a video); a different verse than the filename's goes to review with both candidates and an excerpt; so do unconfirmed verses and files with no verse and no category. 5% spot checks. Detected languages go to the `language` field. No title (the content-discoverer adds it) and no trimming.
-- `uv sync` now installs mlx-whisper on Apple Silicon Macs (it brings torch, a large download). New optional `.env` settings: `TRANSCRIBER_BACKEND`, `WHISPER_MLX_MODEL`, `WHISPER_CLI`, `WHISPER_CPP_MODEL`, `TRANSCRIBE_WORDS`, `VEDABASE_DELAY_S`.
+- `uv sync` now installs mlx-whisper on Apple Silicon Macs (it brings torch, a large download). New optional `.env` settings: `TRANSCRIBER_BACKEND`, `WHISPER_MLX_MODEL`, `WHISPER_CLI`, `WHISPER_CPP_MODEL`, `WHISPER_DEVICE`, `TRANSCRIBE_WORDS`, `VEDABASE_URL`, `VEDABASE_DELAY_S`. The unused `vedabase_verse` table (migration 0004) stays empty: verse pages are cached in `vedabase_cache`.
 
 ### Kirtan splitter
 - Fix: a recording with no kirtan (speech from the start) now continues to the class discoverer in the pipeline instead of stopping.
