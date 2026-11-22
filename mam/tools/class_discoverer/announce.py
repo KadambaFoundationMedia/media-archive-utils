@@ -19,12 +19,16 @@ from mam.tools.class_discoverer.numbers import ORDINALS, parse_number, tokenize
 
 BOOKS = {
     "BG": re.compile(r"bh?agavad[\s\-]?g[iī]t[aā]|\bgita\b|\bb\.?\s?g\b"),
-    "SB": re.compile(r"bh[aā]gavatam|bh[aā]gavata\b|bhagavatham|\bs\.?\s?b\b|\bcanto\b|\bkanta\b"),
+    "SB": re.compile(
+        r"bh[aā]gavatam|bh[aā]gavata\b|bhagavatham|\bs\.?\s?b\b|\bcanto\b|\bkant[ao]m?\b"
+    ),
     "CC": re.compile(
         r"cait?anya[\s\-]?carit[aā]m[rṛ]?ta|chaitanya[\s\-]?charit|\bc\.?\s?c\b"
         r"|\b(?:adi|madhya|antya)[\s\-]?l[iī]l[aā]"
     ),
 }
+# Whisper writes the canto as 'canto', 'kanto', 'kanchu', 'kantam'...
+CANTO_WORDS = {"canto", "cantos", "kanto", "kanta", "kantam", "kanchu", "cantu", "kandha"}
 LILA_RE = re.compile(r"\b(adi|madhya|antya)\b")
 NOISE = {"number", "no", "the", "is", "it", "its", "of", "in"}
 
@@ -75,6 +79,8 @@ def _numbers_after(tokens: list[str], keywords: set[str]) -> list[tuple[str, int
             found.append((tok, number[0], i))
         elif i > 0 and tokens[i - 1] in ORDINALS:  # 'first canto'
             found.append((tok, ORDINALS[tokens[i - 1]], i))
+        elif i > 0 and tok in CANTO_WORDS and tokens[i - 1].isdigit():  # '3rd kanto'
+            found.append((tok, int(tokens[i - 1]), i))
     return found
 
 
@@ -102,40 +108,50 @@ def read_window(book: str, text: str) -> tuple[VerseRef | None, dict[str, Any], 
     dotted = re.search(r"\b(\d{1,3}(?:\.\d{1,3}){1,3})\b", lower)
     if dotted:
         heard["dotted"] = dotted.group(1)
-    kw = _numbers_after(tokens, {"canto", "chapter", "text", "texts", "verse", "verses"})
-    values: dict[str, int] = {}
+    keywords = CANTO_WORDS | {"chapter", "text", "texts", "verse", "verses"}
+    kw = _numbers_after(tokens, keywords)
+    values: dict[str, int] = {}  # the last number said for each part: a correction wins
+    firsts: dict[str, int] = {}  # the first number said, kept as the alternative
     ends: dict[str, int | None] = {}
     for word, value, pos in kw:
-        key = {"canto": "canto", "chapter": "chapter"}.get(word, "verse")
-        if key not in values:
-            values[key] = value
-            if key == "verse":
-                ends[key] = _range_end(tokens, pos, value)
+        key = "canto" if word in CANTO_WORDS else "chapter" if word == "chapter" else "verse"
+        firsts.setdefault(key, value)
+        values[key] = value
+        if key == "verse":
+            ends[key] = _range_end(tokens, pos, value)
     heard.update(values)
     lila = LILA_RE.search(lower)
     if lila:
         heard["lila"] = lila.group(1).capitalize()
-    nums: list[int] = []
-    if book == "BG":
-        if "chapter" in values and "verse" in values:
-            nums = [values["chapter"], values["verse"]]
-        elif dotted and dotted.group(1).count(".") == 1:
-            nums = [int(n) for n in dotted.group(1).split(".")]
-    elif book == "SB":
-        if {"canto", "chapter", "verse"} <= values.keys():
-            nums = [values["canto"], values["chapter"], values["verse"]]
-        elif dotted and dotted.group(1).count(".") == 2:
-            nums = [int(n) for n in dotted.group(1).split(".")]
-    else:
-        lila_name = heard.get("lila")
-        if lila_name and "chapter" in values and "verse" in values:
-            nums = [values["chapter"], values["verse"]]
-        elif lila_name and dotted and dotted.group(1).count(".") == 1:
-            nums = [int(n) for n in dotted.group(1).split(".")]
+
+    def numbers(parts: dict[str, int]) -> list[int]:
+        if book == "BG":
+            if "chapter" in parts and "verse" in parts:
+                return [parts["chapter"], parts["verse"]]
+            if dotted and dotted.group(1).count(".") == 1:
+                return [int(n) for n in dotted.group(1).split(".")]
+        elif book == "SB":
+            if {"canto", "chapter", "verse"} <= parts.keys():
+                return [parts["canto"], parts["chapter"], parts["verse"]]
+            if dotted and dotted.group(1).count(".") == 2:
+                return [int(n) for n in dotted.group(1).split(".")]
+        else:
+            lila_name = heard.get("lila")
+            if lila_name and "chapter" in parts and "verse" in parts:
+                return [parts["chapter"], parts["verse"]]
+            if lila_name and dotted and dotted.group(1).count(".") == 1:
+                return [int(n) for n in dotted.group(1).split(".")]
+        return []
+
+    nums = numbers(values)
     if not nums:
         return None, heard, "The announcement names no complete verse"
     end = ends.get("verse")
-    ref = VerseRef(book, tuple(nums), heard.get("lila") if book == "CC" else None, end)
+    lila_name = heard.get("lila") if book == "CC" else None
+    ref = VerseRef(book, tuple(nums), lila_name, end)
+    first = numbers(firsts)
+    if first and first != nums:  # 'chapter 9 ... no, chapter 19': try the first reading too
+        heard["alternatives"] = [VerseRef(book, tuple(first), lila_name, end).what]
     return ref, heard, None
 
 

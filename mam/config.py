@@ -50,6 +50,14 @@ class Settings(BaseSettings):
     whisper_cli: str | None = None  # path of whisper-cli when it is not on PATH
     whisper_cpp_model: Path | None = None  # ggml-large-v3-turbo.bin
     whisper_device: str = "auto"  # auto: Metal/GPU first, local CPU when that fails
+    transcribe_chunk_s: int = 300  # the recording is transcribed in chunks of about this length
+    transcribe_chunk_timeout_s: int = 240  # a chunk taking longer is stopped and retried
+    # Languages the recordings are in. Whisper detects the language from the first 30 s of a
+    # chunk; kirtan makes it hear Turkish or Hebrew. A chunk detected as another language is
+    # decoded again in English.
+    transcribe_languages: str = (
+        "en,nl,de,fr,es,pt,it,hi,ru,cs,sk,pl,hr,sr,sl,bg,hu,sv,no,da,fi,lt,lv,et,uk,bn,ta,te"
+    )
     transcribe_words: bool = False  # word timestamps cost speed; segment timestamps suffice
 
     # Vedabase (robots.txt asks for a 10 s crawl delay; verse pages are cached for good)
@@ -85,6 +93,9 @@ class Settings(BaseSettings):
     def ensure_dirs(self) -> None:
         for path in (self.local_db_path.parent, self.work_dir, self.log_dir, self.inbox_path):
             path.mkdir(parents=True, exist_ok=True)
+
+    def language_set(self) -> set[str]:
+        return {c.strip().lower() for c in self.transcribe_languages.split(",") if c.strip()}
 
     @property
     def managed_roots(self) -> list[Path]:

@@ -46,8 +46,13 @@ ORDINALS = {
 TOKEN_RE = re.compile(r"\d+(?:\.\d+)*|[a-z]+", re.IGNORECASE)
 
 
+ORDINAL_SUFFIX_RE = re.compile(r"\b(\d+)(?:st|nd|rd|th)\b", re.IGNORECASE)
+
+
 def tokenize(text: str) -> list[str]:
-    return [t.lower() for t in TOKEN_RE.findall(text.replace("-", " "))]
+    """Lower-case words and numbers; '3rd' is read as 3."""
+    text = ORDINAL_SUFFIX_RE.sub(r"\1", text.replace("-", " "))
+    return [t.lower() for t in TOKEN_RE.findall(text)]
 
 
 def parse_number(tokens: list[str], i: int) -> tuple[int, int] | None:

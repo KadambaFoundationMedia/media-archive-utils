@@ -441,3 +441,25 @@ def test_transcript_follows_its_audio(settings, tmp_path):
     assert moved == transcript_file(settings, new) and moved.exists() and not src.exists()
     assert transcript_file(settings, new).parent.name == "Bhagavad-gita"
     assert follow_audio(settings, old, new) is None  # nothing left to move
+
+
+def test_discover_tries_the_first_reading_when_the_correction_is_not_confirmed(monkeypatch):
+    from mam.tools.class_discoverer.match import VerseMatch
+
+    tried = []
+
+    def fake_confirm(client, ref, transcript):
+        tried.append(ref.what)
+        ok = ref.what == "SB-1-9-31"  # only the first reading is really heard
+        return True, VerseMatch(0.9 if ok else 0.0, 3.0 if ok else None, ok), ""
+
+    monkeypatch.setattr(discoverer, "_confirm", fake_confirm)
+    t = Transcript(
+        [Segment(0, 5, "First Canto, Chapter 9, text 31. No, chapter 19.")],
+        "en", "test", None, "test", None, "cpu",
+    )  # fmt: skip
+    # the Bhagavatam name is needed for the announcement
+    t.segments[0].text = "Srimad Bhagavatam " + t.segments[0].text
+    data = discoverer.discover(t, None, client=None)
+    assert tried == ["SB-1-19-31", "SB-1-9-31"]
+    assert data["found"]["what"] == "SB-1-9-31" and data["found"]["confirmed"]

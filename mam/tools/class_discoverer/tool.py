@@ -14,6 +14,7 @@ import logging
 import random
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,13 @@ from mam.errors import CorruptedMedia, MamError, VedabaseError
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import sha256
 from mam.helpers.local_db.repo import set_status
-from mam.helpers.transcriber import Transcript, transcribe, transcript_file, write_markdown
+from mam.helpers.transcriber import (
+    Transcript,
+    transcribe,
+    transcript_file,
+    transcript_quality,
+    write_markdown,
+)
 from mam.helpers.vedabase import VedabaseClient, VerseRef
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.class_discoverer.announce import (
@@ -118,15 +125,29 @@ def discover(
         "announcements": [a.to_dict() for a in found[:10]],
         "found": None,
         "file": file_ref.what if file_ref else None,
+        "quality": transcript_quality(transcript.segments, transcript.fallback),
     }
     if best is not None and best.ref is not None:
+        heard_times = votes[best.ref.what]
         exists, match, note = _confirm(client, best.ref, transcript)
+        if not (exists and match and match.confirmed):
+            # the speaker may have corrected himself ('chapter 9 ... no, chapter 19'): the last
+            # reading is tried first, the first reading is the alternative
+            for alt in best.partial.get("alternatives") or []:
+                alt_ref = VerseRef.from_what(alt)
+                if alt_ref is None:
+                    continue
+                a_exists, a_match, a_note = _confirm(client, alt_ref, transcript)
+                if a_exists and a_match and a_match.confirmed:
+                    best = replace(best, ref=alt_ref)
+                    exists, match, note = a_exists, a_match, a_note
+                    break
         data["found"] = {
             "what": best.ref.what,
             "tag": best.ref.tag,
             "time": best.start,
             "excerpt": best.excerpt,
-            "heard": votes[best.ref.what],
+            "heard": heard_times,
             "on_vedabase": exists,
             "match": match.to_dict() if match else None,
             "note": note,
@@ -155,6 +176,18 @@ def decide(data: dict[str, Any]) -> dict[str, Any]:
                 else "No verse was announced; the filename's verse is kept (not confirmed)."
             )
             return {"action": "keep", "sure": True, "reasons": [note]}
+        quality = data.get("quality") or {}
+        if quality.get("unreliable"):
+            return {
+                "action": "none",
+                "sure": False,
+                "reasons": [
+                    "No verse was heard, but the transcript looks unreliable "
+                    f"({quality.get('bad_share', 0):.0%} of the lines are repeated or invented "
+                    "text), so the verse may simply not have been understood. Listen to the "
+                    "start of the class."
+                ],
+            }
         return {
             "action": "none",
             "sure": True,
@@ -307,7 +340,8 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     record.meta = meta
 
     spot = random.random() < settings.spot_check_rate
-    if decision["action"] == "review" or (spot and decision["action"] == "name"):
+    unsure_none = decision["action"] == "none" and not decision["sure"]
+    if decision["action"] == "review" or unsure_none or (spot and decision["action"] == "name"):
         reason = "\n".join(decision["reasons"])
         if spot and decision["sure"]:
             reason = (
