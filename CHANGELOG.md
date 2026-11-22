@@ -16,6 +16,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - A country code that contradicts a place Baserow knows with one country (`Oslo_fi`) is corrected to the place's country (`Oslo-no`) without a review, and noted in the Baserow `notes`.
 
 ### Class-discoverer
+- Sanskrit glossary: known Whisper misspellings of Sanskrit names and terms (`Harry Krishna`, `Bhagwad Geeta`) are replaced by the glossary's spelling in the transcript. Optionally the terms are given to Whisper as its prompt (`TRANSCRIBE_GLOSSARY_PROMPT`, off).
 - Transcripts are written as `.srt` (SubRip) instead of Markdown. A transcript already written as `.md` still follows its audio.
 - When the announced verse differs from the filename's, and only the filename's verse is heard on vedabase.io, the filename is kept without a review. The review says how much of each translation was heard and marks an unconfirmed verse on its button.
 - A spoken correction up to 20 seconds after the announcement is read ("chapter 9 ... no, chapter 19").
