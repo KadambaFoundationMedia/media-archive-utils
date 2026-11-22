@@ -26,9 +26,9 @@
       <td>{% with s=f.status %}{% include "_status.html" %}{% endwith %}
         {% set job = running.get(f.id) if running else none %}
         {% if job %}
-        <span class="ms-1 job-live text-nowrap" data-bs-toggle="tooltip" data-bs-title="{{ job.text }}" aria-label="{{ job.text }}">
+        <span class="ms-1 job-live text-nowrap" aria-label="{{ job.text }}">
           {% if job.running %}<i class="fa-solid fa-spinner fa-spin text-primary"></i>{% else %}<i class="fa-regular fa-clock text-body-secondary"></i>{% endif %}
-          {% if job.percent is not none %}<span class="small text-body-secondary">{{ job.percent }}%</span>{% endif %}
+          <span class="small text-body-secondary">{{ job.short }}{% if job.percent is not none %} {{ job.percent }}%{% endif %}</span>
         </span>
         {% endif %}</td>
       <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>

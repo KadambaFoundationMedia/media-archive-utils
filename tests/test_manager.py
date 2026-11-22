@@ -1017,11 +1017,22 @@ def test_running_job_shows_live_progress_in_list_jobs_and_details(client, archiv
     client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
     run_queue()
     assert seen["step"] == "Transcribing: part 3 of 14" and seen["progress"] == 0.25
-    assert "Renamer: Transcribing: part 3 of 14 (25%)" in seen["files"]
+    assert "Transcribing 3/14 25%" in " ".join(seen["files"].split()).replace("> ", ">")
+    assert "data-bs-toggle=\"tooltip\" aria-label=\"Renamer" not in seen["files"]
     assert "fa-spin" in seen["files"] and "25%" in seen["jobs"]
     with session_scope() as s:
         job = s.scalars(select(m.Job).where(m.Job.tool == "renamer")).one()
         assert job.step is None and job.progress is None
+
+
+def test_short_step_for_the_file_list():
+    from mam.manager.queries import short_step
+
+    assert short_step("Measuring and adjusting the loudness") == "Loudness"
+    assert short_step("Transcribing: part 3 of 14") == "Transcribing 3/14"
+    assert short_step("Cutting the recording") == "Cutting"
+    assert short_step(None) == "Working"
+    assert len(short_step("Some unknown very long step description")) <= 20
 
 
 def test_banner_asks_for_a_restart_when_program_files_changed(client, monkeypatch):
