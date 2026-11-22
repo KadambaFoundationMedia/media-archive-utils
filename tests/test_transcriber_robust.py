@@ -164,3 +164,13 @@ def test_repeated_segment_with_different_punctuation_is_dropped():
     segs = [Segment(383.0, 384.0, "Translation."), Segment(383.2, 384.5, "Translation"),
             Segment(390.0, 392.0, "Translation of the verse")]  # fmt: skip
     assert [s.text for s in _without_repeats(segs)] == ["Translation.", "Translation of the verse"]
+
+
+def test_a_segment_that_is_the_start_of_the_overlapping_one_is_merged():
+    from mam.helpers.transcriber import Segment
+    from mam.helpers.transcriber.backends import _without_repeats
+
+    segs = [Segment(413.0, 421.0, "The scriptural injunction is that one should humbly approach"),
+            Segment(413.0, 414.0, "The scriptural injunction is that...")]  # fmt: skip
+    assert len(_without_repeats(segs)) == 1
+    assert _without_repeats(segs)[0].text.endswith("approach")

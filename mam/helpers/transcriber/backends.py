@@ -102,11 +102,16 @@ def _plain(text: str) -> str:
 
 
 def _without_repeats(segments: list[Segment]) -> list[Segment]:
-    """A repaired gap overlaps its neighbours by 2 s: drop a segment the previous one repeats."""
+    """A repaired gap overlaps its neighbours by a few seconds: where two overlapping segments
+    say the same (or one is the start of the other) keep the longer one."""
     out: list[Segment] = []
     for seg in segments:
-        if out and seg.start < out[-1].end - 0.5 and _plain(seg.text) == _plain(out[-1].text):
-            continue
+        if out and seg.start < out[-1].end - 0.5:
+            a, b = _plain(out[-1].text), _plain(seg.text)
+            if a == b or b.startswith(a) or a.startswith(b):
+                if len(b) > len(a):
+                    out[-1] = seg
+                continue
         out.append(seg)
     return out
 
