@@ -166,6 +166,15 @@ function initTooltips(root) {
   });
 }
 window.addEventListener("load", () => initTooltips());
+// A swap removes the elements a tooltip belongs to while it may be showing (the file list
+// refreshes every 3 s). The tooltip lives in <body>, so dispose it first or it stays behind.
+document.body.addEventListener("htmx:beforeSwap", (event) => {
+  if (!window.bootstrap) return;
+  const target = event.detail.target;
+  (target || document).querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+    bootstrap.Tooltip.getInstance(el)?.dispose();
+  });
+});
 document.body.addEventListener("htmx:afterSwap", (event) => initTooltips(event.target));
 // Elements that appear later (Alpine templates) get their tooltip on first hover or focus.
 function lazyTooltip(event) {
