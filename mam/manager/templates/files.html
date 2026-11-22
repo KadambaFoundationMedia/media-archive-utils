@@ -108,8 +108,8 @@
       <option value="selected">Selected files</option>
       <option value="all" id="scope-all">All {{ total }} matching files</option>
     </select>
-    <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" aria-label="Preview (dry run)" data-bs-toggle="tooltip" data-bs-title="Preview (dry run): shows the proposed names. Nothing is copied and no review is opened."><i class="fa-regular fa-eye"></i></button>
-    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" aria-label="Run" data-bs-toggle="tooltip" data-bs-title="Run: copies and renames into processed-files and opens a review when needed (or moves, if Settings has Move files instead of copying on). Baserow: written when the Baserow writes switch is on, or when you approve a review. Originals stay as they are unless the Renamer options in Settings move them or add a postfix."><i class="fa-solid fa-play"></i></button>
+    <button class="btn btn-sm btn-outline-primary" type="submit" name="mode" value="preview" aria-label="Preview (dry run)" data-bs-toggle="tooltip" data-bs-title="Preview mode. No files are changed"><i class="fa-regular fa-eye"></i></button>
+    <button class="btn btn-sm btn-primary" type="submit" name="mode" value="run" aria-label="Run" data-bs-toggle="tooltip" data-bs-title="Process file(s)"><i class="fa-solid fa-play"></i></button>
     <span id="list-loading" class="htmx-indicator small text-body-secondary ms-auto"><span class="spinner-border spinner-border-sm" role="status" aria-label="Loading"></span></span>
     <span class="small text-body-secondary {{ '' }}" id="file-count">{{ total }} files</span>
   </div>
