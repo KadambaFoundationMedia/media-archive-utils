@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     sanskrit_glossary_path: Path = REPO_ROOT / "docs" / "references" / "sanskrit-glossary.json"
     transcribe_glossary_fix: bool = True  # known misspellings become the glossary's spelling
     transcribe_glossary_prompt: bool = False  # give Whisper the glossary terms as its prompt
+    transcribe_speech_only: bool = False  # only speech goes to Whisper (Settings page option)
     transcribe_words: bool = False  # word timestamps cost speed; segment timestamps suffice
 
     # Vedabase (robots.txt asks for a 10 s crawl delay; verse pages are cached for good)

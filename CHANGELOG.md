@@ -16,6 +16,8 @@ breaks stored data or commands raises the major number. Each entry names the com
 - A country code that contradicts a place Baserow knows with one country (`Oslo_fi`) is corrected to the place's country (`Oslo-no`) without a review, and noted in the Baserow `notes`.
 
 ### Class-discoverer
+- The chanted Sanskrit now confirms a verse too: it is compared with the verse's transliteration on vedabase.io by its consonants, so Whisper's by-ear spelling still matches (Oslo: 92% for the right verse, 20% for the wrong one). The review shows "Sanskrit heard".
+- Settings page, block "Class discoverer": "Only transcribe speech" (off by default). Parts without speech are not given to Whisper and text written over non-speech is dropped, which removes most invented text and saves time.
 - Sanskrit glossary: known Whisper misspellings of Sanskrit names and terms (`Harry Krishna`, `Bhagwad Geeta`) are replaced by the glossary's spelling in the transcript. Optionally the terms are given to Whisper as its prompt (`TRANSCRIBE_GLOSSARY_PROMPT`, off).
 - Transcripts are written as `.srt` (SubRip) instead of Markdown. A transcript already written as `.md` still follows its audio.
 - When the announced verse differs from the filename's, and only the filename's verse is heard on vedabase.io, the filename is kept without a review. The review says how much of each translation was heard and marks an unconfirmed verse on its button.

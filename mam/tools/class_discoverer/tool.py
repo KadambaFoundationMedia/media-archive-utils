@@ -315,7 +315,12 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     prefetch = _prefetch(client, file_ref)
     ctx.session.commit()  # the transcription takes minutes; do not hold the database
     report("Transcribing: preparing the audio", 0.05)
-    transcript, cached = transcribe(ctx.session, audio, sha, settings)
+    from mam.helpers.local_db.app_settings import transcribe_speech_only
+
+    run_settings = settings.model_copy(
+        update={"transcribe_speech_only": transcribe_speech_only(settings.transcribe_speech_only)}
+    )
+    transcript, cached = transcribe(ctx.session, audio, sha, run_settings)
     report("Looking for the verse on vedabase.io", 0.92)
     ctx.session.commit()  # vedabase.io caches pages through its own session: no lock may be held
     transcribed = time.monotonic()

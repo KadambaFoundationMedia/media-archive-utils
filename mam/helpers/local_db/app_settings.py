@@ -99,3 +99,17 @@ def set_renamer_options(move_files: bool, postfix: str) -> None:
     postfix = clean_postfix(postfix)
     set_setting(RENAMER_MOVE, bool(move_files))
     set_setting(RENAMER_POSTFIX, postfix)
+
+
+# ------------------------------------------------------------ Class discoverer options
+TRANSCRIBE_SPEECH_ONLY = "transcribe_speech_only"
+
+
+def transcribe_speech_only(default: bool = False) -> bool:
+    """ "Only transcribe speech": the Settings choice, else the `.env` default."""
+    value = get_setting(TRANSCRIBE_SPEECH_ONLY, None)
+    return value if isinstance(value, bool) else default
+
+
+def set_transcribe_speech_only(enabled: bool) -> None:
+    set_setting(TRANSCRIBE_SPEECH_ONLY, bool(enabled))

@@ -143,6 +143,7 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
             settings.transcribe_words,
             float(settings.transcribe_chunk_s),
             prompt,
+            settings.transcribe_speech_only,
         ),
         float(settings.transcribe_chunk_timeout_s),
         _cpp_fallback_for(audio, settings, language),
@@ -183,6 +184,8 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
         "loops_collapsed": loops,
         "invented_dropped": dropped,
         "events": events,
+        "skipped_chunks": sum(1 for e in events if e.get("skipped")),
+        "non_speech_dropped": sum(e.get("non_speech_dropped", 0) for e in events),
     }
     return Transcript(
         segments=segments,
