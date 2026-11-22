@@ -26,3 +26,21 @@ def mantra_for_what(what: str | None) -> str | None:
     if book == "CC":
         return PANCA_TATTVA
     return None
+
+
+# A filename that says the recording holds a kirtan too: `SB 1.19.31 (with Radha Madhava)`
+# reads as the WHAT `SB-1-19-31-with-radha-madhava`. After the split the class is no longer a
+# combination, so the phrase goes (decided 2026-11-22).
+_COMBINATION = re.compile(
+    r"-(?:with|and|plus)-(?:the-)?(?:jaya-)?(?:jaya-)?"
+    r"(?:radha-madhava|sri-caitanya|kirtans?|bhajans?|nrsimha-pranama|maha-mantra)(?=-|$)",
+    re.IGNORECASE,
+)
+
+
+def without_combination(what: str | None) -> str | None:
+    """The WHAT without a "with <kirtan>" phrase, or None when it has none."""
+    if not what:
+        return None
+    cleaned = _COMBINATION.sub("", what)
+    return cleaned if cleaned != what and cleaned else None

@@ -321,8 +321,26 @@ def apply_split(
     session.commit()
     baserow = _write_kirtan_row(record, kirtan, kirtan_dst, mantra, proposal, settings)
     result.update(kirtan_id=kirtan.id, baserow=baserow)
+    queued = _queue_class_name(session, record, proposal)
+    if queued:
+        result["renamer_queued"] = queued
     result["summary"] = f"Wrote {kirtan_dst.name} and kept {class_dst.name} as the class."
     return result
+
+
+def _queue_class_name(
+    session: Session, record: m.MediaFile, proposal: dict[str, Any] | None
+) -> bool:
+    """After a split the class is no longer a combination recording: ask the Renamer to drop
+    a "with Radha Madhava" phrase from the WHAT (the splitter never renames itself)."""
+    cleaned = phrases.without_combination((proposal or {}).get("what"))
+    if not cleaned or not record.original_path:
+        return False
+    from mam.manager.queue import enqueue
+
+    evidence = {"what": cleaned, "source": TOOL}
+    enqueue(session, "renamer", [record.id], dry_run=False, params={"evidence": evidence})
+    return True
 
 
 def _free_name(folder: Path, name: str) -> Path:
