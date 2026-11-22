@@ -31,6 +31,7 @@ All recordings are from ISKCON temples, (the International Society for Krishna c
 - Use common phrases to determine timestamps @docs/references/recording-common-phrases.md
 - See @docs/references/verse-structure.md for the default verse structure
 - See @docs/references/editing-standard.md for insights into the recording and editing standards
+- Use @docs/references/sanskrit-glossary.json for sanskrit terms and matching words during transcription
 
 ## Evidence and confidence
 - The filename always takes precedence over other evidence
