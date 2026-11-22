@@ -12,7 +12,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ### Media manager
 - The Run and Preview buttons now have short tooltips ("Process file(s)" and "Preview mode. No files are changed") instead of the long explanation.
-- Live progress: a running job shows what it is doing. The file list has a spinner (a clock while queued) next to the status with a tooltip such as "Class discoverer: Transcribing: part 3 of 14 (21%)"; the Jobs page shows the step and a progress bar; the file page names the step. Reported by the Class discoverer and the Kirtan splitter. The progress bar uses the Material 3 primary color in light and dark.
+- Live progress: a running job shows what it is doing. The file list has a spinner (a clock while queued) next to the status with a tooltip such as "Class discoverer: Transcribing: part 3 of 14 (21%)"; the Jobs page shows the step and a progress bar; the file page names the step. Reported by the Class discoverer and the Kirtan splitter. The progress bar uses the Material 3 primary color in light and dark. A tooltip no longer stays behind when the file list refreshes while it is showing.
 - A banner asks for a restart when the program files changed after the portal started (a `git pull` while it ran made jobs fail with an import error).
 - Running the Renamer again on a file it has already confirmed no longer stops a pipeline run: the next tool is queued.
 
