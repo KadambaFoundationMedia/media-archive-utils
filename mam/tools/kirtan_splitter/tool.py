@@ -333,7 +333,9 @@ def _queue_class_name(
 ) -> bool:
     """After a split the class is no longer a combination recording: ask the Renamer to drop
     a "with Radha Madhava" phrase from the WHAT (the splitter never renames itself)."""
-    cleaned = phrases.without_combination((proposal or {}).get("what"))
+    from mam.tools.renamer.knowledge import get_reference
+
+    cleaned = phrases.without_combination((proposal or {}).get("what"), get_reference().matcher)
     if not cleaned or not record.original_path:
         return False
     from mam.manager.queue import enqueue

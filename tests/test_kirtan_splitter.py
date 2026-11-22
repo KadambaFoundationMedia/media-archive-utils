@@ -839,11 +839,19 @@ def test_a_spoken_ending_is_not_confirmed_as_a_class():
 
 
 def test_a_combination_phrase_is_dropped_from_the_class_what():
+    from mam.helpers.file_organizer.categories import CategoryMatcher
     from mam.tools.kirtan_splitter.phrases import without_combination as w
 
-    assert w("SB-1-19-31-with-radha-madhava") == "SB-1-19-31"
-    assert w("SB-3-6-6-and-Kirtan-Dont-waste-time") == "SB-3-6-6-Dont-waste-time"
-    assert w("CC-Madhya-20-154-with-Jaya-Jaya-Sri-Caitanya") == "CC-Madhya-20-154"
-    assert w("SB-1-19-31") is None
-    assert w("Talk-with-Radhika-Ranjana") is None
-    assert w(None) is None
+    matcher = CategoryMatcher(
+        [
+            {"category": "Kirtan", "filename_terms": "kirtan, bhajans, maha mantra"},
+            {"category": "Jaya-Radha-Madhava", "filename_terms": "JRM, radha madhava"},
+            {"category": "Class", "filename_terms": "Lecture, Class"},
+        ]
+    )
+    assert w("SB-1-19-31-with-radha-madhava", matcher) == "SB-1-19-31"
+    assert w("SB-3-6-6-and-Kirtan-Dont-waste-time", matcher) == "SB-3-6-6-Dont-waste-time"
+    assert w("SB-1-19-31", matcher) is None
+    assert w("Talk-with-Radhika-Ranjana", matcher) is None
+    assert w("SB-1-2-3-with-lecture", matcher) is None  # not a kirtan term
+    assert w(None, matcher) is None
