@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -194,6 +195,29 @@ def counts(session: Session) -> dict[str, int]:
     }
 
 
+_SHORT_STEPS = (
+    ("Measuring and adjusting", "Loudness"),
+    ("Transcribing: preparing", "Preparing audio"),
+    ("Transcribing the chanted verse", "Verse pass"),
+    ("Looking for the verse", "Verse check"),
+    ("Listening", "Listening"),
+    ("Cutting", "Cutting"),
+)
+
+
+def short_step(step: str | None) -> str:
+    """The step of a running job in a few words for the file list ("Transcribing 3/14")."""
+    if not step:
+        return "Working"
+    match = re.match(r"Transcribing: part (\d+) of (\d+)", step)
+    if match:
+        return f"Transcribing {match.group(1)}/{match.group(2)}"
+    for prefix, short in _SHORT_STEPS:
+        if step.startswith(prefix):
+            return short
+    return step if len(step) <= 20 else step[:19].rstrip() + "…"
+
+
 def active_jobs(session: Session) -> dict[int, dict[str, Any]]:
     """The job each file is waiting for or busy with now: {file id: details for the file list}."""
     from mam.manager.tools import TOOLS
@@ -212,6 +236,7 @@ def active_jobs(session: Session) -> dict[int, dict[str, Any]]:
         step = job.step if running else "Waiting in the queue"
         percent = round(job.progress * 100) if running and job.progress is not None else None
         text = f"{label}: {step or 'Working'}" + (f" ({percent}%)" if percent is not None else "")
+        short = short_step(step) if running else "Queued"
         out[job.media_file_id] = {
             "job": job.id,
             "tool": label,
@@ -219,6 +244,7 @@ def active_jobs(session: Session) -> dict[int, dict[str, Any]]:
             "step": step,
             "percent": percent,
             "text": text,
+            "short": short,
         }
     return out
 
