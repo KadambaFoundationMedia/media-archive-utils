@@ -12,7 +12,7 @@ from mam.helpers.audio_optimizer import measure
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db import session_scope
 from mam.helpers.local_db.repo import register_original
-from mam.helpers.transcriber import Segment, Transcript, load_transcript, transcribe, write_markdown
+from mam.helpers.transcriber import Segment, Transcript, load_transcript, transcribe, write_srt
 from mam.helpers.transcriber.backends import cpp_segments
 from mam.helpers.vedabase import VedabaseClient, VerseRef, parse_verse_page
 from mam.manager.tools import JobContext
@@ -215,11 +215,12 @@ def test_transcript_is_cached_by_content(monkeypatch, settings):
         assert load_transcript(s, "abc").languages == ["en"]
 
 
-def test_markdown_has_a_timestamp_on_each_segment(tmp_path):
+def test_transcript_is_written_as_srt(tmp_path):
     t = fake_transcript("Hare Krishna", "Chapter two")
-    out = write_markdown(t, tmp_path / "x.md", "x")
+    out = write_srt(t, tmp_path / "x.srt")
     lines = out.read_text(encoding="utf-8").splitlines()
-    assert "[00:00:00.000] Hare Krishna" in lines and "[00:00:10.000] Chapter two" in lines
+    assert lines[:3] == ["1", "00:00:00,000 --> 00:00:09,000", "Hare Krishna"]
+    assert "2" in lines and "00:00:10,000 --> 00:00:19,000" in lines
 
 
 # ------------------------------------------------------------------- the job
@@ -288,7 +289,7 @@ def test_job_names_the_file_and_queues_the_renamer(prepared, settings):
         assert record.meta["class_discoverer"]["class_start"] == 0.0
         assert record.sha256  # the gained copy's hash
     sub = copy.resolve().parent.relative_to(settings.media_processed_files_path.resolve())
-    assert (settings.transcriptions_path / sub / f"{copy.stem}.md").exists()
+    assert (settings.transcriptions_path / sub / f"{copy.stem}.srt").exists()
 
 
 def test_job_keeps_a_filename_that_agrees(prepared):
@@ -358,7 +359,7 @@ def test_dry_run_changes_nothing(prepared, settings):
     out = run(rid, dry_run=True)
     assert out.state == "info" and out.summary.startswith("Would:")
     assert copy.read_bytes() == before
-    assert not list(settings.transcriptions_path.glob("*.md")) or True
+    assert not list(settings.transcriptions_path.glob("*.srt")) or True
     with session_scope() as s:
         assert s.scalar(select(m.Job).where(m.Job.tool == "renamer")) is None
 
@@ -463,3 +464,34 @@ def test_discover_tries_the_first_reading_when_the_correction_is_not_confirmed(m
     data = discoverer.discover(t, None, client=None)
     assert tried == ["SB-1-19-31", "SB-1-9-31"]
     assert data["found"]["what"] == "SB-1-9-31" and data["found"]["confirmed"]
+
+
+def test_spoken_correction_within_twenty_seconds_wins():
+    from mam.tools.class_discoverer.announce import find_announcements
+
+    lines = [
+        (0, "Om Namah Bhagavate Vasudevaya"), (37, "It's 31."),
+        (39, "First Canto, Chapter 9, the appearance of Sukadeva Goswami, text 31."),
+        (45, "13."), (46, "Huh? No."), (49, "31."), (50, "Yeah."), (51, "Chapter 19."),
+        (53, "19."), (55, "Everyone's there? No. 1.19.31."), (65, "Yeah."),
+    ]  # fmt: skip
+    segs = [Segment(float(t), float(t) + 2, text, "en") for t, text in lines]
+    t = Transcript(segs, "en", "test", "1", "tiny", None, "cpu")
+    first = find_announcements(t)[0]
+    assert first.ref.what == "SB-1-19-31"
+    assert first.partial["alternatives"] == ["SB-1-9-31"]
+
+
+def test_filename_verse_heard_beats_an_announcement_that_is_not():
+    from mam.tools.class_discoverer.tool import decide
+
+    data = {
+        "found": {"what": "SB-1-9-31", "tag": "1.9.31", "confirmed": False,
+                  "match": {"share": 0.0}},
+        "file": "SB-1-19-31",
+        "file_match": {"match": {"share": 0.61, "confirmed": True}},
+    }  # fmt: skip
+    d = decide(data)
+    assert d["action"] == "keep" and d["sure"]
+    data["file_match"]["match"] = {"share": 0.0, "confirmed": False}
+    assert decide(data)["action"] == "review"

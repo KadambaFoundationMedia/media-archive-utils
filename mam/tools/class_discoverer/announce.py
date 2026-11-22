@@ -178,8 +178,12 @@ def find_announcements(
             match = pattern.search(text)
             if not match:
                 continue
-            # the numbers are spoken in the same or the next two segments
-            window = " ".join(s.text for s in segs[max(0, i - 1) : i + 3])
+            # the numbers are spoken in the same segment or in the next 20 seconds, which also
+            # holds a spoken correction ('Huh? No. ... Chapter 19')
+            end = i + 1
+            while end < len(segs) and end <= i + 8 and segs[end].start <= seg.start + 20:
+                end += 1
+            window = " ".join(s.text for s in segs[max(0, i - 1) : max(end, i + 3)])
             ref, heard, issue = read_window(book, window)
             quoted = ref is not None and (marker_seen or seg.start > ANNOUNCE_WINDOW_S)
             out.append(Announcement(book, ref, heard, seg.start, window[:300], issue, quoted))

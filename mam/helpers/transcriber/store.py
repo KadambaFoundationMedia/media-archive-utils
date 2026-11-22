@@ -120,32 +120,34 @@ def transcribe(
 
 
 # ------------------------------------------------------------------- Markdown
-def markdown_text(t: Transcript, title: str) -> str:
-    lines = [
-        f"# {title}",
-        "",
-        f"<!-- engine: {t.engine} {t.engine_version or ''} | model: {t.model} | "
-        f"backend: {t.backend} | language: {t.language or '?'} -->",
-        "",
-    ]
-    lines += [f"[{format_timestamp(s.start)}] {s.text}" for s in t.segments]
-    return "\n".join(lines) + "\n"
+def srt_time(seconds: float) -> str:
+    """SubRip time: 00:01:25,000."""
+    return format_timestamp(seconds).replace(".", ",")
 
 
-def write_markdown(t: Transcript, path: Path, title: str) -> Path:
-    """`transcriptions/<final-base-name>.md` (SPEC.md section 5)."""
+def srt_text(t: Transcript) -> str:
+    """The transcript as SubRip (.srt): numbered cues with start --> end and the text."""
+    cues = []
+    for number, seg in enumerate(t.segments, start=1):
+        end = max(seg.end, seg.start + 0.5)
+        cues.append(f"{number}\n{srt_time(seg.start)} --> {srt_time(end)}\n{seg.text.strip()}\n")
+    return "\n".join(cues)
+
+
+def write_srt(t: Transcript, path: Path) -> Path:
+    """`transcriptions/<category folder>/<final-base-name>.srt` (SPEC.md section 5)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(markdown_text(t, title), encoding="utf-8")
+    path.write_text(srt_text(t), encoding="utf-8")
     return path
 
 
 def transcript_file(settings: Settings, processed: Path) -> Path:
-    """`transcriptions/<category folder>/<name>.md` for an audio copy in processed-files."""
+    """`transcriptions/<category folder>/<name>.srt` for an audio copy in processed-files."""
     folder = Path()
     root = settings.media_processed_files_path.resolve()
     with contextlib.suppress(ValueError):  # outside processed-files (a dry run): the root
         folder = processed.resolve().parent.relative_to(root)
-    return settings.transcriptions_path / folder / f"{processed.stem}.md"
+    return settings.transcriptions_path / folder / f"{processed.stem}.srt"
 
 
 def follow_audio(settings: Settings, old: Path | None, new: Path) -> Path | None:
@@ -155,9 +157,13 @@ def follow_audio(settings: Settings, old: Path | None, new: Path) -> Path | None
     """
     if old is None or old == new:
         return None
-    src, dst = transcript_file(settings, old), transcript_file(settings, new)
-    if src == dst or not src.exists() or dst.exists():
-        return None
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    src.rename(dst)
-    return dst
+    moved = None
+    for suffix in (".srt", ".md"):  # .md is the format before 2026-11-22
+        src = transcript_file(settings, old).with_suffix(suffix)
+        dst = transcript_file(settings, new).with_suffix(suffix)
+        if src == dst or not src.exists() or dst.exists():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        src.rename(dst)
+        moved = moved or dst
+    return moved

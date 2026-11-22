@@ -16,6 +16,10 @@ breaks stored data or commands raises the major number. Each entry names the com
 - A country code that contradicts a place Baserow knows with one country (`Oslo_fi`) is corrected to the place's country (`Oslo-no`) without a review, and noted in the Baserow `notes`.
 
 ### Class-discoverer
+- Transcripts are written as `.srt` (SubRip) instead of Markdown. A transcript already written as `.md` still follows its audio.
+- When the announced verse differs from the filename's, and only the filename's verse is heard on vedabase.io, the filename is kept without a review. The review says how much of each translation was heard and marks an unconfirmed verse on its button.
+- A spoken correction up to 20 seconds after the announcement is read ("chapter 9 ... no, chapter 19").
+- The log has a line for each vedabase.io page fetched and one for each verse check.
 - Transcription: a stretch of 20 to 90 s without text in the first 15 minutes (Whisper skipped it as "no speech", so the read translation of the verse was missing) is decoded again with the no-speech check off.
 - The verse announcement is read when Whisper writes "3rd Kanto" or "Kanchu", and when the speaker corrects a number ("chapter 9, no, chapter 19"): the later number wins and the earlier reading is tried on vedabase.io if the later one is not confirmed.
 - Transcription is now chunked and watched: a stalled chunk is stopped and retried (temperature fallback, then whisper.cpp), repetition loops are collapsed, each chunk is logged, and a transcript full of repeated or invented lines sends "no verse heard" to review instead of Done. New settings `TRANSCRIBE_CHUNK_S` and `TRANSCRIBE_CHUNK_TIMEOUT_S`.

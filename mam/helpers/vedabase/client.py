@@ -70,6 +70,7 @@ class VedabaseClient:
             return None
         if response.status_code != 200:
             raise VedabaseError(f"vedabase.io answered {response.status_code} for {url}")
+        log.info("Fetched %s from vedabase.io", url)
         verse = parse_verse_page(response.text)
         if verse is None:
             raise VedabaseError(f"No verse found on {url}: the page layout may have changed")

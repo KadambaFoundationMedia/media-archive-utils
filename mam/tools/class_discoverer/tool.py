@@ -33,7 +33,7 @@ from mam.helpers.transcriber import (
     transcribe,
     transcript_file,
     transcript_quality,
-    write_markdown,
+    write_srt,
 )
 from mam.helpers.vedabase import VedabaseClient, VerseRef
 from mam.manager.tools import JobContext, ToolOutcome
@@ -204,6 +204,18 @@ def decide(data: dict[str, Any]) -> dict[str, Any]:
             "reasons": [f"The transcript confirms the filename's verse ({found['tag']})."],
         }
     if file_what:
+        file_match = (data.get("file_match") or {}).get("match") or {}
+        if file_match.get("confirmed") and not found["confirmed"]:
+            heard = (found["match"] or {}).get("share", 0)
+            return {
+                "action": "keep",
+                "sure": True,
+                "reasons": [
+                    f"The filename's verse {file_what} is heard in the recording "
+                    f"({file_match['share']:.0%} of its translation), the announced "
+                    f"{found['what']} is not ({heard:.0%}). The filename is kept."
+                ],
+            }
         return {
             "action": "review",
             "sure": False,
@@ -322,6 +334,18 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         "total_s": round(finished - started, 1),
     }
     decision = decide(data)
+    heard, named = data.get("found") or {}, data.get("file_match") or {}
+    log.info(
+        "Verse check for %s: heard %s (on vedabase.io %s, translation heard %s), filename %s "
+        "(translation heard %s) -> %s",
+        audio.name,
+        heard.get("what"),
+        heard.get("on_vedabase"),
+        (heard.get("match") or {}).get("share"),
+        data.get("file"),
+        (named.get("match") or {}).get("share"),
+        decision["action"],
+    )
     languages = [LANGUAGE_NAMES.get(code, code) for code in transcript.languages[:3]]
     data.update(
         decision=decision,
@@ -337,7 +361,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     if ctx.dry_run:
         return ToolOutcome("info", f"Would: {summary}", data)
 
-    path = write_markdown(transcript, transcript_path(settings, record, audio), audio.stem)
+    path = write_srt(transcript, transcript_path(settings, record, audio))
     data["transcript_file"] = str(path)
     meta = dict(record.meta or {})
     meta["class_discoverer"] = {**data, "run_at": datetime.now(UTC).isoformat()}
