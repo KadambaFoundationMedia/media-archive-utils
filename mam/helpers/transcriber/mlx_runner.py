@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from mam.errors import MamError
+from mam.helpers.progress import report
 from mam.helpers.transcriber.chunking import SAMPLE_RATE, pick_boundaries
 
 log = logging.getLogger(__name__)
@@ -247,6 +248,10 @@ def run_chunks(
                 end,
                 time.monotonic() - began,
                 time.monotonic() - started,
+            )
+            report(
+                f"Transcribing: part {idx + 1} of {len(edges) - 1}",
+                0.05 + 0.85 * (idx + 1) / (len(edges) - 1),
             )
         for n, (gap_start, gap_end) in enumerate(find_gaps(results)):
             try:

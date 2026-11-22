@@ -21,6 +21,7 @@ from mam.config import Settings, get_settings
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
+from mam.helpers.progress import reporting
 from mam.manager.tools import TOOLS, JobContext, ToolOutcome, next_in_pipeline
 
 log = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ class JobQueue:
             session.execute(
                 update(m.Job)
                 .where(m.Job.state == "running")
-                .values(state="queued", started_at=None)
+                .values(state="queued", started_at=None, step=None, progress=None)
             )
         sizes = {
             "ml": self.settings.workers_ml,
@@ -197,7 +198,13 @@ class JobQueue:
             session.execute(
                 update(m.Job)
                 .where(m.Job.id == job_id)
-                .values(state="running", started_at=now(), attempts=m.Job.attempts + 1)
+                .values(
+                    state="running",
+                    started_at=now(),
+                    attempts=m.Job.attempts + 1,
+                    step="Starting",
+                    progress=None,
+                )
             )
             return job_id
 
@@ -214,13 +221,15 @@ class JobQueue:
             with session_scope() as session:
                 record = session.get(m.MediaFile, job.media_file_id) if job.media_file_id else None
                 ctx = JobContext(job_id, session, self.settings, dry_run, params, record)
-                outcome = spec.run(ctx)
+                with reporting(self._reporter(job_id)):
+                    outcome = spec.run(ctx)
                 self._finish(session, job_id, record, outcome)
         except Exception as exc:
             log.exception("Job %s (%s) failed", job_id, tool)
             with session_scope() as session:
                 job = session.get(m.Job, job_id)
                 job.state, job.finished_at = "failed", now()
+                job.step = job.progress = None
                 job.error = f"{exc}\n\n{traceback.format_exc()[-3000:]}"
                 if job.media_file_id and spec.sets_status and not dry_run:
                     record = session.get(m.MediaFile, job.media_file_id)
@@ -238,6 +247,31 @@ class JobQueue:
                     enqueue(session, following, [job.media_file_id], dry_run=False, pipeline=True)
                 self.notify()
 
+    def _reporter(self, job_id: int):
+        """Writes what the running job is doing to the job row, a few times a second at most.
+
+        It uses its own short transaction and never fails the job: a busy database only means
+        one update is skipped.
+        """
+        last = [0.0]
+
+        def write(step: str, fraction: float | None) -> None:
+            moment = time.monotonic()
+            if moment - last[0] < 0.3:
+                return
+            last[0] = moment
+            try:
+                with session_scope() as session:
+                    session.execute(
+                        update(m.Job)
+                        .where(m.Job.id == job_id, m.Job.state == "running")
+                        .values(step=step[:200], progress=fraction)
+                    )
+            except Exception:
+                log.debug("Could not store progress of job %s", job_id, exc_info=True)
+
+        return write
+
     def _finish(
         self, session: Session, job_id: int, record: m.MediaFile | None, outcome: ToolOutcome
     ) -> None:
@@ -245,6 +279,7 @@ class JobQueue:
         spec = TOOLS[job.tool]
         job.state = "done"
         job.finished_at = now()
+        job.step = job.progress = None
         job.result = {"state": outcome.state, "summary": outcome.summary, **outcome.data}
         if record is None or job.dry_run:
             return

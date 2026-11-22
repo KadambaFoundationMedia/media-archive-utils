@@ -23,7 +23,14 @@
           <span class="badge text-bg-light border">dry run</span>
         {% else %}<span class="text-body-secondary">–</span>{% endif %}
       </td>
-      <td>{% with s=f.status %}{% include "_status.html" %}{% endwith %}</td>
+      <td>{% with s=f.status %}{% include "_status.html" %}{% endwith %}
+        {% set job = running.get(f.id) if running else none %}
+        {% if job %}
+        <span class="ms-1 job-live" data-bs-toggle="tooltip" data-bs-title="{{ job.text }}" aria-label="{{ job.text }}">
+          {% if job.running %}<i class="fa-solid fa-spinner fa-spin text-primary"></i>{% else %}<i class="fa-regular fa-clock text-body-secondary"></i>{% endif %}
+          {% if job.percent is not none %}<span class="small text-body-secondary">{{ job.percent }}%</span>{% endif %}
+        </span>
+        {% endif %}</td>
       <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>
       {% set what = f.title or (proposal.what if proposal else '') %}
       {% set category = f.category or (proposal.category if proposal else '') %}

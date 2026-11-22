@@ -194,6 +194,35 @@ def counts(session: Session) -> dict[str, int]:
     }
 
 
+def active_jobs(session: Session) -> dict[int, dict[str, Any]]:
+    """The job each file is waiting for or busy with now: {file id: details for the file list}."""
+    from mam.manager.tools import TOOLS
+
+    out: dict[int, dict[str, Any]] = {}
+    jobs = session.scalars(
+        select(m.Job)
+        .where(m.Job.state.in_(("queued", "running")), m.Job.media_file_id.is_not(None))
+        .order_by(m.Job.id)
+    )
+    for job in jobs:
+        label = TOOLS[job.tool].label if job.tool in TOOLS else job.tool
+        running = job.state == "running"
+        if job.media_file_id in out and out[job.media_file_id]["running"] and not running:
+            continue
+        step = job.step if running else "Waiting in the queue"
+        percent = round(job.progress * 100) if running and job.progress is not None else None
+        text = f"{label}: {step or 'Working'}" + (f" ({percent}%)" if percent is not None else "")
+        out[job.media_file_id] = {
+            "job": job.id,
+            "tool": label,
+            "running": running,
+            "step": step,
+            "percent": percent,
+            "text": text,
+        }
+    return out
+
+
 VIEW_LABELS = {"__all": "All files", "__review": "Review", "__failed": "Failed"}
 
 

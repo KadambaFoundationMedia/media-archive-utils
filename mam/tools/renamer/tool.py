@@ -383,7 +383,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
                     "info",
                     f"Kept {unchanged} (confirmed by {confirmed.get('by', 'a reviewer')}); "
                     "no new information",
-                    {"kept": unchanged},
+                    {"kept": unchanged, "continue_pipeline": True},
                 )
 
     # Release the session before helpers write through their own sessions (SQLite locking).

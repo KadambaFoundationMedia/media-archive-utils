@@ -16,6 +16,10 @@
       <td><span class="badge text-bg-{{ 'success' if j.state == 'done' else 'danger' if j.state == 'failed' else 'secondary' if j.state == 'cancelled' else 'info' }}">
         {% if j.state == 'running' %}<i class="fa-solid fa-spinner fa-spin me-1"></i>{% endif %}{{ j.state }}</span></td>
       <td class="text-break">
+        {% if j.state == 'running' %}
+          <div class="small">{{ j.step or 'Working' }}{% if j.progress is not none %} <span class="text-body-secondary">({{ (j.progress * 100) | round | int }}%)</span>{% endif %}</div>
+          {% if j.progress is not none %}<div class="progress mt-1" style="height:4px" role="progressbar" aria-valuenow="{{ (j.progress * 100) | round | int }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" style="width: {{ (j.progress * 100) | round | int }}%"></div></div>{% endif %}
+        {% endif %}
         {% if j.result %}{{ j.result.summary }}
           {% set d = j.result %}
           {% if d.duplicates_by_folder %}

@@ -47,6 +47,12 @@
   </div>
 </nav>
 <main class="container-fluid py-3">
+  {% if code_changed %}
+  <div class="alert alert-warning d-flex align-items-center gap-2" role="alert" id="restart-banner">
+    <i class="fa-solid fa-rotate"></i>
+    <span><strong>Restart the media manager.</strong> The program files changed after it started, so jobs may fail with an import error. Stop it and run <code>uv run mam serve</code> again.</span>
+  </div>
+  {% endif %}
   {% if request.query_params.get('msg') %}
   {% set live = request.query_params.get('live') and counts.jobs %}
   <div class="alert {{ 'alert-info' if live or not request.query_params.get('live') else 'alert-success' }} alert-dismissible fade show" role="alert"

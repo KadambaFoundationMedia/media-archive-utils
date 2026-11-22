@@ -987,3 +987,47 @@ def test_delete_never_touches_a_file_outside_processed_files(
     assert not trashed and original.exists()
     with session_scope() as s:
         assert s.get(m.MediaFile, file_id).status == "Not processed"
+
+
+def test_running_job_shows_live_progress_in_list_jobs_and_details(client, archive, monkeypatch):
+    client.post("/import", data={"root": 0, "path": ""})
+    run_queue()
+    seen = {}
+
+    def slow(ctx):
+        from mam.helpers.progress import report
+
+        report("Transcribing: part 3 of 14", 0.25)
+        with session_scope() as s:
+            job = s.get(m.Job, ctx.job_id)
+            seen["step"], seen["progress"] = job.step, job.progress
+        seen["files"] = client.get("/files/rows").text
+        seen["jobs"] = client.get("/jobs/rows").text
+        from mam.manager.tools import ToolOutcome
+
+        return ToolOutcome("done", "ok", {})
+
+    from mam.manager import tools
+
+    monkeypatch.setitem(
+        tools.TOOLS, "renamer", tools.ToolSpec("renamer", "Renamer", "io", slow, "test")
+    )
+    with session_scope() as s:
+        file_id = next(iter(ids(s).values()))
+    client.post("/actions", data={"tool": "renamer", "ids": [file_id]})
+    run_queue()
+    assert seen["step"] == "Transcribing: part 3 of 14" and seen["progress"] == 0.25
+    assert "Renamer: Transcribing: part 3 of 14 (25%)" in seen["files"]
+    assert "fa-spin" in seen["files"] and "25%" in seen["jobs"]
+    with session_scope() as s:
+        job = s.scalars(select(m.Job).where(m.Job.tool == "renamer")).one()
+        assert job.step is None and job.progress is None
+
+
+def test_banner_asks_for_a_restart_when_program_files_changed(client, monkeypatch):
+    from mam.manager import stale
+
+    assert "restart-banner" not in client.get("/").text
+    monkeypatch.setattr(stale, "STARTED_CODE", stale.STARTED_CODE - 100)
+    monkeypatch.setattr(stale, "_checked", [0.0, False])
+    assert "restart-banner" in client.get("/").text
