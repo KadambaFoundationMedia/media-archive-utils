@@ -59,6 +59,11 @@ def _finish(t: Transcript) -> Transcript:
     return t
 
 
+def save_transcript(session: Session, t: Transcript) -> None:
+    """Replace the stored transcript of the same content (segments and run notes)."""
+    _store(session, t)
+
+
 def _store(session: Session, t: Transcript) -> None:
     session.execute(
         delete(m.TranscriptSegment).where(m.TranscriptSegment.content_sha256 == t.content_sha256)

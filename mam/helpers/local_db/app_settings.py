@@ -113,3 +113,16 @@ def transcribe_speech_only(default: bool = False) -> bool:
 
 def set_transcribe_speech_only(enabled: bool) -> None:
     set_setting(TRANSCRIBE_SPEECH_ONLY, bool(enabled))
+
+
+TRANSCRIBE_VERSE_PASS = "transcribe_verse_pass"
+
+
+def transcribe_verse_pass(default: bool = False) -> bool:
+    """ "Improve the chanted verse": the Settings choice, else the `.env` default."""
+    value = get_setting(TRANSCRIBE_VERSE_PASS, None)
+    return value if isinstance(value, bool) else default
+
+
+def set_transcribe_verse_pass(enabled: bool) -> None:
+    set_setting(TRANSCRIBE_VERSE_PASS, bool(enabled))

@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Class discoverer
+- New Settings option "Improve the chanted verse" (off by default): after the verse is confirmed, the chanting is transcribed a second time with the verse's transliteration from vedabase.io as Whisper's prompt.
+
 ### Media manager
 - Live progress: a running job shows what it is doing. The file list has a spinner (a clock while queued) next to the status with a tooltip such as "Class discoverer: Transcribing: part 3 of 14 (21%)"; the Jobs page shows the step and a progress bar; the file page names the step. Reported by the Class discoverer and the Kirtan splitter.
 - A banner asks for a restart when the program files changed after the portal started (a `git pull` while it ran made jobs fail with an import error).

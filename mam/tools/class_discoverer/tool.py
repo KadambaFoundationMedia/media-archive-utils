@@ -292,6 +292,46 @@ def transcript_path(settings: Settings, record: m.MediaFile, audio: Path) -> Pat
     return transcript_file(settings, audio)
 
 
+def _verse_pass(
+    ctx: JobContext,
+    client: VedabaseClient,
+    settings: Settings,
+    audio: Path,
+    transcript: Transcript,
+    data: dict[str, Any],
+) -> dict[str, Any] | None:
+    """The chanted verse transcribed again with its transliteration as prompt (Settings option).
+
+    Only for a verse confirmed by other evidence, and only once per transcript."""
+    from mam.helpers.transcriber import save_transcript, verse_pass
+
+    notes = transcript.fallback or {}
+    if "verse_pass" in notes:
+        return {"skipped": "done before", **notes["verse_pass"]}
+    found, named = data.get("found") or {}, data.get("file_match") or {}
+    if found.get("confirmed"):
+        what, match = found["what"], found["match"]
+    elif (named.get("match") or {}).get("confirmed"):
+        what, match = data["file"], named["match"]
+    else:
+        return None
+    ref = VerseRef.from_what(what)
+    anchor = (match or {}).get("sanskrit_at")
+    if ref is None or anchor is None:
+        return None
+    verse = client.fetch(ref.verses()[0])
+    if verse is None or not verse.transliteration:
+        return None
+    report("Transcribing the chanted verse again", 0.97)
+    done = verse_pass.improve(audio, settings, transcript, verse.transliteration, anchor)
+    if done is not None:
+        transcript.fallback = {**notes, "verse_pass": done}
+        save_transcript(ctx.session, transcript)
+        ctx.session.commit()
+        log.info("Chanted verse %s transcribed again: %s", what, done)
+    return done
+
+
 def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     record, settings = ctx.media_file, ctx.settings
     if record is None:
@@ -315,10 +355,13 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     prefetch = _prefetch(client, file_ref)
     ctx.session.commit()  # the transcription takes minutes; do not hold the database
     report("Transcribing: preparing the audio", 0.05)
-    from mam.helpers.local_db.app_settings import transcribe_speech_only
+    from mam.helpers.local_db.app_settings import transcribe_speech_only, transcribe_verse_pass
 
     run_settings = settings.model_copy(
-        update={"transcribe_speech_only": transcribe_speech_only(settings.transcribe_speech_only)}
+        update={
+            "transcribe_speech_only": transcribe_speech_only(settings.transcribe_speech_only),
+            "transcribe_verse_pass": transcribe_verse_pass(settings.transcribe_verse_pass),
+        }
     )
     transcript, cached = transcribe(ctx.session, audio, sha, run_settings)
     report("Looking for the verse on vedabase.io", 0.92)
@@ -366,6 +409,8 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     if ctx.dry_run:
         return ToolOutcome("info", f"Would: {summary}", data)
 
+    if run_settings.transcribe_verse_pass:
+        data["verse_pass"] = _verse_pass(ctx, client, run_settings, audio, transcript, data)
     path = write_srt(transcript, transcript_path(settings, record, audio))
     data["transcript_file"] = str(path)
     meta = dict(record.meta or {})
