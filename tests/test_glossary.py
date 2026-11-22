@@ -44,3 +44,18 @@ def test_transcript_is_fixed_and_counted(settings, tmp_path):
     assert apply_glossary(t, cfg) == 2
     assert t.segments[0].text == "Śrīla Prabhupāda says Hare Kṛṣṇa"
     assert t.fallback["glossary_fixed"] == 2
+
+
+def test_a_longer_listed_spelling_is_not_split_and_slash_terms_use_one_part():
+    g = build(
+        [
+            {"source": "Śrīmad-Bhāgavatam", "category": "Scriptures",
+             "variants": ["Srimad Bhagavatam", "Bhagavatam", "Srimad-Bhagavatam"]},
+            {"source": "Rādhā / Rādhārāṇī", "category": "Names of God",
+             "variants": ["Radhaa", "Radha rani", "Radharani"]},
+        ]
+    )  # fmt: skip
+    assert g.correct("Srimad Bhagavatam class")[0] == "Srimad Bhagavatam class"
+    assert g.correct("a Bhagavatam class")[0] == "a Śrīmad-Bhāgavatam class"
+    assert g.correct("Radha rani and Radharani")[0] == "Rādhārāṇī and Radharani"
+    assert " / " not in g.prompt()

@@ -17,6 +17,7 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
 
@@ -37,7 +38,7 @@ def fold(text: str) -> str:
 class Glossary:
     entries: tuple[dict, ...]
     pattern: re.Pattern | None
-    spelling: dict[str, str]  # folded variant -> the glossary's spelling
+    spelling: dict[str, tuple[str, ...]]  # folded variant -> the glossary's spellings
 
     def correct(self, text: str) -> tuple[str, int]:
         """`text` with known variants replaced; and how many were replaced."""
@@ -47,8 +48,13 @@ class Glossary:
 
         def swap(match: re.Match) -> str:
             nonlocal count
-            wanted = self.spelling.get(fold(match.group(0)))
-            if wanted is None or wanted == match.group(0):
+            key = fold(match.group(0))
+            choices = self.spelling.get(key)
+            if not choices:
+                return match.group(0)
+            # 'Rādhā / Rādhārāṇī': the part that looks most like what was heard
+            wanted = max(choices, key=lambda c: SequenceMatcher(None, key, fold(c)).ratio())
+            if fold(wanted) == key:  # already the right spelling (it only guards longer matches)
                 return match.group(0)
             count += 1
             return wanted
@@ -61,22 +67,32 @@ class Glossary:
         for category in PROMPT_CATEGORIES:
             for entry in self.entries:
                 if entry.get("category") == category:
-                    plain = unicodedata.normalize("NFKD", entry["source"])
-                    plain = "".join(c for c in plain if not unicodedata.combining(c))
-                    words.append(plain)
+                    for part in split_source(entry["source"]):
+                        plain = unicodedata.normalize("NFKD", part)
+                        words.append("".join(c for c in plain if not unicodedata.combining(c)))
         text = ", ".join(dict.fromkeys(words))
         return text[:PROMPT_MAX_CHARS].rsplit(",", 1)[0] if len(text) > PROMPT_MAX_CHARS else text
 
 
+def split_source(source: str) -> tuple[str, ...]:
+    """'Rādhā / Rādhārāṇī' is two spellings."""
+    return tuple(p.strip() for p in source.split(" / ") if p.strip())
+
+
 def build(entries: list[dict]) -> Glossary:
-    spelling: dict[str, str] = {}
+    spelling: dict[str, tuple[str, ...]] = {}
     for entry in entries:
-        source = entry.get("source") or ""
+        source = split_source(entry.get("source") or "")
         for variant in entry.get("variants") or []:
             key = fold(variant)
-            if len(re.sub(r"\W", "", key)) < MIN_VARIANT_LETTERS or key == fold(source):
+            if len(re.sub(r"\W", "", key)) < MIN_VARIANT_LETTERS:
                 continue
+            # a variant that is a spelling of the term itself stays in, so that it protects
+            # longer matches ('Srimad Bhagavatam' must not become 'Srimad Śrīmad-Bhāgavatam')
             spelling.setdefault(key, source)
+        for part in source:
+            if len(re.sub(r"\W", "", fold(part))) >= MIN_VARIANT_LETTERS:
+                spelling.setdefault(fold(part), source)
     if not spelling:
         return Glossary(tuple(entries), None, {})
     # every spelling the transcript may have: with a space or a hyphen between words
