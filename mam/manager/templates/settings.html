@@ -68,6 +68,15 @@
           <label class="form-check-label" for="speech_only">Only transcribe speech{{ tip("On: a voice-activity check runs first. Parts of the recording with (almost) no speech are not given to Whisper, and any text Whisper writes over non-speech (kirtan, silence, room noise) is dropped. This removes most invented text and saves time. Off: Whisper gets the whole recording. A recording that already has a transcript is not transcribed again; use Reject result on its review to run it again.") }}</label>
           <span id="saved-speech-only" aria-live="polite"></span>
         </div>
+        <div class="form-check form-switch d-flex align-items-center gap-2 ps-0 mt-3">
+          <input class="form-check-input ms-0 mt-0" type="checkbox" role="switch" id="verse_pass" name="verse_pass"
+                 {% if verse_pass %}checked{% endif %}
+                 hx-post="/settings/class-discoverer/verse-pass" hx-trigger="change"
+                 hx-vals='js:{verse_pass: event.target.checked ? "on" : "off"}'
+                 hx-target="#saved-verse-pass" hx-swap="innerHTML">
+          <label class="form-check-label" for="verse_pass">Improve the chanted verse{{ tip("On: once the verse is confirmed on vedabase.io, the stretch where it is chanted is transcribed a second time with the verse's transliteration as Whisper's prompt, and replaces the first text in the transcript. Adds about a minute. Only done for a confirmed verse (a prompt for a wrong verse would pull the text towards it), and only on macOS (mlx-whisper).") }}</label>
+          <span id="saved-verse-pass" aria-live="polite"></span>
+        </div>
       </div>
     </div>
     <div class="card mb-3">

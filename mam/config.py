@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     transcribe_glossary_fix: bool = True  # known misspellings become the glossary's spelling
     transcribe_glossary_prompt: bool = False  # give Whisper the glossary terms as its prompt
     transcribe_speech_only: bool = False  # only speech goes to Whisper (Settings page option)
+    transcribe_verse_pass: bool = False  # chanted verse decoded again with the verse as prompt
     transcribe_words: bool = False  # word timestamps cost speed; segment timestamps suffice
 
     # Vedabase (robots.txt asks for a 10 s crawl delay; verse pages are cached for good)

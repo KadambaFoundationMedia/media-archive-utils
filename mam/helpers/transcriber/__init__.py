@@ -10,6 +10,7 @@ from mam.helpers.transcriber.models import Segment, Transcript, format_timestamp
 from mam.helpers.transcriber.store import (
     follow_audio,
     load_transcript,
+    save_transcript,
     srt_text,
     transcribe,
     transcript_file,
@@ -19,6 +20,7 @@ from mam.helpers.transcriber.store import (
 __all__ = [
     "transcript_quality",
     "follow_audio",
+    "save_transcript",
     "transcript_file",
     "Segment",
     "Transcript",
