@@ -55,7 +55,7 @@ def test_reset_clears_records_and_copies_but_not_originals(client, worked, setti
     originals = sorted(p.name for p in worked.rglob("*") if p.is_file())
     assert any(settings.media_processed_files_path.rglob("*.mp3"))
     (settings.media_processed_files_path / ".gitkeep").write_text("")
-    transcript = settings.transcriptions_path / "class" / "x.md"
+    transcript = settings.transcriptions_path / "class" / "x.srt"
     transcript.parent.mkdir(parents=True, exist_ok=True)
     transcript.write_text("[00:00:00.000] hello\n")
 

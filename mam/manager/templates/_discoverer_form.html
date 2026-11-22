@@ -29,7 +29,7 @@
     </div>
   </div>
   <div class="card-footer d-flex flex-wrap gap-2">
-    {% if p.found %}<button class="btn btn-success btn-sm" name="action" value="use_transcript" data-bs-toggle="tooltip" data-bs-title="Rename with the verse from the recording (the Renamer is queued with it as evidence).">Use {{ p.found.what }}</button>{% endif %}
+    {% if p.found %}<button class="btn {{ 'btn-success' if p.found.confirmed else 'btn-outline-warning' }} btn-sm" name="action" value="use_transcript" data-bs-toggle="tooltip" data-bs-title="Rename with the verse from the recording (the Renamer is queued with it as evidence).">Use {{ p.found.what }}{% if not p.found.confirmed %} (not confirmed){% endif %}</button>{% endif %}
     {% if p.file %}<button class="btn btn-outline-secondary btn-sm" name="action" value="keep_filename" data-bs-toggle="tooltip" data-bs-title="Keep the verse in the filename. Nothing is renamed.">Keep {{ p.file }}</button>{% endif %}
     <button class="btn btn-outline-primary btn-sm" name="action" value="custom" data-bs-toggle="tooltip" data-bs-title="Rename with the verse typed above.">Use the typed verse</button>
     <button class="btn btn-outline-danger btn-sm" name="action" value="reject" data-bs-toggle="tooltip" data-bs-title="Discard this result. The file can be run again." onclick="return confirm('Discard this result?')">Reject result</button>
