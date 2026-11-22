@@ -7,6 +7,8 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-22
+
 ### Kirtan splitter
 - After a split, the class loses a "with Radha Madhava" phrase in its name (`SB-1-19-31-with-radha-madhava` becomes `SB-1-19-31`), because it is no longer a combination recording. The Renamer is queued with the cleaned WHAT.
 
