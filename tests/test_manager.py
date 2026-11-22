@@ -1018,7 +1018,7 @@ def test_running_job_shows_live_progress_in_list_jobs_and_details(client, archiv
     run_queue()
     assert seen["step"] == "Transcribing: part 3 of 14" and seen["progress"] == 0.25
     assert "Transcribing 3/14 25%" in " ".join(seen["files"].split()).replace("> ", ">")
-    assert "data-bs-toggle=\"tooltip\" aria-label=\"Renamer" not in seen["files"]
+    assert 'data-bs-toggle="tooltip" aria-label="Renamer' not in seen["files"]
     assert "fa-spin" in seen["files"] and "25%" in seen["jobs"]
     with session_scope() as s:
         job = s.scalars(select(m.Job).where(m.Job.tool == "renamer")).one()
