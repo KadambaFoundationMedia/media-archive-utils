@@ -49,6 +49,19 @@ def set_default_status(value: str) -> None:
     set_setting(DEFAULT_STATUS, value)
 
 
+DEFAULT_SIZE = "default_size"
+
+
+def default_size_setting() -> int:
+    """How many files the file list's Show selector starts on; 50 until chosen."""
+    value = get_setting(DEFAULT_SIZE, 50)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 50
+
+
+def set_default_size(value: int) -> None:
+    set_setting(DEFAULT_SIZE, int(value))
+
+
 # ----------------------------------------------------------------------- Renamer options
 RENAMER_MOVE = "renamer_move_files"
 RENAMER_POSTFIX = "renamer_postfix"

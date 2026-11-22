@@ -16,6 +16,8 @@ breaks stored data or commands raises the major number. Each entry names the com
 - A verse only counts as the class verse when it is announced in the first 10 minutes and before the Translation or Purport is read, so a verse quoted in the purport can no longer win.
 
 ### Media manager
+- Settings page: the "File list" block is now called **Filters** and has a new option **Default Show** (50, 100, 200 or 500). The file list's Show selector starts on it and Reset all returns to it. It saves by itself.
+- Settings page, Reset block: new checkbox **Also delete all earlier database backups** (also `uv run mam reset --old-backups`). It removes the older `mam-export-*` folders in `~/.mam/backups`; the backup made by that reset is always kept. Off by default.
 - Settings, Reset: with "Delete the processed copies" the reset also removes the transcript files in `transcriptions/` (the page shows how many). Cached transcripts in the database stay unless "Also clear caches" is ticked, so a re-run does not transcribe again.
 - Jobs page: a Scan folder result now has collapsible lists. **Identical copies** are grouped by folder and show which registered file each one duplicates; **other files ignored** are grouped by file type with counts. The lists keep the first 2000 of each (the counts stay complete).
 - Settings page: options now save by themselves when you change them (a check mark shows, or the problem if a value is refused), so there are no Save buttons any more.
