@@ -131,9 +131,18 @@ def transcribe_mlx(audio: Path, settings: Settings, language: str | None) -> Tra
     from mam.helpers.transcriber.mlx_runner import MlxRunner, run_chunks
 
     repo = settings.whisper_mlx_model
+    from mam.helpers.transcriber import glossary
+
+    terms = glossary.load(settings.sanskrit_glossary_path)
+    prompt = terms.prompt() if terms and settings.transcribe_glossary_prompt else None
     results, events = run_chunks(
         lambda: MlxRunner(
-            audio, repo, language, settings.transcribe_words, float(settings.transcribe_chunk_s)
+            audio,
+            repo,
+            language,
+            settings.transcribe_words,
+            float(settings.transcribe_chunk_s),
+            prompt,
         ),
         float(settings.transcribe_chunk_timeout_s),
         _cpp_fallback_for(audio, settings, language),
@@ -268,5 +277,25 @@ def transcribe_whispercpp(audio: Path, settings: Settings, language: str | None)
 
 def run_backend(audio: Path, settings: Settings, language: str | None) -> Transcript:
     if pick_backend(settings) == "mlx":
-        return transcribe_mlx(audio, settings, language)
-    return transcribe_whispercpp(audio, settings, language)
+        transcript = transcribe_mlx(audio, settings, language)
+    else:
+        transcript = transcribe_whispercpp(audio, settings, language)
+    if settings.transcribe_glossary_fix:
+        apply_glossary(transcript, settings)
+    return transcript
+
+
+def apply_glossary(transcript: Transcript, settings: Settings) -> int:
+    """Write the glossary's spelling for the variants Whisper is known to produce."""
+    from mam.helpers.transcriber import glossary
+
+    terms = glossary.load(settings.sanskrit_glossary_path)
+    if terms is None:
+        return 0
+    total = 0
+    for seg in transcript.segments:
+        seg.text, count = terms.correct(seg.text)
+        total += count
+    if total:
+        transcript.fallback = {**(transcript.fallback or {}), "glossary_fixed": total}
+    return total

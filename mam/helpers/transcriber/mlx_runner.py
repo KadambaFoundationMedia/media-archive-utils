@@ -62,7 +62,15 @@ def _slim(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _worker(conn, audio_path: str, repo: str, language: str | None, words: bool, chunk_s: float):
+def _worker(
+    conn,
+    audio_path: str,
+    repo: str,
+    language: str | None,
+    words: bool,
+    chunk_s: float,
+    prompt: str | None = None,
+):
     """Child process: load the audio and the model once, then answer chunk requests."""
     try:
         import mlx_whisper
@@ -77,6 +85,8 @@ def _worker(conn, audio_path: str, repo: str, language: str | None, words: bool,
             idx, start, end, options = job
             options = dict(options)
             lang = options.pop("language", language)
+            if prompt:
+                options["initial_prompt"] = prompt
             part = audio[int(start * SAMPLE_RATE) : int(end * SAMPLE_RATE)]
             result = mlx_whisper.transcribe(
                 part,
@@ -96,8 +106,16 @@ def _worker(conn, audio_path: str, repo: str, language: str | None, words: bool,
 class MlxRunner:
     """The parent side: starts the child, asks for chunks, enforces the time limit."""
 
-    def __init__(self, audio: Path, repo: str, language: str | None, words: bool, chunk_s: float):
-        self.args = (str(audio), repo, language, words, chunk_s)
+    def __init__(
+        self,
+        audio: Path,
+        repo: str,
+        language: str | None,
+        words: bool,
+        chunk_s: float,
+        prompt: str | None = None,
+    ):
+        self.args = (str(audio), repo, language, words, chunk_s, prompt)
         self.proc: mp.Process | None = None
         self.conn = None
         self.boundaries: list[float] = []
