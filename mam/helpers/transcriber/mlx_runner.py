@@ -50,6 +50,40 @@ REPAIR_UNTIL_S = 900.0  # the verse is read at the start of the class
 REPAIR_MAX_GAPS = 8
 
 
+# Speech only (Settings): a chunk with (almost) no speech is not transcribed at all, and text that
+# Whisper wrote over stretches without speech (kirtan, silence, room noise) is dropped.
+MIN_SPEECH_SHARE = 0.02  # share of the seconds of a chunk that must hold speech
+SPEECH_P = 0.10  # a second counts as speech above this voice probability (kirtan 0.00-0.01)
+NON_SPEECH_P = 0.05  # text over seconds averaging below this is dropped
+
+
+def speech_profile(part) -> list[float]:
+    """Voice probability per second of a 16 kHz mono chunk (the Kirtan splitter's Silero model)."""
+    import numpy as np
+
+    from mam.tools.kirtan_splitter.features import profile_from_samples
+
+    return [p or 0.0 for p in profile_from_samples(np.asarray(part, dtype="float32"))]
+
+
+def speech_share(profile: list[float]) -> float:
+    return sum(1 for p in profile if p >= SPEECH_P) / len(profile) if profile else 0.0
+
+
+def drop_non_speech(segments: list[dict], profile: list[float]) -> tuple[list[dict], int]:
+    """Remove segments whose seconds hold no speech; returns (kept, how many were dropped)."""
+    kept, dropped = [], 0
+    for seg in segments:
+        first = int(seg["start"] or 0)
+        last = max(first + 1, int((seg["end"] or 0) + 0.999))
+        window = profile[first:last]
+        if window and sum(window) / len(window) < NON_SPEECH_P:
+            dropped += 1
+        else:
+            kept.append(seg)
+    return kept, dropped
+
+
 class ChunkStalled(MamError):
     """A chunk did not finish within its time limit."""
 
@@ -70,6 +104,7 @@ def _worker(
     words: bool,
     chunk_s: float,
     prompt: str | None = None,
+    speech_only: bool = False,
 ):
     """Child process: load the audio and the model once, then answer chunk requests."""
     try:
@@ -88,6 +123,12 @@ def _worker(
             if prompt:
                 options["initial_prompt"] = prompt
             part = audio[int(start * SAMPLE_RATE) : int(end * SAMPLE_RATE)]
+            profile = speech_profile(part) if speech_only and idx < 1000 else None
+            if profile is not None and speech_share(profile) < MIN_SPEECH_SHARE:
+                conn.send(
+                    ("done", idx, {"language": None, "segments": [], "vad": {"skipped": True}})
+                )
+                continue
             result = mlx_whisper.transcribe(
                 part,
                 path_or_hf_repo=repo,
@@ -97,7 +138,11 @@ def _worker(
                 verbose=None,
                 **options,
             )
-            conn.send(("done", idx, _slim(result)))
+            slim = _slim(result)
+            if profile is not None:
+                slim["segments"], dropped = drop_non_speech(slim["segments"], profile)
+                slim["vad"] = {"skipped": False, "dropped": dropped}
+            conn.send(("done", idx, slim))
     except BaseException as exc:  # reported to the parent, which decides what to do
         with contextlib.suppress(Exception):  # the pipe is gone: the parent notices the exit
             conn.send(("error", repr(exc)))
@@ -114,8 +159,9 @@ class MlxRunner:
         words: bool,
         chunk_s: float,
         prompt: str | None = None,
+        speech_only: bool = False,
     ):
-        self.args = (str(audio), repo, language, words, chunk_s, prompt)
+        self.args = (str(audio), repo, language, words, chunk_s, prompt, speech_only)
         self.proc: mp.Process | None = None
         self.conn = None
         self.boundaries: list[float] = []
@@ -233,8 +279,14 @@ def run_chunks(
                         {"chunk": idx, "start": start, "attempt": attempt, "problem": str(exc)}
                     )
                     log.warning("Chunk %d (%.0f s) attempt %d: %s", idx, start, attempt, exc)
+            vad = (result or {}).get("vad") or {}
+            if vad.get("skipped"):
+                events.append({"chunk": idx, "start": start, "skipped": "no speech"})
+            elif vad.get("dropped"):
+                events.append({"chunk": idx, "start": start, "non_speech_dropped": vad["dropped"]})
             if (
                 result is not None
+                and not vad.get("skipped")
                 and allowed_languages
                 and result.get("language") not in allowed_languages
             ):

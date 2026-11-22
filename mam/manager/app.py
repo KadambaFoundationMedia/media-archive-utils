@@ -29,6 +29,8 @@ from mam.helpers.local_db.app_settings import (
     set_default_size,
     set_default_status,
     set_renamer_options,
+    set_transcribe_speech_only,
+    transcribe_speech_only,
 )
 from mam.helpers.local_db.repo import media_kind
 from mam.manager import queries, stale
@@ -758,6 +760,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
             page_sizes=queries.PAGE_SIZES,
             renamer_move_files=renamer_move_files(),
             renamer_postfix=renamer_postfix(),
+            speech_only=transcribe_speech_only(settings.transcribe_speech_only),
         )
 
     def saved(request: Request, what: str, error: str | None = None):
@@ -771,6 +774,12 @@ def create_app(start_queue: bool = True) -> FastAPI:
         form = await request.form()
         set_renamer_options(form.get("move_files") == "on", renamer_postfix())
         return saved(request, "Move files instead of copying")
+
+    @app.post("/settings/class-discoverer/speech-only")
+    async def settings_speech_only(request: Request):
+        form = await request.form()
+        set_transcribe_speech_only(form.get("speech_only") == "on")
+        return saved(request, "Only transcribe speech")
 
     @app.post("/settings/renamer/postfix")
     async def settings_renamer_postfix(request: Request):

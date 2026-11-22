@@ -7,7 +7,7 @@
         <div class="fw-semibold">Heard in the recording</div>
         {% if p.found %}
         <div><code>{{ p.found.what }}</code> ({{ p.found.tag }}), announced at {{ p.found.time | hms }}{% if p.found.heard > 1 %}, heard {{ p.found.heard }} times{% endif %}</div>
-        <div>On vedabase.io: {{ 'yes' if p.found.on_vedabase else 'no' }}{% if p.found.match %} · translation heard: {{ '%.0f' % (p.found.match.share * 100) }}%{% endif %}</div>
+        <div>On vedabase.io: {{ 'yes' if p.found.on_vedabase else 'no' }}{% if p.found.match %} · translation heard: {{ '%.0f' % (p.found.match.share * 100) }}% · Sanskrit heard: {{ '%.0f' % ((p.found.match.sanskrit or 0) * 100) }}%{% endif %}</div>
         <blockquote class="border-start ps-2 my-2 text-body-secondary">{{ p.found.excerpt }}</blockquote>
         {% else %}<div class="text-body-secondary">No verse was announced.</div>{% endif %}
       </div>
@@ -15,7 +15,7 @@
         <div class="fw-semibold">In the filename</div>
         {% if p.file %}
         <div><code>{{ p.file }}</code></div>
-        {% if p.file_match and p.file_match.match %}<div>Translation heard in the recording: {{ '%.0f' % (p.file_match.match.share * 100) }}%</div>{% endif %}
+        {% if p.file_match and p.file_match.match %}<div>Translation heard in the recording: {{ '%.0f' % (p.file_match.match.share * 100) }}% · Sanskrit heard: {{ '%.0f' % ((p.file_match.match.sanskrit or 0) * 100) }}%</div>{% endif %}
         {% else %}<div class="text-body-secondary">No verse.</div>{% endif %}
       </div>
       <div class="col-12 col-md-6">

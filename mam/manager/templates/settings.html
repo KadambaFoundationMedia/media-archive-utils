@@ -57,6 +57,20 @@
       </div>
     </div>
     <div class="card mb-3">
+      <div class="card-header">Class discoverer</div>
+      <div class="card-body">
+        <div class="form-check form-switch d-flex align-items-center gap-2 ps-0">
+          <input class="form-check-input ms-0 mt-0" type="checkbox" role="switch" id="speech_only" name="speech_only"
+                 {% if speech_only %}checked{% endif %}
+                 hx-post="/settings/class-discoverer/speech-only" hx-trigger="change"
+                 hx-vals='js:{speech_only: event.target.checked ? "on" : "off"}'
+                 hx-target="#saved-speech-only" hx-swap="innerHTML">
+          <label class="form-check-label" for="speech_only">Only transcribe speech{{ tip("On: a voice-activity check runs first. Parts of the recording with (almost) no speech are not given to Whisper, and any text Whisper writes over non-speech (kirtan, silence, room noise) is dropped. This removes most invented text and saves time. Off: Whisper gets the whole recording. A recording that already has a transcript is not transcribed again; use Reject result on its review to run it again.") }}</label>
+          <span id="saved-speech-only" aria-live="polite"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card mb-3">
       <div class="card-header">Current settings <span class="small text-body-secondary">(folders and pools come from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
       <div class="card-body">
         <dl class="row small mb-0">

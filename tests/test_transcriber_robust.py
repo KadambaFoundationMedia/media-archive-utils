@@ -174,3 +174,17 @@ def test_a_segment_that_is_the_start_of_the_overlapping_one_is_merged():
             Segment(413.0, 414.0, "The scriptural injunction is that...")]  # fmt: skip
     assert len(_without_repeats(segs)) == 1
     assert _without_repeats(segs)[0].text.endswith("approach")
+
+
+def test_speech_only_drops_text_over_non_speech_and_skips_empty_chunks():
+    from mam.helpers.transcriber.mlx_runner import drop_non_speech, speech_share
+
+    profile = [0.0] * 10 + [0.6] * 10  # kirtan, then a speaking voice
+    segs = [
+        {"start": 1.0, "end": 4.0, "text": "Thank you."},
+        {"start": 12.0, "end": 16.0, "text": "Om namo bhagavate"},
+        {"start": 8.0, "end": 12.5, "text": "straddles"},
+    ]
+    kept, dropped = drop_non_speech(segs, profile)
+    assert dropped == 1 and [s["text"] for s in kept] == ["Om namo bhagavate", "straddles"]
+    assert speech_share(profile) == 0.5 and speech_share([0.0] * 300) == 0.0

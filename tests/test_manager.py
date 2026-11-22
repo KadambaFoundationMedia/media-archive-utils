@@ -1031,3 +1031,16 @@ def test_banner_asks_for_a_restart_when_program_files_changed(client, monkeypatc
     monkeypatch.setattr(stale, "STARTED_CODE", stale.STARTED_CODE - 100)
     monkeypatch.setattr(stale, "_checked", [0.0, False])
     assert "restart-banner" in client.get("/").text
+
+
+def test_speech_only_option_autosaves_on_the_settings_page(client):
+    from mam.helpers.local_db.app_settings import transcribe_speech_only
+
+    assert "Only transcribe speech" in client.get("/settings").text
+    assert transcribe_speech_only(False) is False
+    assert client.post(
+        "/settings/class-discoverer/speech-only", data={"speech_only": "on"}
+    ).is_success
+    assert transcribe_speech_only(False) is True
+    client.post("/settings/class-discoverer/speech-only", data={"speech_only": "off"})
+    assert transcribe_speech_only(True) is False
