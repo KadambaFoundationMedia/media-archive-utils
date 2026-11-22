@@ -560,10 +560,12 @@ class Resolver:
                     flags.append(f"Unknown country code '{raw}'.")
                     return None
             if place_cc and place_cc != chosen:
-                flags.append(
-                    f"Country code '{chosen}' does not match {place.name} "
-                    f"({place.country}, '{place_cc}'). Check the place or the country."
+                # Baserow knows this place with exactly one country: correct the code itself.
+                notes.append(
+                    f"Corrected country code '{raw}' to '{place_cc}' ({place.country}): "
+                    f"{place.name} is in {place.country} (Baserow place_country)."
                 )
+                return place_cc
             return chosen
         if place_cc:
             return place_cc

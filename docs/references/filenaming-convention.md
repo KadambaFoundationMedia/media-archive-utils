@@ -52,7 +52,7 @@ WHERE has one of three forms:
 - `cc`: the country only, when the place is unknown, e.g. `fi`
 - omitted, when nothing is known
 
-The ccTLD must be a valid country code (`no` for Norway, `se` for Sweden, `in` for India).
+The ccTLD must be a valid country code (`no` for Norway, `se` for Sweden, `in` for India). When the filename's code contradicts a place that Baserow knows with exactly one country (`oslo_fi`), the code is corrected to the place's country (`Oslo-no`) without a review and recorded in the Baserow `notes`.
 
 The country of a known place comes from the Baserow `place_country` table (e.g. `Brno` → `Czech-Republic` → `cz`); general places such as `Zoom-livestream` or `Home-program` have no country there, so the file's own evidence decides. The travel schedule only says where KKS possibly was on a date; it is not where a new place is added. The "New place" flag tells you to add the place as a `place_location` option in Baserow.
 

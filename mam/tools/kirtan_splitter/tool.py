@@ -22,6 +22,7 @@ from mam.helpers.file_organizer.organizer import assert_writable
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import fingerprint, sha256
 from mam.helpers.local_db.repo import record_event, register_derived, set_status
+from mam.helpers.progress import report
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter.audio import extract_audio
@@ -125,6 +126,7 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
         stem = (settings.work_dir / "split" if ctx.dry_run else src.parent) / src.stem
         work_audio = extract_audio(src, stem, dry_run=False)
     ctx.session.commit()  # the analysis takes a while; do not hold the database
+    report("Listening to the recording: music or speech", 0.1)
     try:
         decision, duration = analyse(record, work_audio, settings)
     finally:
@@ -157,6 +159,7 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
         return ToolOutcome("skipped", summary, {**data, "continue_pipeline": True})
     if decision.mode == "kirtan_only":
         return ToolOutcome("skipped", summary, data)
+    report("Cutting the recording", 0.9)
     result = apply_split(ctx.session, record, work_audio, data, settings, dry_run=False)
     return ToolOutcome("done", f"{summary} {result['summary']}", {**data, **result})
 

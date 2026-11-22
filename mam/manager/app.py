@@ -31,7 +31,7 @@ from mam.helpers.local_db.app_settings import (
     set_renamer_options,
 )
 from mam.helpers.local_db.repo import media_kind
-from mam.manager import queries
+from mam.manager import queries, stale
 from mam.manager.queue import JobQueue, enqueue
 from mam.manager.tools import TOOLS, menu_tools, pipeline_start
 
@@ -249,8 +249,11 @@ def create_app(start_queue: bool = True) -> FastAPI:
         from mam.helpers.local_db.app_settings import baserow_writes_enabled
 
         context["baserow_on"] = baserow_writes_enabled()
+        context["code_changed"] = stale.code_changed()
         with session_scope() as session:
             context.setdefault("counts", queries.counts(session))
+            if "rows" in context:
+                context["running"] = queries.active_jobs(session)
         if "rows" in context and "active" not in context:
             # Keep refreshing the list while any job (also a dry run) is queued or running.
             context["active"] = context["counts"]["jobs"] > 0

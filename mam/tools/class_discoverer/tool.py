@@ -27,6 +27,7 @@ from mam.errors import CorruptedMedia, MamError, VedabaseError
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import sha256
 from mam.helpers.local_db.repo import set_status
+from mam.helpers.progress import report
 from mam.helpers.transcriber import (
     Transcript,
     transcribe,
@@ -290,6 +291,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     audio = source_audio(record, dry_run=ctx.dry_run)
     file_ref = filename_verse(record)
     client = VedabaseClient(settings)
+    report("Measuring and adjusting the loudness", 0.02)
     try:
         gain = apply_gain(ctx.session, record, audio, settings, dry_run=ctx.dry_run)
     except CorruptedMedia as exc:
@@ -300,7 +302,9 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         record.sha256 = sha
     prefetch = _prefetch(client, file_ref)
     ctx.session.commit()  # the transcription takes minutes; do not hold the database
+    report("Transcribing: preparing the audio", 0.05)
     transcript, cached = transcribe(ctx.session, audio, sha, settings)
+    report("Looking for the verse on vedabase.io", 0.92)
     ctx.session.commit()  # vedabase.io caches pages through its own session: no lock may be held
     transcribed = time.monotonic()
     if prefetch is not None:

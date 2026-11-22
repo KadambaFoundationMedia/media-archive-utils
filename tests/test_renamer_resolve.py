@@ -118,9 +118,10 @@ def test_new_place_suggests_closest_known_place(reference, settings, tree):
     assert any("did you mean Fruska-Gora" in f for f in p.flags)
 
 
-def test_country_conflict_is_flagged(propose):
+def test_country_conflict_with_known_place_is_corrected(propose):
     p = propose("2011-08-20_KKS_Jaya-radha-madhava_oslo_fi.mp3")
-    assert any("does not match Oslo" in f for f in p.flags)
+    assert p.cc == "no" and not p.flags
+    assert any("Corrected country code 'fi' to 'no'" in n for n in p.notes)
 
 
 def test_invalid_country_is_corrected_from_place(propose):

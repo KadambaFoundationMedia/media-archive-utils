@@ -2,7 +2,8 @@
      hx-get="/files/{{ f_id }}/activity" hx-trigger="every 2s" hx-swap="outerHTML">
   <i class="fa-solid fa-spinner fa-spin"></i>
   {% for j in running %}
-    <span>{{ tools[j.tool].label if j.tool in tools else j.tool }}{% if j.dry_run %} (preview){% endif %} is {{ 'running' if j.state == 'running' else 'waiting in the queue' }}…</span>
+    <span>{{ tools[j.tool].label if j.tool in tools else j.tool }}{% if j.dry_run %} (preview){% endif %} is {{ 'running' if j.state == 'running' else 'waiting in the queue' }}…
+      {% if j.state == 'running' and j.step %}<strong>{{ j.step }}</strong>{% if j.progress is not none %} ({{ (j.progress * 100) | round | int }}%){% endif %}{% endif %}</span>
   {% endfor %}
   <span class="small text-body-secondary ms-auto">This page updates by itself.</span>
 </div>

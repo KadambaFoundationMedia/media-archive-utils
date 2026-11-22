@@ -7,6 +7,14 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Media manager
+- Live progress: a running job shows what it is doing. The file list has a spinner (a clock while queued) next to the status with a tooltip such as "Class discoverer: Transcribing: part 3 of 14 (21%)"; the Jobs page shows the step and a progress bar; the file page names the step. Reported by the Class discoverer and the Kirtan splitter.
+- A banner asks for a restart when the program files changed after the portal started (a `git pull` while it ran made jobs fail with an import error).
+- Running the Renamer again on a file it has already confirmed no longer stops a pipeline run: the next tool is queued.
+
+### Renamer
+- A country code that contradicts a place Baserow knows with one country (`Oslo_fi`) is corrected to the place's country (`Oslo-no`) without a review, and noted in the Baserow `notes`.
+
 ### Class-discoverer
 - Transcription: a stretch of 20 to 90 s without text in the first 15 minutes (Whisper skipped it as "no speech", so the read translation of the verse was missing) is decoded again with the no-speech check off.
 - The verse announcement is read when Whisper writes "3rd Kanto" or "Kanchu", and when the speaker corrects a number ("chapter 9, no, chapter 19"): the later number wins and the earlier reading is tried on vedabase.io if the later one is not confirmed.

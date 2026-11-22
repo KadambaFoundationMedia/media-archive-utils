@@ -127,6 +127,8 @@ class Job(Base):
     result: Mapped[dict[str, Any] | None]
     error: Mapped[str | None] = mapped_column(Text)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    step: Mapped[str | None] = mapped_column(String(200))  # what a running job is doing now
+    progress: Mapped[float | None] = mapped_column(Float)  # 0 to 1, None when unknown
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
