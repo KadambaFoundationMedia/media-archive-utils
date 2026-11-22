@@ -166,6 +166,10 @@
 [data-bs-theme] .btn-group > .btn:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; }
 [data-bs-theme] .btn-group > .btn:first-child { border-top-left-radius: 100rem; border-bottom-left-radius: 100rem; }
 [data-bs-theme] .btn-group > .btn:last-child { border-top-right-radius: 100rem; border-bottom-right-radius: 100rem; }
+[data-bs-theme] .progress {
+  --bs-progress-bg: var(--md-surface-container-high);
+  --bs-progress-bar-bg: var(--md-primary);
+}
 [data-bs-theme] .btn-primary {
   --bs-btn-color: var(--md-on-primary); --bs-btn-bg: var(--md-primary); --bs-btn-border-color: var(--md-primary);
   --bs-btn-hover-color: var(--md-on-primary); --bs-btn-hover-bg: var(--md-hover-hex); --bs-btn-hover-border-color: var(--md-hover-hex);
