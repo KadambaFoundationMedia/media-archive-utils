@@ -8,8 +8,11 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Kirtan splitter
-- Clear statuses: a file the splitter handled shows `Kirtan splitter: Class` (no kirtan before the class), `Kirtan splitter: Kirtan` (singing throughout) or `Kirtan splitter: Split`, all green, instead of `Skipped` or `Kirtan splitter Done`. When a reviewer chooses *Do not split* on a recording that the splitter wanted to split, the status is `Kirtan splitter: Not split`. Existing files are converted by a database migration.
+- Clear statuses: a file the splitter handled shows `Splitter: Class` (no kirtan before the class), `Splitter: Kirtan` (singing throughout) or `Splitter: Done`, all green, instead of `Skipped` or `Kirtan splitter Done`. When a reviewer chooses *Do not split* on a recording that the splitter wanted to split, the status is `Splitter: Not split`. Existing files are converted by a database migration.
 - A kirtan recording (singing throughout) is now filed in the Kirtan folder. A name such as `Radhastami-Bhajanas` gave the category Radhastami, but only classes go in the Radhastami and Nrsimha-caturdasi folders. The splitter marks the recording and queues the Renamer, which moves the copy and sets the category Kirtan (the file keeps its splitter status). A WHAT that is itself a kirtan category (`Nrsimha-pranama`, `Jaya-radha-madhava`) keeps its own folder.
+
+### Renamer
+- Bhajans are always Kirtan: `Radhastami-Bhajanas` is filed under Kirtan, not Radhastami (unless it is a combination: a verse first, or `with`/`and`/`plus` before the word).
 
 ### Media manager
 - The statuses `Queued <Tool>` and `Processing <Tool>` are merged into `Queued` and `Processing`; the tool is shown in the file list's job column.

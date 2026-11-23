@@ -2,7 +2,7 @@
 
 `Queued <Tool>` and `Processing <Tool>` become `Queued` and `Processing`. A recording the
 Kirtan splitter handled has `Skipped` or `Kirtan splitter Done`; they become
-`Kirtan splitter: Class`, `: Kirtan` or `: Split` from the splitter's stored proposal, and a
+`Splitter: Class`, `: Kirtan` or `: Split` from the splitter's stored proposal, and a
 kirtan recording is marked so the Renamer files it under Kirtan.
 
 Revision ID: 0006
@@ -41,7 +41,7 @@ def upgrade() -> None:
     )
     conn.execute(
         sa.text(
-            "UPDATE media_file SET status='Kirtan splitter: Split' "
+            "UPDATE media_file SET status='Splitter: Done' "
             "WHERE status='Kirtan splitter Done'"
         )
     )
@@ -53,7 +53,7 @@ def upgrade() -> None:
         mode = ((meta.get("splitter") or {}).get("proposal") or {}).get("mode")
         if mode not in ("class_only", "kirtan_only"):
             continue
-        status = "Kirtan splitter: Class" if mode == "class_only" else "Kirtan splitter: Kirtan"
+        status = "Splitter: Class" if mode == "class_only" else "Splitter: Kirtan"
         if mode == "kirtan_only":
             meta["recording_kind"] = "kirtan"
         conn.execute(
@@ -66,9 +66,9 @@ def downgrade() -> None:
     conn = op.get_bind()
     conn.execute(
         sa.text("UPDATE media_file SET status='Kirtan splitter Done' "
-                "WHERE status='Kirtan splitter: Split'")
+                "WHERE status='Splitter: Done'")
     )
     conn.execute(
         sa.text("UPDATE media_file SET status='Skipped' "
-                "WHERE status IN ('Kirtan splitter: Class', 'Kirtan splitter: Kirtan')")
+                "WHERE status IN ('Splitter: Class', 'Splitter: Kirtan')")
     )

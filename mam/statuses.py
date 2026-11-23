@@ -9,10 +9,10 @@ from __future__ import annotations
 
 QUEUED = "Queued"
 PROCESSING = "Processing"
-SPLITTER_CLASS = "Kirtan splitter: Class"  # no kirtan before the class: nothing to split
-SPLITTER_KIRTAN = "Kirtan splitter: Kirtan"  # singing throughout: a kirtan recording
-SPLITTER_SPLIT = "Kirtan splitter: Split"  # cut into a kirtan and a class
-SPLITTER_NOT_SPLIT = "Kirtan splitter: Not split"  # a reviewer decided not to split
+SPLITTER_CLASS = "Splitter: Class"  # no kirtan before the class: nothing to split
+SPLITTER_KIRTAN = "Splitter: Kirtan"  # singing throughout: a kirtan recording
+SPLITTER_SPLIT = "Splitter: Done"  # cut into a kirtan and a class
+SPLITTER_NOT_SPLIT = "Splitter: Not split"  # a reviewer decided not to split
 SPLITTER_STATUSES = (SPLITTER_CLASS, SPLITTER_KIRTAN, SPLITTER_SPLIT, SPLITTER_NOT_SPLIT)
 
 
