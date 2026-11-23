@@ -285,6 +285,34 @@ def apply_tool_evidence(proposal: Proposal, evidence: dict[str, Any], ref: Refer
     _rebuild_name(proposal)
 
 
+def apply_recording_kind(proposal: Proposal, record: m.MediaFile, ref: Reference) -> bool:
+    """A recording the Kirtan splitter found to be singing throughout is filed under Kirtan.
+
+    A name such as `Radhastami-Bhajanas` matches the category Radhastami, but only classes go in
+    the Radhastami or Nrsimha-caturdasi folders (decided 2026-11-23). A WHAT that is itself a
+    kirtan category (`Nrsimha-pranama`, `Jaya-radha-madhava`) is left alone. True when the
+    category was changed to Kirtan."""
+    from mam.tools.kirtan_splitter.phrases import KIRTAN_CATEGORIES, MAHA_MANTRA
+
+    if (record.meta or {}).get("recording_kind") != "kirtan":
+        return False
+    match = ref.matcher.match(proposal.what)
+    if match and match.category.name.lower() in KIRTAN_CATEGORIES:
+        proposal.category = match.category.name
+        return False
+    if proposal.category and proposal.category.lower() in KIRTAN_CATEGORIES:
+        return False
+    kirtan = ref.matcher.by_name(MAHA_MANTRA)
+    if kirtan is None:
+        return False
+    old = proposal.category or "no category"
+    proposal.category = kirtan.name
+    proposal.notes.append(
+        f"Singing throughout (Kirtan splitter): filed under {kirtan.name}, not {old}."
+    )
+    return True
+
+
 def merge_confirmed(
     proposal: Proposal, confirmed: dict[str, Any], evidence: dict[str, Any]
 ) -> list[str]:
@@ -386,12 +414,15 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
                     {"kept": unchanged, "continue_pipeline": True},
                 )
 
+    kirtan_only = apply_recording_kind(proposal, record, res.ref)
+    # With a kirtan recording the folder comes from the Kirtan category, not from the WHAT.
+    folder_what = None if kirtan_only else proposal.what
     # Release the session before helpers write through their own sessions (SQLite locking).
     ctx.session.commit()
     organizer = FileOrganizer(res.ref.matcher, settings)
     move_files, postfix = renamer_move_files(), renamer_postfix()
     origin = Path(record.original_path)
-    folder, _ = organizer.target_folder(proposal.what, proposal.category, origin)
+    folder, _ = organizer.target_folder(folder_what, proposal.category, origin)
     unique, other = reserve_name(record.id, folder, proposal.new_name)
     if other:
         proposal.flags.append(
@@ -402,7 +433,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
     placed = organizer.organize(
         source_path(record),
         proposal.new_name,
-        proposal.what,
+        folder_what,
         tool=TOOL,
         dry_run=ctx.dry_run,
         media_file_id=record.id,

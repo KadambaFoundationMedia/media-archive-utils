@@ -39,6 +39,7 @@ class ToolOutcome:
     state: str  # done | review | skipped | corrupted | info
     summary: str
     data: dict[str, Any] = field(default_factory=dict)
+    status: str | None = None  # a status of the tool's own, instead of "<Tool> Done"
 
 
 @dataclass(frozen=True)

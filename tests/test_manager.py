@@ -734,8 +734,8 @@ def test_status_list_and_guide_show_the_same_statuses_in_order(client):
     statuses = all_statuses()
     assert statuses[:6] == [
         "Not processed",
-        "Queued Renamer",
-        "Processing Renamer",
+        "Queued",
+        "Processing",
         "Renamer Done",
         "Renamer Review",
         "Renamer Failed",

@@ -10,6 +10,7 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from mam.helpers.local_db import models as m
+from mam.statuses import PROCESSING, QUEUED, SPLITTER_STATUSES
 
 PAGE_SIZES = (50, 100, 200, 500)  # the "Show" choices; Load more adds this many each time
 PAGE_SIZE = PAGE_SIZES[0]
@@ -147,11 +148,13 @@ def all_statuses(present: dict[str, int] | None = None) -> list[str]:
     """
     from mam.manager.tools import PIPELINE_ORDER, TOOLS
 
-    ordered = ["Not processed"]
+    ordered = ["Not processed", QUEUED, PROCESSING]
     for name in PIPELINE_ORDER:
         if name in TOOLS:
             label = TOOLS[name].label
-            ordered += [f"Queued {label}", f"Processing {label}"]
+            if name == "kirtan-splitter":  # it says what it found instead of "Done"
+                ordered += [*SPLITTER_STATUSES, f"{label} Review", f"{label} Failed"]
+                continue
             ordered += [f"{label} {state}" for state in ("Done", "Review", "Failed")]
     ordered += ["Skipped", "Excluded", "Deleted", "Corrupted", "Processing complete"]
     return ordered + sorted(set(present or {}) - set(ordered))

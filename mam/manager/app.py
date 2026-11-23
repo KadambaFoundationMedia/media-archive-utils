@@ -38,6 +38,15 @@ from mam.helpers.local_db.repo import media_kind
 from mam.manager import queries, stale
 from mam.manager.queue import JobQueue, enqueue
 from mam.manager.tools import TOOLS, menu_tools, pipeline_start
+from mam.statuses import (
+    SPLITTER_CLASS,
+    SPLITTER_KIRTAN,
+    SPLITTER_NOT_SPLIT,
+    SPLITTER_SPLIT,
+    SPLITTER_STATUSES,
+    is_busy,
+    is_queued,
+)
 
 log = logging.getLogger(__name__)
 HERE = Path(__file__).parent
@@ -51,6 +60,7 @@ STATUS_COLORS = {
     "Deleted": "dark",
     "Skipped": "light",
     "Processing complete": "success",
+    **{status: "success" for status in SPLITTER_STATUSES},
 }
 
 
@@ -61,7 +71,7 @@ def status_color(status: str) -> str:
         return "warning"
     if status.endswith(" Failed"):
         return "danger"
-    if status.startswith(("Processing ", "Queued ")):
+    if is_busy(status):
         return "info"
     if status.endswith(" Done"):
         return "success"
@@ -92,11 +102,16 @@ VIEW_HELP = {
 STATUS_HELP = {
     "Not processed": "Imported, but no tool has changed it yet. A dry run does not change the "
     "status; its proposed name is shown with a 'dry run' label.",
-    "Queued": "Waiting in the job queue for a tool.",
+    "Queued": "Waiting in the job queue for a tool (the Status column shows which one).",
     "Processing": "A tool is working on it now.",
     "Done": "The tool finished; the file waits for the next tool in the pipeline.",
     "Review": "The tool needs your decision. Open it from the Review page.",
     "Failed": "The tool hit an error (see Jobs). Fix the cause and retry.",
+    SPLITTER_CLASS: "Kirtan splitter: a class with no kirtan before it, so nothing was split.",
+    SPLITTER_KIRTAN: "Kirtan splitter: singing throughout, a kirtan recording that is not split. "
+    "It is filed in the Kirtan folder.",
+    SPLITTER_SPLIT: "Kirtan splitter: cut into a kirtan and a class.",
+    SPLITTER_NOT_SPLIT: "Kirtan splitter: a reviewer decided that it is not split.",
     "Skipped": "The step does not apply to this file.",
     "Excluded": "A reviewer stopped all processing of this file.",
     "Deleted": "The copy in processed-files was moved to the Trash. The original was not touched.",
@@ -625,7 +640,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 job.state = "cancelled"
                 if job.media_file_id and not job.dry_run and TOOLS[job.tool].sets_status:
                     record = session.get(m.MediaFile, job.media_file_id)
-                    if record.status.startswith("Queued "):
+                    if is_queued(record.status):
                         from mam.helpers.local_db.repo import set_status
 
                         last = session.scalar(

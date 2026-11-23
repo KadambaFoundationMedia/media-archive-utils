@@ -24,6 +24,7 @@ from mam.helpers.local_db.hashing import fingerprint, sha256
 from mam.helpers.local_db.repo import record_event, register_derived, set_status
 from mam.helpers.progress import report
 from mam.manager.tools import JobContext, ToolOutcome
+from mam.statuses import SPLITTER_CLASS, SPLITTER_KIRTAN, SPLITTER_NOT_SPLIT, SPLITTER_SPLIT
 from mam.tools.kirtan_splitter import phrases
 from mam.tools.kirtan_splitter.audio import extract_audio
 from mam.tools.kirtan_splitter.detect import Decision, detect, format_time
@@ -156,12 +157,32 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
             "review", f"{summary} (score {decision.score:.2f}, needs a review)", data
         )
     if decision.mode == "class_only":  # no kirtan to split: the class itself goes on
-        return ToolOutcome("skipped", summary, {**data, "continue_pipeline": True})
+        return ToolOutcome(
+            "skipped", summary, {**data, "continue_pipeline": True}, status=SPLITTER_CLASS
+        )
     if decision.mode == "kirtan_only":
-        return ToolOutcome("skipped", summary, data)
+        mark_kirtan_recording(ctx.session, record)
+        return ToolOutcome("skipped", summary, data, status=SPLITTER_KIRTAN)
     report("Cutting the recording", 0.9)
     result = apply_split(ctx.session, record, work_audio, data, settings, dry_run=False)
-    return ToolOutcome("done", f"{summary} {result['summary']}", {**data, **result})
+    return ToolOutcome(
+        "done", f"{summary} {result['summary']}", {**data, **result}, status=SPLITTER_SPLIT
+    )
+
+
+def mark_kirtan_recording(session: Session, record: m.MediaFile) -> None:
+    """A recording that is singing throughout is a kirtan, not a class (decided 2026-11-23).
+
+    It is marked, and the Renamer is queued to move its copy to the Kirtan folder: the name may
+    say Radhastami or Nrsimha-caturdasi, but only classes go in those folders. The file keeps
+    the splitter's status when the Renamer is done."""
+    meta = dict(record.meta or {})
+    meta["recording_kind"] = "kirtan"
+    record.meta = meta
+    if record.original_path:
+        from mam.manager.queue import enqueue
+
+        enqueue(session, "renamer", [record.id], dry_run=False, params={"keep_status": True})
 
 
 def describe(d: Decision) -> str:
@@ -298,7 +319,7 @@ def apply_split(
         class_rec.rec_date, class_rec.title = record.rec_date, record.title
         class_rec.location, class_rec.category = record.location, record.category
         class_rec.sha256 = sha256(class_dst)
-        set_status(session, class_rec, "Kirtan splitter Done", TOOL, "class audio of a video")
+        set_status(session, class_rec, SPLITTER_SPLIT, TOOL, "class audio of a video")
         class_id = class_rec.id
     else:
         record.size, record.mtime = stat.st_size, stat.st_mtime
@@ -307,6 +328,7 @@ def apply_split(
         record.current_name = class_dst.name
         record.processed_path = str(class_dst)
     meta = dict(record.meta or {})
+    meta.pop("recording_kind", None)  # no longer a kirtan recording
     meta["split"] = {
         "kirtan_id": kirtan.id,
         "class_id": class_id,
@@ -341,7 +363,13 @@ def _queue_class_name(
     from mam.manager.queue import enqueue
 
     evidence = {"what": cleaned, "source": TOOL}
-    enqueue(session, "renamer", [record.id], dry_run=False, params={"evidence": evidence})
+    enqueue(
+        session,
+        "renamer",
+        [record.id],
+        dry_run=False,
+        params={"evidence": evidence, "keep_status": True},
+    )
     return True
 
 
@@ -404,7 +432,13 @@ def decide_review(
         review.outcome = "edited" if proposal.get("mode") == "split" else "approved"
         review.final = {"mode": "no_split"}
         review.operator, review.note, review.decided_at = operator, note, datetime.now(UTC)
-        set_status(session, record, "Skipped", TOOL, f"not split (approved by {operator})")
+        mode = proposal.get("mode")
+        if mode == "kirtan_only":
+            mark_kirtan_recording(session, record)
+            status = SPLITTER_KIRTAN
+        else:
+            status = SPLITTER_CLASS if mode == "class_only" else SPLITTER_NOT_SPLIT
+        set_status(session, record, status, TOOL, f"not split (approved by {operator})")
         return "Approved: the recording is not split"
     if not split_at:
         raise MamError("Enter the time where the kirtan ends")
@@ -422,5 +456,5 @@ def decide_review(
     )
     review.final = {"mode": "split", "split_at": cut, "mantra": decision["mantra"]}
     review.operator, review.note, review.decided_at = operator, note, datetime.now(UTC)
-    set_status(session, record, "Kirtan splitter Done", TOOL, f"split at {format_time(cut)}")
+    set_status(session, record, SPLITTER_SPLIT, TOOL, f"split at {format_time(cut)}")
     return f"Approved and split at {format_time(cut)}: {result['summary']}"
