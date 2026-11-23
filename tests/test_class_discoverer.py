@@ -416,7 +416,7 @@ def test_review_page_and_approval_through_the_portal(prepared):
         assert done.status_code == 303
     with session_scope() as s:
         assert s.get(m.Review, review_id).outcome == "approved"
-        assert s.get(m.MediaFile, rid).status == "Queued Renamer"  # the Renamer is next
+        assert s.get(m.MediaFile, rid).status == "Queued"  # the Renamer is next
         assert s.scalar(select(m.Job).where(m.Job.tool == "renamer")) is not None
 
 

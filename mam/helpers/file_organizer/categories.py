@@ -78,4 +78,40 @@ class CategoryMatcher:
             if not follow:
                 break
             _, end, category, term = max(follow, key=lambda f: f[1])
-        return CategoryMatch(category, " ".join(term), end - start)
+        result = CategoryMatch(category, " ".join(term), end - start)
+        return self._kirtan_over_event(result, tokens) or result
+
+    def _kirtan_over_event(self, result: CategoryMatch, tokens: list[str]) -> CategoryMatch | None:
+        """Singing is always Kirtan, unless the recording is a combination (decided 2026-11-23).
+
+        `Radhastami-Bhajanas` matches the event category Radhastami first, but a bhajan
+        recording is a Kirtan: only classes go in the Radhastami folder. Not when a scripture
+        comes first (`SB-1-19-31-with-Radha-Madhava` is a class) or when the word follows
+        `with`, `and` or `plus` (a class and a kirtan in one recording)."""
+        if result.category.name.lower() in KIRTAN_NAMES or _is_scripture(result.category):
+            return None
+        # `Bhajanas3`: a source index glued to the word does not change what it is
+        bare = [re.sub(r"(?<=[a-z])\d+$", "", t) for t in tokens]
+        for category in self.categories:
+            if category.name.lower() != KIRTAN:
+                continue
+            for term in sorted(category.terms, key=len, reverse=True):
+                n = len(term)
+                for pos in range(len(bare) - n + 1):
+                    if tuple(bare[pos : pos + n]) != term:
+                        continue
+                    if pos > 0 and tokens[pos - 1] in JOINERS:
+                        return None
+                    return CategoryMatch(category, " ".join(term), n)
+        return None
+
+
+KIRTAN = "kirtan"
+# the kirtan categories (see mam/tools/kirtan_splitter/phrases.py)
+KIRTAN_NAMES = {"kirtan", "jaya-radha-madhava", "jaya-jaya-sri-caitanya", "nrsimha-pranama"}
+JOINERS = {"with", "and", "plus"}
+
+
+def _is_scripture(category: Category) -> bool:
+    """A book category (`BG`, `SB`, `CC` terms): its name is a verse, not an event."""
+    return any(t and t[0] in {"bg", "sb", "cc"} for t in category.terms)

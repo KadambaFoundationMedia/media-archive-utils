@@ -23,6 +23,7 @@ from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.helpers.progress import reporting
 from mam.manager.tools import TOOLS, JobContext, ToolOutcome, next_in_pipeline
+from mam.statuses import PROCESSING, QUEUED, is_busy
 
 log = logging.getLogger(__name__)
 
@@ -35,8 +36,8 @@ def now() -> datetime:
 
 def status_for(label: str, state: str) -> str:
     return {
-        "queued": f"Queued {label}",
-        "running": f"Processing {label}",
+        "queued": QUEUED,
+        "running": PROCESSING,
         "done": f"{label} Done",
         "review": f"{label} Review",
         "failed": f"{label} Failed",
@@ -285,23 +286,33 @@ class JobQueue:
             return
         if outcome.state == "corrupted":
             set_status(session, record, "Corrupted", job.tool, outcome.summary)
+        elif spec.sets_status and outcome.status:
+            set_status(session, record, outcome.status, job.tool, outcome.summary)
+        elif (
+            spec.sets_status
+            and (job.params or {}).get("keep_status")
+            and outcome.state in ("done", "info")
+        ):
+            # A follow-up job another tool queued (e.g. the Renamer moving a kirtan recording):
+            # the file keeps the status that tool gave it.
+            set_status(session, record, stable_status(session, record), job.tool, outcome.summary)
         elif spec.sets_status and outcome.state in ("done", "review", "skipped"):
             set_status(
                 session, record, status_for(spec.label, outcome.state), job.tool, outcome.summary
             )
-        elif spec.sets_status and record.status.startswith(("Queued ", "Processing ")):
+        elif spec.sets_status and is_busy(record.status):
             # The tool changed nothing (e.g. kept an approved name): restore the earlier status.
             set_status(session, record, stable_status(session, record), job.tool, outcome.summary)
 
 
 def stable_status(session: Session, record: m.MediaFile) -> str:
-    """The last status that was not 'Queued ...' or 'Processing ...'."""
+    """The last status that was not 'Queued' or 'Processing'."""
     for status in session.scalars(
         select(m.StatusHistory.new_status)
         .where(m.StatusHistory.media_file_id == record.id)
         .order_by(m.StatusHistory.id.desc())
     ):
-        if not status.startswith(("Queued ", "Processing ")):
+        if not is_busy(status):
             return status
     return "Not processed"
 

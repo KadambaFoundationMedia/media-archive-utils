@@ -651,7 +651,7 @@ def test_approving_a_review_with_an_edited_cut(prepared):
         assert "00:03:30.500" in msg
         assert review.outcome == "edited" and review.final["split_at"] == 210.5
         record = s.get(m.MediaFile, rid)
-        assert record.status == "Kirtan splitter Done"
+        assert record.status == "Splitter: Done"
     assert probe(copy).duration == pytest.approx(300 - 210.5, abs=0.5)
 
 
@@ -663,7 +663,7 @@ def test_do_not_split_decision(prepared):
         splitter.decide_review(
             s, review, action="no_split", split_at=None, mantra=None, operator="t", note=None
         )
-        assert s.get(m.MediaFile, rid).status == "Skipped"
+        assert s.get(m.MediaFile, rid).status == "Splitter: Not split"
         assert review.outcome == "edited"  # the tool proposed a split
 
 
@@ -855,3 +855,151 @@ def test_a_combination_phrase_is_dropped_from_the_class_what():
     assert w("Talk-with-Radhika-Ranjana", matcher) is None
     assert w("SB-1-2-3-with-lecture", matcher) is None  # not a kirtan term
     assert w(None, matcher) is None
+
+
+# ---------------------------------------------------- statuses and the Kirtan folder (2026-11-23)
+def test_music_throughout_gets_the_kirtan_status_and_queues_the_renamer(prepared):
+    rid, _copy = prepared([0.01] * 290)
+    outcome = run(rid)
+    assert outcome.status == "Splitter: Kirtan"
+    with session_scope() as s:
+        assert s.get(m.MediaFile, rid).meta["recording_kind"] == "kirtan"
+        job = s.scalars(select(m.Job).where(m.Job.tool == "renamer")).one()
+        assert job.params == {"keep_status": True} and not job.dry_run
+
+
+def test_a_class_without_kirtan_gets_the_class_status(prepared):
+    rid, _copy = prepared([0.6] * 290)
+    outcome = run(rid)
+    assert outcome.status == "Splitter: Class"
+    with session_scope() as s:
+        assert "recording_kind" not in (s.get(m.MediaFile, rid).meta or {})
+        assert s.scalars(select(m.Job).where(m.Job.tool == "renamer")).first() is None
+
+
+def test_a_split_gets_the_split_status(prepared, sure_silence):
+    rid, _copy = prepared(SURE, steady=True)
+    # a reviewer-approved split sets the same status as a sure one (see decide_review above)
+    assert splitter.SPLITTER_SPLIT == "Splitter: Done"
+
+
+def test_a_follow_up_renamer_job_keeps_the_splitter_status(prepared):
+    from mam.manager.queue import JobQueue
+
+    rid, _copy = prepared([0.01] * 290)
+    from mam.helpers.local_db.repo import set_status
+    from mam.manager.tools import ToolOutcome
+
+    with session_scope() as s:
+        set_status(s, s.get(m.MediaFile, rid), "Splitter: Kirtan", tool="kirtan-splitter")
+        job = m.Job(
+            tool="renamer",
+            pool="io",
+            media_file_id=rid,
+            dry_run=False,
+            params={"keep_status": True},
+            state="running",
+        )
+        s.add(job)
+        s.flush()
+        job_id = job.id
+    with session_scope() as s:
+        set_status(s, s.get(m.MediaFile, rid), "Processing", tool="renamer")
+        JobQueue()._finish(s, job_id, s.get(m.MediaFile, rid), ToolOutcome("done", "moved"))
+        assert s.get(m.MediaFile, rid).status == "Splitter: Kirtan"
+
+
+def test_a_kirtan_recording_is_filed_under_kirtan_not_radhastami():
+    from types import SimpleNamespace
+
+    from mam.helpers.file_organizer.categories import CategoryMatcher
+    from mam.tools.renamer.tool import apply_recording_kind
+
+    matcher = CategoryMatcher(
+        [
+            {"category": "Kirtan", "filename_terms": "kirtan, bhajans", "folder": "Kirtan"},
+            {"category": "Radhastami", "filename_terms": "radhastami", "folder": "Radhastami"},
+            {"category": "Nrsimha-pranama", "filename_terms": "nrsimha pranama"},
+        ]
+    )
+    ref = SimpleNamespace(matcher=matcher)
+    kirtan = SimpleNamespace(meta={"recording_kind": "kirtan"})
+
+    proposal = SimpleNamespace(what="Radhastami-Bhajanas3", category="Radhastami", notes=[])
+    assert apply_recording_kind(proposal, kirtan, ref)
+    assert proposal.category == "Kirtan" and "not Radhastami" in proposal.notes[0]
+
+    sung = SimpleNamespace(what="Nrsimha-pranama", category="Nrsimha-pranama", notes=[])
+    assert not apply_recording_kind(sung, kirtan, ref)  # a kirtan category stays as it is
+    assert sung.category == "Nrsimha-pranama"
+
+    a_class = SimpleNamespace(what="Radhastami-lecture", category="Radhastami", notes=[])
+    assert not apply_recording_kind(a_class, SimpleNamespace(meta={}), ref)
+    assert a_class.category == "Radhastami"  # only a kirtan recording is moved
+
+
+def test_migration_renames_statuses_and_labels_splitter_results(tmp_path):
+    import json
+
+    from alembic import command
+    from sqlalchemy import create_engine, text
+
+    from mam.helpers.local_db.db import alembic_config
+
+    db = tmp_path / "old.sqlite"
+    cfg = alembic_config(db)
+    command.upgrade(cfg, "0005")
+    engine = create_engine(f"sqlite:///{db}")
+    meta = lambda mode: json.dumps({"splitter": {"proposal": {"mode": mode}}})  # noqa: E731
+    rows = [
+        ("Queued Renamer", None),
+        ("Processing Kirtan splitter", None),
+        ("Processing complete", None),
+        ("Kirtan splitter Done", None),
+        ("Skipped", meta("kirtan_only")),
+        ("Skipped", meta("class_only")),
+        ("Skipped", None),
+    ]
+    with engine.begin() as conn:
+        for i, (status, meta_json) in enumerate(rows, start=1):
+            conn.execute(
+                text(
+                    "INSERT INTO media_file (id, original_path, status, meta, kind, size, mtime, "
+                    "fingerprint, created_at, updated_at) VALUES (:i, :p, :s, :m, 'audio', 1, 1, "
+                    "'f', '2026-01-01', '2026-01-01')"
+                ),
+                {"i": i, "p": f"/x/{i}.mp3", "s": status, "m": meta_json},
+            )
+    command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        got = [r[0] for r in conn.execute(text("SELECT status FROM media_file ORDER BY id"))]
+        kind = conn.execute(text("SELECT meta FROM media_file WHERE id=5")).scalar()
+    assert got == [
+        "Queued",
+        "Processing",
+        "Processing complete",
+        "Splitter: Done",
+        "Splitter: Kirtan",
+        "Splitter: Class",
+        "Skipped",
+    ]
+    assert json.loads(kind)["recording_kind"] == "kirtan"
+
+
+def test_bhajans_are_always_kirtan_unless_a_class_is_part_of_it():
+    from mam.helpers.file_organizer.categories import CategoryMatcher
+
+    matcher = CategoryMatcher(
+        [
+            {"category": "Kirtan", "filename_terms": "kirtan, bhajan, bhajans, bhajanas"},
+            {"category": "Radhastami", "filename_terms": "radhastami"},
+            {"category": "Srimad-bhagavatam", "filename_terms": "SB, Srimad Bhagavatam"},
+            {"category": "Jaya-Radha-Madhava", "filename_terms": "radha madhava"},
+        ]
+    )
+    name = lambda what: (matcher.match(what) or None) and matcher.match(what).category.name  # noqa: E731
+    assert name("Radhastami-Bhajanas3") == "Kirtan"
+    assert name("Radhastami") == "Radhastami"
+    assert name("Radhastami-lecture-and-Bhajans") == "Radhastami"  # a combination
+    assert name("SB-1-19-31-Bhajans") == "Srimad-bhagavatam"  # a scripture comes first
+    assert name("Bhajans-Radhastami") == "Kirtan"
