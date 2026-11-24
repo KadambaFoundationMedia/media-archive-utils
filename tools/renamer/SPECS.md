@@ -41,6 +41,9 @@ The filename provides the best evidence for the type of recording and provides t
 ## mp3 tag information
 The MP3 tag information embedded in media files could also provide metadata. The confidence for that data is medium to high.
 
+### Writing tags
+The Renamer also writes the tags of the processed copy (mp3, m4a, wma; not video), every time it renames the file, so the tags follow the filename. The fields and rules are in SPEC.md (Renamer, "Tag writing") and docs/references/idv3-tags.md. The Genre comes from the `idv3_genre` column of `category_terms_folder`.
+
 ## Travel schedule
 The travel_schedule does not provide 100% proof that the speaker/recording was at that location. If there is a date and/or a location in the filename this should always take precedence. In those cases the travel_schedule can be used to provide further proof. The country of a place never comes from the travel_schedule: it comes from the Baserow `place_country` table (see helpers/baserow/SPECS.md).
 

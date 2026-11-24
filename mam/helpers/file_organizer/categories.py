@@ -16,6 +16,13 @@ def _select_text(cell: Any) -> str:
     return str(cell or "").strip().lower()
 
 
+def _plain_text(cell: Any) -> str:
+    """Text of a Baserow cell as typed (a select arrives as {"value": ...})."""
+    if isinstance(cell, dict):
+        cell = cell.get("value")
+    return str(cell or "").strip()
+
+
 def _tokens(text: str) -> list[str]:
     """Lowercase word tokens; dots are dropped so 'S.B.' and 'SB' compare equal."""
     text = text.lower().replace(".", "")
@@ -29,6 +36,7 @@ class Category:
     color: str | None
     terms: tuple[tuple[str, ...], ...]
     kind: str | None = None  # "class" or "kirtan": the `type` column of category_terms_folder
+    genre: str | None = None  # the `idv3_genre` column: the Genre tag written to the file
 
 
 @dataclass(frozen=True)
@@ -53,6 +61,7 @@ class CategoryMatcher:
                     folder=(row.get("folder_name") or name).strip(),
                     color=row.get("color"),
                     kind=_select_text(row.get("type")) or None,
+                    genre=_plain_text(row.get("idv3_genre")) or None,
                     terms=tuple(t for t in terms if t),
                 )
             )

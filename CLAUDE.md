@@ -18,6 +18,7 @@ The goal is to build those tools and the media manager to discover and properly 
 - Verse structure: @docs/references/verse-structure.md
 - Editing standards: @docs/references/editing-standard.md
 - Common phrases: @docs/references/recording-common-phrases.md
+- ID3 tags: @docs/references/idv3-tags.md
 
 ## Helpers
 - Baserow Helper (helpers/baserow/SPECS.md): This connects to Baserow and provides CRUD actions.

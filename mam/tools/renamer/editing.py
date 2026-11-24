@@ -34,6 +34,7 @@ from mam.tools.renamer.knowledge import (
 )
 from mam.tools.renamer.naming import build_name, format_where, problems
 from mam.tools.renamer.parse import parser_from_settings
+from mam.tools.renamer.tags import apply_tags
 
 log = logging.getLogger(__name__)
 
@@ -352,6 +353,12 @@ def save(
             record, data, placed.dst, settings, dry_run=False, live=True
         )
     data["place_country"] = remember_place_country(place, cc, ref)
+    tagged = apply_tags(
+        placed.dst, data, ref, dry_run=False, media_file_id=record.id, tool="manual-edit"
+    )
+    data["tags"] = tagged["tags"]
+    if tagged["warning"]:
+        data["notes"] = [*(data.get("notes") or []), tagged["warning"]]
 
     now = datetime.now(UTC)
     meta = dict(record.meta or {})
