@@ -27,7 +27,7 @@ from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.helpers.transcriber import follow_audio
 from mam.manager.tools import JobContext, ToolOutcome
-from mam.tools.renamer.dates import DateValue
+from mam.tools.renamer.dates import DateValue, set_min_year
 from mam.tools.renamer.knowledge import (
     PLACEMENT_MAX_AGE_S,
     Reference,
@@ -44,6 +44,7 @@ ALIAS_ACTIVATION = 3  # a correction made this many times becomes a rule (SPEC.m
 
 def resolver(settings: Settings | None = None) -> Resolver:
     settings = tuned(settings or get_settings())
+    set_min_year(settings.min_year)
     return Resolver(
         get_reference(max_age=PLACEMENT_MAX_AGE_S),
         [p for _, p in settings.import_roots],

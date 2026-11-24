@@ -220,6 +220,15 @@ OPTIONS: tuple[Option, ...] = (
         "Honorifics and format words (commas) that are left out of the WHAT.",
     ),
     Option(
+        "min_year",
+        "int",
+        "Earliest year read as a date",
+        "Advanced",
+        "A year before this in a name is not taken as a date.",
+        1900,
+        2100,
+    ),
+    Option(
         "transcribe_languages",
         "text",
         "Languages Whisper may choose",

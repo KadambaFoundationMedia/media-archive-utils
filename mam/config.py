@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     recorder_albums: str = "tascam,zoom,roland,olympus,sony,dr-"
     # Renamer, Advanced: speakers other than KKS (flagged) and words dropped from names
     other_speakers: str = "SNS,BVS,KKD,KVS,BVPS,RNS"
+    min_year: int = 1990
     noise_words: str = "hh,his,holiness,mp3,wav,stereo,jet,clean,copy,unedited"
 
     operator_name: str = Field(default_factory=getpass.getuser)
