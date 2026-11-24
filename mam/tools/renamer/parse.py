@@ -165,13 +165,6 @@ def _mask(text: str, spans: list[tuple[int, int]]) -> str:
     return "".join(chars)
 
 
-def _country_token(token: str, ref: Reference) -> str | None:
-    cc = cc_for_name(token)
-    if cc:
-        return cc
-    return None
-
-
 def _tidy_word(word: str) -> str:
     if len(word) > 3 and word.isupper():
         return word.capitalize()
@@ -258,7 +251,7 @@ class NameParser:
             if language and (token.isupper() or len(key) > 3):
                 result.languages.append(language)
             use_cc = allow_countries and len(key) >= 3 and not language
-            cc = _country_token(token, self.ref) if use_cc else None
+            cc = cc_for_name(token) if use_cc else None
             if cc:
                 result.ccs.append((cc, token))
                 continue

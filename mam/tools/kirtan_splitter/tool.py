@@ -1,4 +1,4 @@
-"""Kirtan splitter job: transcribe, find the boundary, cut, name, and flag when unsure."""
+"""Kirtan splitter job: listen (no transcript), find the boundary, cut, name, flag when unsure."""
 
 from __future__ import annotations
 
