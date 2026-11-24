@@ -120,6 +120,21 @@ class Settings(BaseSettings):
     analysis_early_stop: bool = True
     workers_io: int = 4
 
+    @field_validator(
+        "media_sample_files_path",
+        "media_processed_files_path",
+        "media_unprocessed_files_path",
+        "media_identical_files_path",
+        mode="before",
+    )
+    @classmethod
+    def _empty_path_is_default(cls, value, info):
+        """`MEDIA_..._PATH=` left empty (as in `.env.example`) means the default folder, never
+        the current folder (an empty path would resolve to the repository root)."""
+        if value is None or str(value).strip() == "":
+            return cls.model_fields[info.field_name].default
+        return value
+
     @field_validator("nas_root", mode="before")
     @classmethod
     def _empty_is_unset(cls, value):

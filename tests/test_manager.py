@@ -1076,3 +1076,25 @@ def test_settings_page_options_autosave(client):
         in client.post("/settings/option/recorder_prefixes", data={"value": "a b!"}).text
     )
     assert client.post("/settings/option/nope", data={"value": "1"}).status_code == 404
+
+
+def test_empty_folder_settings_mean_the_defaults(monkeypatch):
+    from mam.config import REPO_ROOT, Settings
+
+    monkeypatch.setenv("MEDIA_UNPROCESSED_FILES_PATH", "")
+    monkeypatch.setenv("MEDIA_IDENTICAL_FILES_PATH", "")
+    s = Settings()
+    assert s.media_unprocessed_files_path == REPO_ROOT / "unprocessed-files"
+    assert s.media_identical_files_path == REPO_ROOT / "identical-files"
+
+
+def test_reset_refuses_a_folder_that_contains_the_repository(monkeypatch):
+    import pytest
+
+    from mam.config import REPO_ROOT, get_settings
+    from mam.errors import MamError
+    from mam.manager import maintenance
+
+    settings = get_settings().model_copy(update={"media_identical_files_path": REPO_ROOT})
+    with pytest.raises(MamError, match="repository"):
+        maintenance._check_processed_roots(settings)
