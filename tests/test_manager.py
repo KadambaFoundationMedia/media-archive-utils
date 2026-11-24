@@ -1079,4 +1079,13 @@ def test_settings_page_options_autosave(client):
     assert 'value="0.1"' in client.get("/settings").text
     bad = client.post("/settings/option/vedabase_delay_s", data={"value": "3"})
     assert "At least 10" in bad.text
+    assert "Recorder file name prefixes" in page.text
+    assert (
+        "saved"
+        in client.post("/settings/option/recorder_prefixes", data={"value": "ZOOM, HANDY"}).text
+    )
+    assert (
+        "Use words"
+        in client.post("/settings/option/recorder_prefixes", data={"value": "a b!"}).text
+    )
     assert client.post("/settings/option/nope", data={"value": "1"}).status_code == 404

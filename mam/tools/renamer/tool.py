@@ -21,6 +21,7 @@ from mam.helpers.local_db.app_settings import (
     baserow_writes_enabled,
     renamer_move_files,
     renamer_postfix,
+    tuned,
 )
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
@@ -42,9 +43,12 @@ ALIAS_ACTIVATION = 3  # a correction made this many times becomes a rule (SPEC.m
 
 
 def resolver(settings: Settings | None = None) -> Resolver:
-    settings = settings or get_settings()
+    settings = tuned(settings or get_settings())
     return Resolver(
-        get_reference(max_age=PLACEMENT_MAX_AGE_S), [p for _, p in settings.import_roots]
+        get_reference(max_age=PLACEMENT_MAX_AGE_S),
+        [p for _, p in settings.import_roots],
+        settings.recorder_prefixes,
+        settings.recorder_albums,
     )
 
 

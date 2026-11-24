@@ -106,12 +106,19 @@ def find_verse(text: str) -> Verse | None:
 
 
 # ------------------------------------------------------------ recorder names
-RECORDER_RES = [
-    re.compile(
-        r"^(?:R\d{2}|ZOOM|STE|DSC|MVI|IMG|REC|DR|LS|VN|WS|TASCAM|DM|MOV)[-_ ]?\d{2,5}$", re.I
-    ),
-    re.compile(r"^\d{5}$"),  # camcorder clips (00008.MTS)
-]
+DEFAULT_RECORDER_PREFIXES = "ZOOM,STE,DSC,MVI,IMG,REC,DR,LS,VN,WS,TASCAM,DM,MOV"
+
+
+def recorder_res(prefixes: str = DEFAULT_RECORDER_PREFIXES) -> list[re.Pattern]:
+    """Patterns for recorder names: R09-style, a configured prefix plus digits, camcorder clips."""
+    words = "|".join(re.escape(w.strip()) for w in prefixes.split(",") if w.strip())
+    alt = rf"R\d{{2}}|{words}" if words else r"R\d{2}"
+    return [
+        re.compile(rf"^(?:{alt})[-_ ]?\d{{2,5}}$", re.I),
+        re.compile(r"^\d{5}$"),  # camcorder clips (00008.MTS)
+    ]
+
+
 PREFIX_RES = [
     re.compile(r"(?<=^\d{6})_\d{4}(?:_D)?"),  # TASCAM 150905_0124_D: keep the date, drop the index
     re.compile(r"^A\d{3}F?(?=\s)"),  # catalogue numbers: A019 03-10-23 ...
@@ -172,8 +179,9 @@ def _tidy_word(word: str) -> str:
 
 
 class NameParser:
-    def __init__(self, ref: Reference) -> None:
+    def __init__(self, ref: Reference, recorder_prefixes: str = DEFAULT_RECORDER_PREFIXES) -> None:
         self.ref = ref
+        self.recorder_res = recorder_res(recorder_prefixes)
         a = ref.aliases
         self.noise = {norm_key(w) for w in a.get("noise", [])}
         self.generic = ref.generic_words()  # the Class category's terms (Baserow)
@@ -182,7 +190,7 @@ class NameParser:
     def parse(self, text: str, source: str = "filename") -> ParsedName:
         text = text.strip()
         result = ParsedName(text=text, source=source)
-        if any(r.match(text) for r in RECORDER_RES):
+        if any(r.match(text) for r in self.recorder_res):
             result.recorder = True
             return result
         cleaned = text

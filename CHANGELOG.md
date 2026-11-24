@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Renamer
+- The recorder file name prefixes (ZOOM, DSC, TASCAM, ...) and the recorder album tags that are ignored are now options on the Settings page (Renamer block), not code.
 - Summercamp now comes from a row in `category_terms_folder` (add the row and its spellings in Baserow), not from a pattern in the code. A recorder file in a Summercamp folder is named `..._Summercamp_...` and is no longer flagged.
 
 ### Renamer

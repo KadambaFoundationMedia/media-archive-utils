@@ -123,3 +123,12 @@ def test_class_words_next_to_a_verse_come_from_the_class_category(parser, refere
     row = next(c for c in reference.matcher.categories if c.name == "Class")
     assert any(word.lower() in term for term in row.terms)
     assert parser.parse(f"SB 3.1.20 {word}").what_words == []
+
+
+def test_recorder_prefixes_come_from_the_option(reference):
+    from mam.tools.renamer.parse import NameParser
+
+    custom = NameParser(reference, "ZOOM,HANDY")
+    assert custom.parse("HANDY0012").recorder
+    assert not custom.parse("DSC0012").recorder
+    assert custom.parse("R09_0004").recorder  # R09-style names always count
