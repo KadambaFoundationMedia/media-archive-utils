@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Kirtan splitter
+- A kirtan split off a class is now always named `Jaya-radha-madhava` (it was `Jaya-Jaya-Sri-Caitanya` before a CC class). A recording that is singing throughout stays `Kirtan`.
+
 ### Class discoverer
 - A recording in which no verse is heard now goes to review when the file's only WHAT or category is a general one (`Class`, `Various`, `Unknown`), instead of being marked Done.
 

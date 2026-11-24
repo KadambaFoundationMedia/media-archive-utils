@@ -27,9 +27,9 @@ If the singing continues throughout the whole recording it is a "kirtan recordin
 
 ## Determining the mantra type
 The type of mantra in a recording could be anything but there are standard mantra’s that are sung. Here is a list:
-- Jaya radha-madhava: Is always sung before a Srimad-bhagavatam and Bhagavad-gita, followed by the maha-mantra
+- Jaya radha-madhava: Is the only mantra sung in full before a class (SB, BG or other), followed by the maha-mantra. A kirtan split off a class is always named Jaya-radha-madhava (decided 2026-11-24)
 example: https://srimayapurdhama.com/vsong/jaya-radha-madhava/
-- Sri Panca-tattva mantra before a CC class: (Jaya Jaya Sri Caitanya, Jaya Nityananda)
+- Sri Panca-tattva mantra before a CC class: (Jaya Jaya Sri Caitanya, Jaya Nityananda). Only a short intro that the class-trimmer cuts, so it is not split off
 example https://kksongs.org/songs/j/jayajayasrikrsnacaitanya.html
 - Nrsimha pranama - Namaste narasimha ajam, prahladala-dadayine, etc
 example: https://srimayapurdhama.com/vsong/nrsimhadeva-arati/

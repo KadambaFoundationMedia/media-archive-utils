@@ -47,12 +47,9 @@ def sound(music: int, quiet: int, music_db=-10.0, quiet_db=-45.0, high=0.1) -> S
 
 
 # ------------------------------------------------------------------- phrases
-def test_mantra_from_the_class():
-    assert phrases.mantra_for_what("SB-3-6-6") == phrases.RADHA_MADHAVA
-    assert phrases.mantra_for_what("BG-2-51") == phrases.RADHA_MADHAVA
-    assert phrases.mantra_for_what("CC-Madhya-20-154") == phrases.PANCA_TATTVA
-    assert phrases.mantra_for_what("Janmastami-evening-lecture") is None
-    assert phrases.mantra_for_what(None) is None
+def test_a_split_kirtan_is_always_jaya_radha_madhava():
+    assert phrases.RADHA_MADHAVA == "Jaya-radha-madhava"
+    assert not hasattr(phrases, "mantra_for_what")  # no rule per book any more
 
 
 def test_time_round_trip():
