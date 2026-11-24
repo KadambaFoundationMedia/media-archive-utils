@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from functools import lru_cache
@@ -217,9 +216,6 @@ def build_context(
         sibling_ccs,
     )
     return context
-
-
-SUMMERCAMP_RE = re.compile(r"\bsumm?er ?camp")
 
 
 # ------------------------------------------------------------------- resolver
@@ -635,12 +631,13 @@ class Resolver:
         )
         if not option or name.verse:
             return None
-        if SUMMERCAMP_RE.search(norm_key(stem)):
+        matcher = self.ref.matcher
+        if matcher.finds(stem, option):
             return option, "filename", '"summercamp" in the filename'
         if place and norm_key(place.name) == "summercamp":  # e.g. Fruska-Gora, by its alias
             return option, "filename", "the place is Summercamp (a place_country alias)"
         for folder in ctx.folders:
-            if SUMMERCAMP_RE.search(norm_key(folder.text)):
+            if matcher.finds(folder.text, option):
                 return option, "folder", f'"summercamp" in folder "{folder.text}"'
         return None
 

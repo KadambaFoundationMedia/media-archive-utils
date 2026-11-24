@@ -303,7 +303,36 @@ def test_country_from_places_named_by_other_files_in_the_folder(propose):
     assert propose("two-countries/KKS SB 1.1.1.mp3").cc is None
 
 
-def test_summercamp_in_the_name_gives_the_summercamp_category(propose):
+SUMMERCAMP_ROW = {
+    "category": "Summercamp",
+    "filename_terms": "summer camp, summercamp",
+    "folder_name": "Summercamp",
+    "color": "green",
+    "type": "class",
+}
+
+
+@pytest.fixture
+def summercamp_propose(settings, tree):
+    """Summercamp is a category_terms_folder row, like every other category (2026-11-24)."""
+    from mam.tools.renamer.knowledge import build_reference
+    from tests.renamer_fixtures import reference_raw
+
+    raw = reference_raw()
+    raw["categories"] = [*raw["categories"], SUMMERCAMP_ROW]
+    resolver = Resolver(build_reference(raw), [p for _, p in settings.import_roots])
+    return lambda name: resolver.propose(tree / name)
+
+
+def test_a_recorder_file_in_a_summercamp_folder_is_named_from_the_folder(summercamp_propose):
+    p = summercamp_propose("Serbia-summercamp-6-13-jul-2012/R09_0004.MP3")
+    assert p.category == "Summercamp"
+    assert p.new_name == "2012-07-DD_KKS_Summercamp_rs.mp3"
+    assert not any("Non-descriptive" in f for f in p.flags)
+
+
+def test_summercamp_in_the_name_gives_the_summercamp_category(summercamp_propose):
+    propose = summercamp_propose
     for stem in (
         "2012-07-12_KKS_Kirtan_Serbia-Summercamp_rs",
         "2012-07-12_KKS_Swiss-summercamp_ch",
@@ -313,8 +342,8 @@ def test_summercamp_in_the_name_gives_the_summercamp_category(propose):
         assert propose(f"{stem}.mp3").category == "Summercamp", stem
 
 
-def test_a_verse_beats_summercamp_for_the_category(propose):
-    p = propose("2012-07-12_KKS_SB-1-2-3_Serbia-Summercamp_rs.mp3")
+def test_a_verse_beats_summercamp_for_the_category(summercamp_propose):
+    p = summercamp_propose("2012-07-12_KKS_SB-1-2-3_Serbia-Summercamp_rs.mp3")
     assert p.category == "Srimad-bhagavatam"
 
 
@@ -325,6 +354,7 @@ def test_a_place_that_is_summercamp_by_alias_gives_the_summercamp_category(
     from tests.renamer_fixtures import reference_raw
 
     raw = reference_raw()
+    raw["categories"] = [*raw["categories"], SUMMERCAMP_ROW]
     raw["options"]["place_location"] = [*raw["options"]["place_location"], "Summercamp"]
     raw["place_country"] = [
         *raw["place_country"],

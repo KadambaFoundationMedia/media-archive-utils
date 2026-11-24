@@ -57,6 +57,20 @@ class CategoryMatcher:
                 )
             )
 
+    def finds(self, text: str, category: str) -> bool:
+        """True when any term of `category` (category_terms_folder) is a word group in `text`,
+        wherever it stands (`match` only returns the earliest category)."""
+        cat = self.by_name(category)
+        tokens = _tokens(text)
+        return bool(
+            cat
+            and any(
+                tuple(tokens[i : i + len(term)]) == term
+                for term in cat.terms
+                for i in range(len(tokens) - len(term) + 1)
+            )
+        )
+
     def kirtan_names(self) -> list[str]:
         """The categories whose `type` is kirtan (Kirtan, Jaya-Radha-Madhava, ...)."""
         return [c.name for c in self.categories if c.kind == "kirtan"]

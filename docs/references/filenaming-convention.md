@@ -69,7 +69,7 @@ Category words are matched against the `filename_terms` of the Baserow `category
 Words that mean a language (`GER`, `deutsch`) are in the Baserow `language_terms` table (`language`, `aliases`), and country words (`Holland`, `UAE`, `Cesko`) in `country_terms` (`country`, `aliases`, `ccTLD`). A place that is no real location, or that has no single country, is ticked `not_place` or `no_country` on its `place_country` row. Add words there, not in the code.
 
 ### Summercamp
-A name or folder with `summercamp` in it (`Serbia-Summercamp`, `Swiss summercamp`, `Summer-camp`) is in the `Summercamp` category, unless the filename has a book and verse; the book's category then wins.
+Summercamp is a row in the Baserow `category_terms_folder` table, with its spellings (`summercamp`, `summer camp`, `Summer-camp`) as terms. A name or folder with one of them is in the `Summercamp` category, unless the filename has a book and verse; the book's category then wins. A recorder file in a Summercamp folder is named from the folder (`2012-07-DD_KKS_Summercamp_rs.mp3`), like `Vyasa-puja`.
 
 ## Partial information
 A file is always renamed with whatever is known. A WHO, WHAT or WHERE that is not known is left out, never replaced by a placeholder; only the date uses placeholders.
