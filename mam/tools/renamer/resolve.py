@@ -18,7 +18,7 @@ from mam.tools.renamer.countries import cc_for_name, country_name, is_valid_cctl
 from mam.tools.renamer.dates import DateMatch, DateValue, find_dates
 from mam.tools.renamer.knowledge import MediaRow, Place, Reference, norm_key
 from mam.tools.renamer.naming import build_name, format_where
-from mam.tools.renamer.parse import NameParser, ParsedName
+from mam.tools.renamer.parse import DEFAULT_RECORDER_PREFIXES, NameParser, ParsedName
 
 log = logging.getLogger(__name__)
 
@@ -159,12 +159,17 @@ def _parsed_siblings(parser: NameParser, folder: str) -> list[tuple[str, ParsedN
     return cache[folder]
 
 
-RECORDER_ALBUMS = ("tascam", "zoom", "roland", "olympus", "sony", "dr-")
+DEFAULT_RECORDER_ALBUMS = "tascam,zoom,roland,olympus,sony,dr-"
 
 
 def build_context(
-    path: Path, parser: NameParser, roots: list[Path], tags_from: Path | None = None
+    path: Path,
+    parser: NameParser,
+    roots: list[Path],
+    tags_from: Path | None = None,
+    recorder_albums: str = DEFAULT_RECORDER_ALBUMS,
 ) -> Context:
+    albums = tuple(w.strip().lower() for w in recorder_albums.split(",") if w.strip())
     folders = [parser.parse(name, "folder") for name in folder_chain(path, roots)]
     siblings: Counter = Counter()
     sibling_places: dict[str, set[str]] = {}
@@ -188,7 +193,7 @@ def build_context(
         if k in ("title", "album")
         and norm_key(v) != norm_key(path.stem)
         and norm_key(v) != norm_key(path.name)
-        and not norm_key(v).startswith(RECORDER_ALBUMS)
+        and not (albums and norm_key(v).startswith(albums))
     }
     tag_text = " ".join(useful.values())
     tag_origin = (
@@ -220,16 +225,23 @@ def build_context(
 
 # ------------------------------------------------------------------- resolver
 class Resolver:
-    def __init__(self, ref: Reference, roots: list[Path]) -> None:
+    def __init__(
+        self,
+        ref: Reference,
+        roots: list[Path],
+        recorder_prefixes: str = DEFAULT_RECORDER_PREFIXES,
+        recorder_albums: str = DEFAULT_RECORDER_ALBUMS,
+    ) -> None:
         self.ref = ref
-        self.parser = NameParser(ref)
+        self.recorder_albums = recorder_albums
+        self.parser = NameParser(ref, recorder_prefixes)
         self.roots = [r.resolve() for r in roots]
 
     def propose(self, path: Path, tags_from: Path | None = None) -> Proposal:
         """Propose a name from `path`; `tags_from` is where the file is now if it was moved."""
         path = Path(path)
         name = self.parser.parse(path.stem)
-        ctx = build_context(path, self.parser, self.roots, tags_from)
+        ctx = build_context(path, self.parser, self.roots, tags_from, self.recorder_albums)
         ev: list[Evidence] = []
         flags: list[str] = []
         notes: list[str] = []

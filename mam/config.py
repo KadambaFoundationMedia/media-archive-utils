@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     # Auto/review decisions (SPEC.md section 10)
     spot_check_rate: float = 0.05
 
+    # Renamer: recorder file names (set on the Settings page)
+    recorder_prefixes: str = "ZOOM,STE,DSC,MVI,IMG,REC,DR,LS,VN,WS,TASCAM,DM,MOV"
+    recorder_albums: str = "tascam,zoom,roland,olympus,sony,dr-"
+
     operator_name: str = Field(default_factory=getpass.getuser)
 
     # Worker pools

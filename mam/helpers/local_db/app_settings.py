@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -189,6 +190,22 @@ OPTIONS: tuple[Option, ...] = (
         1800,
     ),
     Option(
+        "recorder_prefixes",
+        "text",
+        "Recorder file name prefixes",
+        "Renamer",
+        "Names such as ZOOM0004 or DSC_0012 that a recorder made are not descriptive. Prefixes "
+        "separated by commas. R09-style names (R followed by two digits) always count.",
+    ),
+    Option(
+        "recorder_albums",
+        "text",
+        "Recorder album tags to ignore",
+        "Renamer",
+        "An ID3 album that starts with one of these words (commas) is a recorder's name, not "
+        "evidence.",
+    ),
+    Option(
         "transcribe_languages",
         "text",
         "Languages Whisper may choose",
@@ -277,6 +294,11 @@ def parse_option(option: Option, raw: Any) -> Any:
             if not codes or any(not (len(c) == 2 and c.isalpha()) for c in codes):
                 raise ValueError("Use two-letter language codes separated by commas")
             return ",".join(codes)
+        if option.key in ("recorder_prefixes", "recorder_albums"):
+            words = [w.strip() for w in text.split(",") if w.strip()]
+            if not words or any(not re.fullmatch(r"[A-Za-z0-9_-]+", w) for w in words):
+                raise ValueError("Use words (letters, digits, - and _) separated by commas")
+            return ",".join(words)
         return text
     try:
         value = int(text) if option.kind == "int" else float(text.replace(",", "."))
