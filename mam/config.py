@@ -7,11 +7,25 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_HOME = Path.home() / ".mam"
+
+
+FOLDER_FIELDS = (
+    "media_sample_files_path",
+    "media_processed_files_path",
+    "media_unprocessed_files_path",
+    "media_identical_files_path",
+    "inbox_path",
+    "trimming_samples_path",
+    "transcriptions_path",
+    "local_db_path",
+    "work_dir",
+    "log_dir",
+)
 
 
 class Settings(BaseSettings):
@@ -119,6 +133,19 @@ class Settings(BaseSettings):
     # stop analysing a recording once the class is found (the cut cannot change after that)
     analysis_early_stop: bool = True
     workers_io: int = 4
+
+    @model_validator(mode="before")
+    @classmethod
+    def _empty_folder_is_default(cls, data):
+        """`MEDIA_IDENTICAL_FILES_PATH=` (empty) means the default folder. An empty path would
+        otherwise become the current folder, the repository itself."""
+        if isinstance(data, dict):
+            return {
+                k: v
+                for k, v in data.items()
+                if not (k in FOLDER_FIELDS and (v is None or str(v).strip() == ""))
+            }
+        return data
 
     @field_validator("nas_root", mode="before")
     @classmethod
