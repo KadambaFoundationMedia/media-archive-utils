@@ -102,6 +102,10 @@
       </div>
     </div>
     <div class="card mb-3">
+      <div class="card-header">Kirtan splitter</div>
+      <div class="card-body pt-0">{{ option_rows(option_groups['Kirtan splitter']) }}</div>
+    </div>
+    <div class="card mb-3">
       <div class="card-header">Class discoverer</div>
       <div class="card-body">
         <div class="form-check form-switch d-flex align-items-center gap-2 ps-0">
@@ -120,7 +124,10 @@
       <div class="card-header">Content discoverer</div>
       <div class="card-body pt-0">{{ option_rows(option_groups['Content discoverer']) }}</div>
     </div>
-{% for group in ["Kirtan splitter", "Review", "General", "Advanced"] %}
+  </div>
+
+  <div class="col-12 col-lg-6">
+{% for group in ["Review", "General", "Advanced"] %}
     <div class="card mb-3">
       <div class="card-header">{{ group }}</div>
       <div class="card-body pt-0">{{ option_rows(option_groups[group]) }}</div>
@@ -171,9 +178,6 @@
         </dl>
       </div>
     </div>
-  </div>
-
-  <div class="col-12 col-lg-6">
     <form method="post" action="/settings/reset" class="card border-danger mb-3"
           onsubmit="return confirm('Reset the media manager? A backup of the database is made first.');">
       <div class="card-header text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Reset the media manager</div>
