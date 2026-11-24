@@ -142,6 +142,12 @@ def _check_processed_roots(settings: Settings) -> list[Path]:
                 )
         if root == Path(root.anchor) or root == Path.home().resolve():
             raise MamError(f"Refusing to clear {root}")
+        from mam.config import REPO_ROOT
+
+        protected = [REPO_ROOT.resolve(), settings.local_db_path.parent.resolve()]
+        for keep in protected:
+            if root == keep or root in keep.parents:
+                raise MamError(f"Refusing to clear {root}: it is or contains {keep}")
     return roots
 
 

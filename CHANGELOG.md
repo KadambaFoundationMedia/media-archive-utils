@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Safety
+- An empty folder setting in `.env` (for example `MEDIA_IDENTICAL_FILES_PATH=`) now means the default folder; it used to become the repository folder, which made the Settings page count the whole repository as processed copies. The reset also refuses any folder that is or contains the repository or the folder of the local database.
+
 ### Settings
 - The Settings page spreads its blocks over both columns: the tool blocks on the left in pipeline order (Renamer, Kirtan splitter, Class discoverer, Content discoverer, as in CONTRACTS.md; the Class trimmer joins when it is built), and Review, General, Advanced, Current settings and Reset on the right.
 - `.env.example` is shortened to the private values and paths; the other options are set on the Settings page. The test now checks that every key in it is a real setting.
