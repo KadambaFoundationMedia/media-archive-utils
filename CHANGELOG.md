@@ -10,6 +10,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 ### Class discoverer
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.
 
+### Media manager
+- Reset keeps the values set on the Settings page; only the Baserow writes switch is turned off again.
+
 ### Renamer
 - The earliest year read as a date (1990) is an option in the Advanced block of the Settings page.
 - Acronyms of other speakers and the words dropped from names are options in a new Advanced block on the Settings page.

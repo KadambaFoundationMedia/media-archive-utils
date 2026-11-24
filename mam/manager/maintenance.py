@@ -16,6 +16,7 @@ from sqlalchemy import delete, func, select
 from mam.config import Settings, get_settings
 from mam.errors import MamError
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import BASEROW_WRITES
 from mam.helpers.local_db.db import get_engine, session_scope
 from mam.helpers.local_db.repo import export_db
 
@@ -178,7 +179,12 @@ def reset(options: ResetOptions, settings: Settings | None = None) -> ResetResul
         for table in reversed(m.Base.metadata.sorted_tables):  # children before parents
             if table.name in keep:
                 continue
-            outcome = s.execute(delete(table))
+            stmt = delete(table)
+            if table.name == m.AppSetting.__tablename__:
+                # the Settings page values stay (decided 2026-11-24); only the Baserow writes
+                # switch goes back to off
+                stmt = stmt.where(m.AppSetting.key == BASEROW_WRITES)
+            outcome = s.execute(stmt)
             result.rows_deleted[table.name] = outcome.rowcount or 0
     with get_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         conn.exec_driver_sql("VACUUM")
