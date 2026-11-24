@@ -17,10 +17,19 @@ def test_changelog_mentions_current_version():
     assert f"## [{__version__}]" in text
 
 
-def test_env_example_documents_every_setting():
-    """Every setting the code reads is in .env.example (commented or not)."""
+def test_env_example_only_has_known_settings():
+    """.env.example holds the private values and paths; every KEY= in it is a real setting.
+
+    The other options are set on the Settings page, so they need not be listed here.
+    """
+    import re
+
     from mam.config import REPO_ROOT, Settings
 
-    text = (REPO_ROOT / ".env.example").read_text(encoding="utf-8").upper()
-    missing = [name for name in Settings.model_fields if name.upper() not in text]
-    assert not missing, f"add to .env.example: {missing}"
+    text = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
+    keys = set(re.findall(r"^#?\s*([A-Z][A-Z0-9_]+)=", text, flags=re.MULTILINE))
+    # Kept for tools that are not built yet (YouTube) and for the Baserow MCP connection.
+    reserved = {"BASEROW_MCP_URL", "YOUTUBE_API_KEY_KF", "YOUTUBE_API_KEY_KKSBLOG"}
+    known = {name.upper() for name in Settings.model_fields} | reserved
+    assert "ANTHROPIC_API_KEY" in keys
+    assert not keys - known, f"not a setting: {sorted(keys - known)}"
