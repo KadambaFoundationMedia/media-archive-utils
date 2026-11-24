@@ -11,7 +11,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-MIN_YEAR = 1990
+MIN_YEAR = 1990  # the earliest year read as a date; the Settings page sets it (set_min_year)
+
+
+def set_min_year(year: int) -> None:
+    global MIN_YEAR
+    MIN_YEAR = year
+
+
 # The archive mostly uses European day-month-year; American month-day-year is only chosen
 # when other evidence (folder, siblings, tags, travel schedule) points to it.
 MDY_PRIOR = 0.15

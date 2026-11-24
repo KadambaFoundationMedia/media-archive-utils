@@ -44,3 +44,14 @@ def test_digits_glued_to_letters_are_not_dates():
 def test_future_and_ancient_dates_are_rejected():
     assert readings("01-01-85") == []  # 1985 is before the archive (1990+)
     assert DateValue(2012, 7, None).text() == "2012-07-DD"
+
+
+def test_min_year_is_an_option():
+    from mam.tools.renamer import dates
+
+    try:
+        dates.set_min_year(2000)
+        assert not find_dates("1995-03-04")
+    finally:
+        dates.set_min_year(1990)
+    assert find_dates("1995-03-04")
