@@ -62,6 +62,11 @@ def enqueue(
     if not spec.per_file:
         session.add(m.Job(tool=tool, pool=spec.pool, dry_run=dry_run, params=params))
         return 1
+    run, run_params = spec, params
+    if spec.first_step and not (params or {}).get("loudness_done"):
+        # the tool starts with a step on another pool (loudness); that step queues the tool
+        run = TOOLS[spec.first_step]
+        run_params = {**(params or {}), "then": tool, "then_pipeline": pipeline}
     for file_id in file_ids:
         record = session.get(m.MediaFile, file_id)
         if record is None or record.status in ("Excluded", "Deleted"):
@@ -69,7 +74,7 @@ def enqueue(
         busy = session.scalar(
             select(m.Job.id).where(
                 m.Job.media_file_id == file_id,
-                m.Job.tool == tool,
+                m.Job.tool.in_((tool, run.name)),
                 m.Job.state.in_(("queued", "running")),
             )
         )
@@ -78,11 +83,11 @@ def enqueue(
         session.add(
             m.Job(
                 media_file_id=file_id,
-                tool=tool,
-                pool=spec.pool,
+                tool=run.name,
+                pool=run.pool,
                 dry_run=dry_run,
                 pipeline=pipeline,
-                params=params,
+                params=run_params,
             )
         )
         if spec.sets_status and not dry_run:
@@ -96,9 +101,13 @@ class Worker(threading.Thread):
         super().__init__(name=f"mam-{pool}-{index}", daemon=True)
         self.queue = queue
         self.pool = pool
+        self.index = index
 
     def run(self) -> None:
         while not self.queue.stopping.is_set():
+            if self.index >= self.queue.limits.get(self.pool, 1 << 30):
+                self.queue.wakeup.wait(1.0)  # the pool is scaled down: this worker rests
+                continue
             try:
                 job_id = self.queue.claim(self.pool)
             except Exception:  # database busy etc.; try again shortly
@@ -117,6 +126,8 @@ class JobQueue:
         self.wakeup = threading.Event()
         self.workers: list[Worker] = []
         self._claim_lock = threading.Lock()
+        self.limits: dict[str, int] = {}  # workers allowed to run now, per scaled pool
+        self.maximums: dict[str, int] = {}
 
     # ------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -137,6 +148,11 @@ class JobQueue:
                 worker = Worker(self, pool, i)
                 worker.start()
                 self.workers.append(worker)
+        if pool_settings.autoscale_workers:
+            self.maximums = {"cpu": max(1, sizes["cpu"]), "io": max(1, sizes["io"])}
+            self.limits = {pool: min(2, size) for pool, size in self.maximums.items()}
+            scaler = threading.Thread(target=self._autoscale, name="mam-autoscale", daemon=True)
+            scaler.start()
         watcher = threading.Thread(target=self._watch_inbox, name="mam-inbox", daemon=True)
         watcher.start()
         log.info("Job queue started: %s", sizes)
@@ -147,6 +163,38 @@ class JobQueue:
         deadline = time.monotonic() + timeout
         for worker in self.workers:
             worker.join(max(0.0, deadline - time.monotonic()))
+
+    def _autoscale(self, interval: float = 5.0) -> None:
+        """Every few seconds add a worker while the computer has spare CPU and memory and jobs
+        wait, and take one away when it is busy (resources.py)."""
+        from mam.manager.resources import next_limit, sample
+
+        sample()  # the first reading has no interval to measure
+        while not self.stopping.wait(interval):
+            try:
+                cpu, free = sample()
+                with session_scope() as session:
+                    for pool, maximum in self.maximums.items():
+                        waiting = bool(
+                            session.scalar(
+                                select(m.Job.id)
+                                .where(m.Job.pool == pool, m.Job.state == "queued")
+                                .limit(1)
+                            )
+                        )
+                        new = next_limit(self.limits[pool], maximum, cpu, free, waiting)
+                        if new != self.limits[pool]:
+                            log.info(
+                                "%s workers %s -> %s (CPU %.0f%%, memory free %.0f%%)",
+                                pool,
+                                self.limits[pool],
+                                new,
+                                cpu,
+                                free,
+                            )
+                            self.limits[pool] = new
+            except Exception:
+                log.exception("Autoscaling failed")
 
     def _watch_inbox(self, interval: float = 60.0) -> None:
         """Register new files dropped into the inbox folder (SPEC.md section 2)."""
