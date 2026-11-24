@@ -9,7 +9,7 @@ from typing import Any
 
 from mam.helpers.transcriber import Transcript
 
-PROMPT_VERSION = "content-1"
+PROMPT_VERSION = "content-2"
 
 SYSTEM = """\
 You describe recordings of Kadamba Kanana Swami, an ISKCON guru, for the Kadamba Foundation's \
@@ -19,22 +19,71 @@ by speech recognition: Sanskrit names may be misspelled, and some lines may be r
 invented. Rely on what is said repeatedly and clearly, and never invent teachings, stories, \
 quotes or names that are not in the transcript.
 
+First work out what the recording is really about: where most of its time goes. A class often \
+spends little time on the verse and most of it on a discussion, questions or a debate with the \
+listeners; the topics, title and description must follow that, with the verse as background. \
 Write in English, whatever language is spoken. Return only a JSON object with these keys:
 
-"topics": 1 to 5 topics that the speaker really develops. Each topic is at most 2 words. \
-Not too general: "Krishna Prema" or "Kali Yuga" is good, "Devotion" or "Spiritual life" is too \
-broad. Most important first.
+"topics": the topics the speaker really develops, as many as the content needs and no more: \
+usually 2 or 3, one for a focused class, 4 or 5 only when that many separate subjects each get \
+real time. Fewer, true topics are better than many: a long list dilutes the point of having \
+themes. Every topic must be a subject of the teaching that your description also covers, never \
+a word that is only mentioned in passing. Each topic is at most 2 words, a natural noun phrase \
+in correct English word order ("Humble Inquiry", "Kali Yuga", "Spiritual Authority"; never a \
+reversed order such as "Preaching Art" for the art of preaching). Not too general: never use \
+a theme from the list of broad themes you are given.
 
-"title": a short title that names the main point of the class. 2 to 6 words, enticing but \
-accurate, not generic, and built around one of the topics where possible. In sentence case \
-(capital letters only for names such as Krishna). No verse numbers, \
+"title": a short title that names the main point of the recording as it is actually spoken. \
+2 to 6 words, enticing but accurate, not generic, and built around one of the topics where \
+possible. In sentence case (capital letters only for names such as Krishna). No verse numbers, \
 no place, no date, no quotation marks, no colon.
 
-"description": a YouTube description in 2 to 3 paragraphs separated by a blank line, interesting \
-and captivating, that follows the topics. Plain text, no headings, no bullet points, no hashtags, \
-no footer, no mention that it was machine transcribed. Refer to the speaker as Kadamba Kanana \
-Swami or Maharaja.\
+"description": a YouTube description in 2 to 3 paragraphs separated by a blank line, \
+interesting and captivating, that follows the topics. The first sentence says, in natural \
+language, what the recording is and when and where it was recorded, using the facts you are \
+given, for example: "During a class on Srimad Bhagavatam 1.19.31, recorded on 20 August 2011 \
+in Oslo, Norway, Kadamba Kanana Swami considers how ...". Leave out any fact you are not given. \
+Plain text, no headings, no bullet points, no hashtags, no footer, no mention that it was \
+machine transcribed. Refer to the speaker as Kadamba Kanana Swami or Maharaja.
+
+Spell Sanskrit and Bengali names and terms exactly as in the list of glossary spellings you \
+are given, and in the same way as the transcript spells them; never add or drop letters such as \
+"h" ("Caitanya", not "Chaitanya").\
 """
+
+SCRIPTURES = {
+    "SB": "Srimad Bhagavatam",
+    "BG": "Bhagavad-gita",
+    "CC": "Caitanya-caritamrta",
+}
+
+
+def spoken_date(rec_date: str | None) -> str | None:
+    """'2011-08-20' -> '20 August 2011'; None when the date is not complete."""
+    from datetime import date
+
+    try:
+        d = date.fromisoformat(rec_date or "")
+    except ValueError:
+        return None
+    return f"{d.day} {d:%B %Y}"
+
+
+def place_text(place: str | None, cc: str | None) -> str | None:
+    """'Oslo' and 'no' -> 'Oslo, Norway'."""
+    country = None
+    if cc:
+        try:
+            import pycountry
+
+            found = pycountry.countries.get(alpha_2=cc.upper())
+            country = getattr(found, "common_name", None) or getattr(found, "name", None)
+        except Exception:  # noqa: BLE001 - the country name is a nicety
+            country = None
+    place = (place or "").replace("-", " ").strip() or None
+    if place and country and place.lower() != country.lower():
+        return f"{place}, {country}"
+    return place or country
 
 
 def plain_transcript(transcript: Transcript, start: float | None = None) -> str:
@@ -65,6 +114,9 @@ def build_user_prompt(
     what: str | None,
     languages: list[str],
     topics_known: str | None = None,
+    facts: dict[str, str] | None = None,
+    broad: list[str] | None = None,
+    terms: list[str] | None = None,
 ) -> str:
     parts: list[str] = []
     meta = []
@@ -76,6 +128,15 @@ def build_user_prompt(
         meta.append("Languages heard: " + ", ".join(languages))
     if topics_known:
         meta.append(f"Themes already entered by a person (keep close to these): {topics_known}")
+    for label, key in (("Recorded on", "date"), ("Recorded in", "place")):
+        if facts and facts.get(key):
+            meta.append(f"{label}: {facts[key]}")
+    if facts and facts.get("scripture"):
+        meta.append(f"Scripture: {facts['scripture']}")
+    if broad:
+        meta.append("Broad themes (never use as a topic): " + ", ".join(broad))
+    if terms:
+        meta.append("Glossary spellings to use for names in the transcript: " + ", ".join(terms))
     if meta:
         parts.append("\n".join(meta))
     if verse:

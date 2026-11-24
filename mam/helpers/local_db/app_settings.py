@@ -272,6 +272,40 @@ OPTIONS: tuple[Option, ...] = (
         100000,
     ),
     Option(
+        "content_broad_themes",
+        "text",
+        "Broad themes (never used)",
+        "Content discoverer",
+        "Themes that are too general, separated by commas. The model is told to avoid them "
+        "and any of them in its answer is dropped.",
+    ),
+    Option(
+        "content_footer",
+        "textarea",
+        "YouTube footer",
+        "Content discoverer",
+        "Added after every description. {year} becomes the current year. Empty: the text file "
+        "docs/references/youtube-footer.txt is used.",
+    ),
+    Option(
+        "llm_price_in",
+        "float",
+        "Price per million input tokens (USD)",
+        "Content discoverer",
+        "Only used to show what a run cost. Check anthropic.com/pricing for the model.",
+        0,
+        1000,
+    ),
+    Option(
+        "llm_price_out",
+        "float",
+        "Price per million output tokens (USD)",
+        "Content discoverer",
+        "Only used to show what a run cost.",
+        0,
+        1000,
+    ),
+    Option(
         "analysis_early_stop",
         "bool",
         "Stop listening once the class is found",
@@ -340,7 +374,11 @@ def parse_option(option: Option, raw: Any) -> Any:
         if text not in option.choices:
             raise ValueError("Choose one of: " + ", ".join(option.choices))
         return text
+    if option.kind == "textarea":
+        return str(raw if raw is not None else "").replace("\r\n", "\n").strip()
     if option.kind == "text":
+        if option.key == "content_broad_themes":
+            return ", ".join(w.strip() for w in text.split(",") if w.strip())
         if not text and option.key not in ("words_chapter", "words_verse"):
             raise ValueError("This cannot be empty")
         if option.key == "transcribe_languages":

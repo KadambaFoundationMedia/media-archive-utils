@@ -79,6 +79,15 @@ class Settings(BaseSettings):
     # the YouTube footer comes from this file ({year} is the current year).
     content_review_first: int = 20
     content_footer_path: Path = REPO_ROOT / "docs" / "references" / "youtube-footer.txt"
+    # Settings page, block "Content discoverer": a footer typed there wins over the file; themes
+    # that are too broad are never used; prices (USD per million tokens) only for the cost shown.
+    content_footer: str = ""
+    content_broad_themes: str = (
+        "Krishna Consciousness, Spiritual Life, Devotion, Devotional Service, Bhakti, "
+        "Spirituality, Krishna, God, Philosophy, Religion, Love"
+    )
+    llm_price_in: float = 2.0
+    llm_price_out: float = 10.0
 
     # Local state (never on the NAS share)
     local_db_path: Path = DEFAULT_HOME / "mam.sqlite"
