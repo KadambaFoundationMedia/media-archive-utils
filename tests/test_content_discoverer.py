@@ -351,3 +351,20 @@ def test_new_settings_are_options():
     assert OPTION_BY_KEY["content_footer"].kind == "textarea"
     assert parse_option(OPTION_BY_KEY["content_footer"], " a\r\nb ") == "a\nb"
     assert parse_option(OPTION_BY_KEY["content_broad_themes"], "A,  b ,") == "A, b"
+
+
+def test_settings_blocks_follow_the_pipeline_order_in_two_columns():
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from mam.manager.app import create_app
+
+    with TestClient(create_app(start_queue=False)) as client:
+        html = client.get("/settings").text
+    left, right = html.split('<div class="col-12 col-lg-6">')[1:3]
+    heads = lambda part: re.findall(r'class="card-header[^"]*">(?:<i[^>]*></i>)?([A-Za-z ]+)', part)  # noqa: E731
+    tools = ["Renamer", "Kirtan splitter", "Class discoverer", "Content discoverer"]
+    assert [h for h in heads(left) if h in tools] == tools
+    assert [h.strip() for h in heads(right)][:3] == ["Review", "General", "Advanced"]
+    assert "Reset the media manager" in heads(right)[-1] or "Reset" in right
