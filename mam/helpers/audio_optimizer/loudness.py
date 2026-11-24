@@ -35,6 +35,8 @@ ENCODERS = {
     "aac": "aac",
     "wmav2": "wmav2",
     "wmav1": "wmav2",
+    "ac3": "ac3",
+    "eac3": "eac3",
     "opus": "libopus",
     "vorbis": "libvorbis",
     "flac": "flac",

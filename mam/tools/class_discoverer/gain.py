@@ -13,7 +13,7 @@ from mam.config import Settings
 from mam.helpers.audio_optimizer import measure, normalize_whole
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import fingerprint, sha256
-from mam.helpers.local_db.repo import record_event
+from mam.helpers.local_db.repo import media_kind, record_event
 
 log = logging.getLogger(__name__)
 TOOL = "class-discoverer"
@@ -26,6 +26,9 @@ def apply_gain(
 
     A recording that already meets the target is left alone: no needless re-encode.
     """
+    if media_kind(audio) == "video":
+        # a video file is never edited (SPEC.md section 4); its sound is only read
+        return {"applied": False, "reason": "video file: never edited"}
     before = measure(audio)
     if before.meets_target():
         return {"applied": False, "before": before.integrated, "reason": "already at the target"}

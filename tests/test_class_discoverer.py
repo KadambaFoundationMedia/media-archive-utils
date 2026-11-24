@@ -531,3 +531,14 @@ def test_loudness_runs_first_on_the_cpu_pool_then_the_transcription(prepared):
         record = s.get(m.MediaFile, rid)
         assert record.meta["class_discoverer"]["gain"]["applied"]
         assert record.meta["class_discoverer"]["timings"]["gain_s"] >= 0
+
+
+def test_gain_never_edits_a_video_file(settings, tmp_path):
+    from mam.tools.class_discoverer.gain import apply_gain
+
+    video = tmp_path / "talk.mp4"
+    video.write_bytes(b"not real media")  # it is never opened
+    with session_scope() as s:
+        out = apply_gain(s, m.MediaFile(), video, settings, dry_run=False)
+    assert out["applied"] is False and "video" in out["reason"]
+    assert video.read_bytes() == b"not real media"

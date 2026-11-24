@@ -99,3 +99,15 @@ def test_stream_cut_dry_run(tone, settings):
     out = settings.media_processed_files_path / "cut.mp3"
     commands = stream_cut(tone, out, [(0.0, 2.0)])
     assert len(commands) == 1 and "-c copy" in commands[0] and not out.exists()
+
+
+def test_normalize_handles_an_ac3_track(settings):
+    from tests.conftest import make_tone
+
+    src = make_tone(
+        settings.media_sample_files_path / "a.ac3", codec_args=["-c:a", "ac3", "-b:a", "192k"]
+    )
+    assert probe(src).codec == "ac3"
+    out = settings.media_processed_files_path / "a.ac3"
+    result = normalize_whole(src, out, dry_run=False)
+    assert result.qa_passed and probe(out).codec == "ac3"
