@@ -7,6 +7,12 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Content discoverer
+- New tool: reads the class transcript and writes 1 to 5 themes, a short title and a YouTube description (with the footer and the current year). Run it from the Action menu or with `mam content-discover <file>` (dry run by default; a dry run asks the model once and caches the answer, so the real run is not billed again).
+- The themes, description and `youtube_desc` go to the Baserow media row (empty fields only; a different existing value goes to review). A class with a verse and no title gets the title in its filename through the Renamer. A recording without a verse keeps its filename.
+- The first 20 results (Settings: "Results checked first") are reviewed on the file page, where the themes, title and description can be edited; after that it works alone, with the random check.
+- New LLM helper with a pluggable provider (the Claude API for now; set `ANTHROPIC_API_KEY` in `.env`). The model and its thinking effort are options on the Settings page. Answers are cached by input and prompt version.
+
 ### Class discoverer
 - Removed the experimental "Improve the chanted verse" option (a second transcription pass on the chanted verse); the test on real recordings was mixed.
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.

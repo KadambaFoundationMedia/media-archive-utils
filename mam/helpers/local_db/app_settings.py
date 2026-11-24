@@ -134,6 +134,7 @@ class Option:
     low: float | None = None
     high: float | None = None
     restart: bool = False  # only read at start-up
+    choices: tuple[str, ...] = ()  # kind "choice": the allowed values
 
 
 OPTIONS: tuple[Option, ...] = (
@@ -247,6 +248,30 @@ OPTIONS: tuple[Option, ...] = (
         120,
     ),
     Option(
+        "llm_model",
+        "text",
+        "AI model",
+        "Content discoverer",
+        "The Claude model that writes the themes, title and description.",
+    ),
+    Option(
+        "llm_effort",
+        "choice",
+        "Thinking effort",
+        "Content discoverer",
+        "Low is fastest and cheapest; high thinks longer.",
+        choices=("low", "medium", "high"),
+    ),
+    Option(
+        "content_review_first",
+        "int",
+        "Results checked first",
+        "Content discoverer",
+        "The first results go to review before it works alone (0 = never).",
+        0,
+        100000,
+    ),
+    Option(
         "analysis_early_stop",
         "bool",
         "Stop listening once the class is found",
@@ -311,6 +336,10 @@ def parse_option(option: Option, raw: Any) -> Any:
     if option.kind == "bool":
         return raw in (True, "on", "true", "1")
     text = str(raw if raw is not None else "").strip()
+    if option.kind == "choice":
+        if text not in option.choices:
+            raise ValueError("Choose one of: " + ", ".join(option.choices))
+        return text
     if option.kind == "text":
         if not text and option.key not in ("words_chapter", "words_verse"):
             raise ValueError("This cannot be empty")

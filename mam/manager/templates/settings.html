@@ -14,6 +14,16 @@
     <label class="form-check-label" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}</label>
     <span id="saved-{{ o.key }}" aria-live="polite"></span>
   </div>
+  {% elif o.kind == "choice" %}
+  <label class="form-label small mb-1" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}</label>
+  <div class="d-flex gap-2 align-items-center">
+    <select class="form-select form-select-sm w-auto" id="opt_{{ o.key }}" name="value"
+            hx-post="/settings/option/{{ o.key }}" hx-trigger="change" hx-include="this"
+            hx-target="#saved-{{ o.key }}" hx-swap="innerHTML">
+      {% for c in o.choices %}<option value="{{ c }}" {% if values[o.key] == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+    <span id="saved-{{ o.key }}" aria-live="polite"></span>
+  </div>
   {% else %}
   <label class="form-label small mb-1" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}{% if o.restart %} <span class="text-body-secondary">(after restart)</span>{% endif %}</label>
   <div class="d-flex gap-2 align-items-center">
@@ -97,6 +107,10 @@
         </div>
         {{ option_rows(option_groups['Class discoverer']) }}
       </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header">Content discoverer</div>
+      <div class="card-body pt-0">{{ option_rows(option_groups['Content discoverer']) }}</div>
     </div>
 {% for group in ["Kirtan splitter", "Review", "General", "Advanced"] %}
     <div class="card mb-3">

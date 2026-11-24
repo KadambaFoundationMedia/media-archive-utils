@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     vedabase_url: str = "https://vedabase.io"
     vedabase_delay_s: float = 10.0
 
+    # LLM (SPEC.md section 1): a pluggable provider; the Claude API is the default. Used by the
+    # content discoverer. An empty key falls back to the SDK's own credentials (`ant auth login`).
+    llm_provider: str = "claude"
+    anthropic_api_key: str = ""
+    llm_model: str = "claude-sonnet-5-5"
+    llm_effort: str = "low"  # low | medium | high: how hard the model thinks (cost and speed)
+    llm_timeout_s: float = 300.0
+    # Content discoverer: its first N results are reviewed before it works on its own, and
+    # the YouTube footer comes from this file ({year} is the current year).
+    content_review_first: int = 20
+    content_footer_path: Path = REPO_ROOT / "docs" / "references" / "youtube-footer.txt"
+
     # Local state (never on the NAS share)
     local_db_path: Path = DEFAULT_HOME / "mam.sqlite"
     work_dir: Path = DEFAULT_HOME / "work"

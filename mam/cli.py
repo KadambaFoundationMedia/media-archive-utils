@@ -358,6 +358,20 @@ def class_discover(
     _run_tool_cli("class-discoverer", path, dry_run)
 
 
+@app.command("content-discover")
+def content_discover(
+    path: Path,
+    dry_run: DryRun = True,
+) -> None:
+    """Write the themes, a title and the YouTube description of a class (dry run by default).
+
+    Needs the transcript the class discoverer made, and the Claude API key in `.env`. A dry run
+    asks the model (the answer is cached, so the real run is not billed again) and changes
+    nothing.
+    """
+    _run_tool_cli("content-discoverer", path, dry_run)
+
+
 @app.command()
 def reset(
     processed_files: Annotated[bool, typer.Option(help="Delete the processed copies.")] = True,

@@ -111,7 +111,31 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                         )
                     ):
                         resumed = resume_after_review(session, record, review.tool)
-                elif review.tool == "class-discoverer" and action == "reject":
+                elif review.tool == "content-discoverer" and action == "approve":
+                    from mam.tools.content_discoverer import tool as content
+
+                    record = session.get(m.MediaFile, review.media_file_id)
+                    result_msg = content.decide_review(
+                        session,
+                        review,
+                        topics=form.get("topics") or "",
+                        title=form.get("title") or "",
+                        description=form.get("description") or "",
+                        use_new={k for k in ("themes", "description") if form.get(f"use_new_{k}")},
+                        operator=operator,
+                        note=note,
+                    )
+                    if session.scalar(
+                        select(m.Job.id).where(
+                            m.Job.media_file_id == record.id,
+                            m.Job.tool == review.tool,
+                            m.Job.pipeline.is_(True),
+                        )
+                    ):
+                        resumed = resume_after_review(session, record, review.tool)
+                elif (
+                    review.tool in ("class-discoverer", "content-discoverer") and action == "reject"
+                ):
                     from datetime import UTC, datetime
 
                     from mam.helpers.local_db.repo import set_status
@@ -120,13 +144,13 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
                     review.outcome, review.operator, review.note = "rejected", operator, note
                     review.decided_at = datetime.now(UTC)
                     meta = dict(record.meta or {})
-                    meta.pop("class_discoverer", None)
+                    meta.pop(review.tool.replace("-", "_"), None)
                     record.meta = meta
                     set_status(
                         session,
                         record,
                         stable_status(session, record),
-                        "class-discoverer",
+                        review.tool,
                         "result rejected",
                     )
                     result_msg = "Result rejected: nothing was changed; the file can be run again"
