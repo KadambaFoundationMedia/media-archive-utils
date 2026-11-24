@@ -206,6 +206,20 @@ OPTIONS: tuple[Option, ...] = (
         "evidence.",
     ),
     Option(
+        "other_speakers",
+        "text",
+        "Acronyms of other speakers",
+        "Advanced",
+        "A name with one of these (commas) is flagged, because WHO is always KKS.",
+    ),
+    Option(
+        "noise_words",
+        "text",
+        "Words dropped from names",
+        "Advanced",
+        "Honorifics and format words (commas) that are left out of the WHAT.",
+    ),
+    Option(
         "transcribe_languages",
         "text",
         "Languages Whisper may choose",
@@ -294,7 +308,7 @@ def parse_option(option: Option, raw: Any) -> Any:
             if not codes or any(not (len(c) == 2 and c.isalpha()) for c in codes):
                 raise ValueError("Use two-letter language codes separated by commas")
             return ",".join(codes)
-        if option.key in ("recorder_prefixes", "recorder_albums"):
+        if option.key in ("recorder_prefixes", "recorder_albums", "other_speakers", "noise_words"):
             words = [w.strip() for w in text.split(",") if w.strip()]
             if not words or any(not re.fullmatch(r"[A-Za-z0-9_-]+", w) for w in words):
                 raise ValueError("Use words (letters, digits, - and _) separated by commas")

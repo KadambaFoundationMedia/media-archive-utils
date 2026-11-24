@@ -51,7 +51,9 @@ TOOL = "class-discoverer"
 # a recording in which no verse is heard goes to review.
 GENERIC_CATEGORIES = {"class", "various", "unknown"}
 
-LANGUAGE_NAMES = {
+# Fallback while the Baserow `language_terms.whisper_code` column is empty (decided 2026-11-24:
+# the codes live in that column).
+FALLBACK_LANGUAGE_NAMES = {
     "en": "English", "nl": "Dutch", "de": "German", "es": "Spanish", "hi": "Hindi",
     "fr": "French", "cs": "Czech", "sk": "Slovak", "ru": "Russian", "pt": "Portuguese",
     "it": "Italian", "pl": "Polish", "hr": "Croatian", "sl": "Slovenian", "sr": "Serbian",
@@ -397,7 +399,8 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         (named.get("match") or {}).get("share"),
         decision["action"],
     )
-    languages = [LANGUAGE_NAMES.get(code, code) for code in transcript.languages[:3]]
+    codes = _whisper_codes()
+    languages = [codes.get(code, code) for code in transcript.languages[:3]]
     data.update(
         decision=decision,
         gain=gain,
@@ -444,6 +447,17 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         data["renamer_queued"] = queued
         summary += " The Renamer is queued with this evidence." if queued else ""
     return ToolOutcome("done", summary, data)
+
+
+def _whisper_codes() -> dict[str, str]:
+    """Whisper code -> Baserow language name: the `whisper_code` column, else the built-in list."""
+    try:
+        from mam.tools.renamer.knowledge import get_reference
+
+        table = get_reference().aliases.get("whisper_codes") or {}
+    except Exception:  # Baserow unreachable: the built-in list still works
+        table = {}
+    return table or FALLBACK_LANGUAGE_NAMES
 
 
 def _has_what(record: m.MediaFile) -> bool:

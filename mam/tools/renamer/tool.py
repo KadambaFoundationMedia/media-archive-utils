@@ -49,6 +49,8 @@ def resolver(settings: Settings | None = None) -> Resolver:
         [p for _, p in settings.import_roots],
         settings.recorder_prefixes,
         settings.recorder_albums,
+        settings.other_speakers,
+        settings.noise_words,
     )
 
 

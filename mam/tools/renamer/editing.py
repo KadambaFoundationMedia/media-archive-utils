@@ -33,7 +33,7 @@ from mam.tools.renamer.knowledge import (
     norm_key,
 )
 from mam.tools.renamer.naming import build_name, format_where, problems
-from mam.tools.renamer.parse import NameParser
+from mam.tools.renamer.parse import parser_from_settings
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def place_suggestion(text: str, ref: Reference) -> str | None:
 def parse_filename(name: str, ref: Reference) -> dict[str, Any]:
     """Values a filename stands for: date, WHAT, place, country, tag, category, title."""
     stem = Path(name).stem
-    parsed = NameParser(ref).parse(stem)
+    parsed = parser_from_settings(ref).parse(stem)
     when = "YYYY-MM-DD"
     if parsed.dates and parsed.dates[0].readings:
         when = parsed.dates[0].readings[0].value.text()

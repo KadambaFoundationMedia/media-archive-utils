@@ -8,6 +8,8 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Renamer
+- Acronyms of other speakers and the words dropped from names are options in a new Advanced block on the Settings page.
+- The class discoverer reads Whisper language codes from the `whisper_code` column of Baserow `language_terms` (built-in list only as a fallback while the column is empty).
 - The recorder file name prefixes (ZOOM, DSC, TASCAM, ...) and the recorder album tags that are ignored are now options on the Settings page (Renamer block), not code.
 - Summercamp now comes from a row in `category_terms_folder` (add the row and its spellings in Baserow), not from a pattern in the code. A recorder file in a Summercamp folder is named `..._Summercamp_...` and is no longer flagged.
 

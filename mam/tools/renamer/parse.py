@@ -178,14 +178,36 @@ def _tidy_word(word: str) -> str:
     return word
 
 
+def _words(text: str) -> list[str]:
+    return [w.strip() for w in text.split(",") if w.strip()]
+
+
+def parser_from_settings(ref: Reference) -> NameParser:
+    """A parser using the Renamer options of the Settings page."""
+    from mam.helpers.local_db.app_settings import tuned
+
+    s = tuned()
+    return NameParser(ref, s.recorder_prefixes, s.other_speakers, s.noise_words)
+
+
 class NameParser:
-    def __init__(self, ref: Reference, recorder_prefixes: str = DEFAULT_RECORDER_PREFIXES) -> None:
+    def __init__(
+        self,
+        ref: Reference,
+        recorder_prefixes: str = DEFAULT_RECORDER_PREFIXES,
+        other_speakers: str | None = None,
+        noise_words: str | None = None,
+    ) -> None:
         self.ref = ref
         self.recorder_res = recorder_res(recorder_prefixes)
         a = ref.aliases
-        self.noise = {norm_key(w) for w in a.get("noise", [])}
+        noise = _words(noise_words) if noise_words is not None else a.get("noise", [])
+        self.noise = {norm_key(w) for w in noise}
         self.generic = ref.generic_words()  # the Class category's terms (Baserow)
-        self.other_speakers = {w.upper() for w in a.get("other_speakers", [])}
+        speakers = (
+            _words(other_speakers) if other_speakers is not None else a.get("other_speakers", [])
+        )
+        self.other_speakers = {w.upper() for w in speakers}
 
     def parse(self, text: str, source: str = "filename") -> ParsedName:
         text = text.strip()

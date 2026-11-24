@@ -5,6 +5,7 @@
 # Keys are matched case-insensitively, without accents, with spaces/hyphens/underscores equal.
 
 # Speaker acronyms. WHO is always KKS; another speaker in a name is flagged for review.
+# `other_speakers` and `noise` below are only the fallback: the Settings page (Advanced) sets them.
 kks: [KKS, Kadamba Kanana Swami, Kadambakanana Swami, Kadamba Kanana, Kadamba S]
 other_speakers: [SNS, BVS, KKD, KVS, BVPS, RNS]
 
