@@ -1057,19 +1057,6 @@ def test_speech_only_option_autosaves_on_the_settings_page(client):
     assert transcribe_speech_only(True) is False
 
 
-def test_verse_pass_option_autosaves_on_the_settings_page(client):
-    from mam.helpers.local_db.app_settings import transcribe_verse_pass
-
-    assert "Improve the chanted verse" in client.get("/settings").text
-    assert transcribe_verse_pass(False) is False
-    assert client.post(
-        "/settings/class-discoverer/verse-pass", data={"verse_pass": "on"}
-    ).is_success
-    assert transcribe_verse_pass(False) is True
-    client.post("/settings/class-discoverer/verse-pass", data={"verse_pass": "off"})
-    assert transcribe_verse_pass(True) is False
-
-
 def test_settings_page_options_autosave(client):
     page = client.get("/settings")
     assert page.status_code == 200

@@ -35,9 +35,7 @@ from mam.helpers.local_db.app_settings import (
     set_option,
     set_renamer_options,
     set_transcribe_speech_only,
-    set_transcribe_verse_pass,
     transcribe_speech_only,
-    transcribe_verse_pass,
 )
 from mam.helpers.local_db.repo import media_kind
 from mam.manager import queries, stale
@@ -787,7 +785,6 @@ def create_app(start_queue: bool = True) -> FastAPI:
             renamer_move_files=renamer_move_files(),
             renamer_postfix=renamer_postfix(),
             speech_only=transcribe_speech_only(settings.transcribe_speech_only),
-            verse_pass=transcribe_verse_pass(settings.transcribe_verse_pass),
             option_groups=option_groups(),
             values={o.key: option_value(o, settings) for o in OPTIONS},
         )
@@ -821,12 +818,6 @@ def create_app(start_queue: bool = True) -> FastAPI:
         form = await request.form()
         set_transcribe_speech_only(form.get("speech_only") == "on")
         return saved(request, "Only transcribe speech")
-
-    @app.post("/settings/class-discoverer/verse-pass")
-    async def settings_verse_pass(request: Request):
-        form = await request.form()
-        set_transcribe_verse_pass(form.get("verse_pass") == "on")
-        return saved(request, "Improve the chanted verse")
 
     @app.post("/settings/renamer/postfix")
     async def settings_renamer_postfix(request: Request):

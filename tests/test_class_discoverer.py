@@ -497,22 +497,6 @@ def test_filename_verse_heard_beats_an_announcement_that_is_not():
     assert decide(data)["action"] == "review"
 
 
-def test_verse_pass_runs_only_when_switched_on(prepared, monkeypatch):
-    from mam.helpers.local_db.app_settings import set_transcribe_verse_pass
-    from mam.helpers.transcriber import verse_pass
-
-    called = []
-    monkeypatch.setattr(verse_pass, "improve", lambda *a: called.append(a))
-    rid, _ = prepared(translation_texts(), "2008-01-04_KKS_BG-2-51.mp3", what="BG-2-51")
-    assert "verse_pass" not in run(rid).data  # option off
-    set_transcribe_verse_pass(True)
-    rid2, _ = prepared(translation_texts(), "2008-01-05_KKS_BG-2-51.mp3", what="BG-2-51")
-    out = run(rid2)
-    assert out.state == "done"
-    assert out.data["verse_pass"] is None  # the (fake) pass changed nothing
-    assert len(called) == 1 and "karma" in called[0][3]  # the confirmed verse is the prompt
-
-
 def test_only_a_general_category_does_not_count_as_a_what():
     from types import SimpleNamespace
 
