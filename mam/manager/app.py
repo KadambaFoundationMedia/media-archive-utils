@@ -623,10 +623,10 @@ def create_app(start_queue: bool = True) -> FastAPI:
 
         data = snapshot()
         bars = [
-            ("CPU", "cpu", data["cpu"], "%", "fa-microchip"),
-            ("GPU", "gpu", data["gpu"], "%", "fa-display"),
-            ("Memory", "memory", data["memory"], "%", "fa-memory"),
-            ("CPU temperature", "temp", data["temp"], "\u00b0C", "fa-temperature-half"),
+            ("CPU", "cpu", data["cpu"], "%", "CPU"),
+            ("GPU", "gpu", data["gpu"], "%", "GPU"),
+            ("Memory", "memory", data["memory"], "%", "MEM"),
+            ("CPU temperature", "temp", data["temp"], "\u00b0C", "TEMP"),
         ]
         shown = [
             {
