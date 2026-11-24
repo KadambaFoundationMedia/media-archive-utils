@@ -780,12 +780,17 @@ def create_app(start_queue: bool = True) -> FastAPI:
         if ref is None:
             return {"ready": False}
         general = {norm_key(p) for p in ref.aliases.get("no_country") or []}
+
+        def is_general(name: str) -> bool:
+            """A general place, or a spelling that a general place lists as its alias."""
+            target = ref.places.get(norm_key(name))
+            return norm_key(name) in general or bool(target and norm_key(target.name) in general)
+
         missing = sorted(
             {
                 name
                 for name in ref.place_options
-                if norm_key(name) not in general
-                and not (ref.place_rows.get(norm_key(name)) or {}).get("cc")
+                if not is_general(name) and not (ref.place_rows.get(norm_key(name)) or {}).get("cc")
             },
             key=str.casefold,
         )
