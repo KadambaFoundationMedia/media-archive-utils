@@ -52,7 +52,8 @@ class ToolSpec:
     per_file: bool = True
     changes_files: bool = True
     sets_status: bool = True  # read-only checks leave the processing status alone
-    hidden: bool = False  # a step another tool queues; not in the action menu
+    first_step: str | None = None  # a hidden tool that runs first, on its own pool
+    hidden: bool = False  # a step of another tool: not in the action menu
 
 
 def _scan(ctx: JobContext) -> ToolOutcome:
@@ -85,10 +86,10 @@ def _class_discoverer(ctx: JobContext) -> ToolOutcome:
     return run_class_discoverer(ctx)
 
 
-def _audio_gain(ctx: JobContext) -> ToolOutcome:
-    from mam.tools.class_discoverer.gain import run_audio_gain
+def _class_loudness(ctx: JobContext) -> ToolOutcome:
+    from mam.tools.class_discoverer.tool import run_class_loudness
 
-    return run_audio_gain(ctx)
+    return run_class_loudness(ctx)
 
 
 def _content_discoverer(ctx: JobContext) -> ToolOutcome:
@@ -118,14 +119,16 @@ TOOLS: dict[str, ToolSpec] = {
         "ml",
         _class_discoverer,
         "Even out the volume, transcribe the class and find its verse on vedabase.io",
+        first_step="class-loudness",
     ),
-    "audio-gain": ToolSpec(
-        "audio-gain",
-        "Volume",
+    # The loudness step of the Class discoverer: ffmpeg work, so it runs on the CPU pool, many
+    # files at once, while the ML pool transcribes one file. It queues the transcription itself.
+    "class-loudness": ToolSpec(
+        "class-loudness",
+        "Class discoverer",
         "cpu",
-        _audio_gain,
-        "Even out the volume of a class ahead of the Class discoverer (queued by it)",
-        sets_status=False,
+        _class_loudness,
+        "Measure and even out the volume of a class before it is transcribed",
         hidden=True,
     ),
     "content-discoverer": ToolSpec(

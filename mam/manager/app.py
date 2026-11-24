@@ -351,7 +351,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
         pipeline = tool == "__pipeline"
         if pipeline:
             tool = pipeline_start()
-        if tool not in TOOLS or not TOOLS[tool].per_file:
+        if tool not in TOOLS or not TOOLS[tool].per_file or TOOLS[tool].hidden:
             raise HTTPException(400, f"Unknown tool {tool}")
         with session_scope() as session:
             if form.get("scope") == "all":
@@ -616,6 +616,33 @@ def create_app(start_queue: bool = True) -> FastAPI:
             raise HTTPException(500, str(exc)) from exc
 
     # ------------------------------------------------------------------ jobs
+    @app.get("/nav/resources", response_class=HTMLResponse)
+    def nav_resources(request: Request):
+        """CPU, GPU, memory and temperature bars of the header (see _resources.html)."""
+        from mam.manager.resources import level, snapshot
+
+        data = snapshot()
+        bars = [
+            ("CPU", "cpu", data["cpu"], "%", "C"),
+            ("GPU", "gpu", data["gpu"], "%", "G"),
+            ("Memory", "memory", data["memory"], "%", "M"),
+            ("CPU temperature", "temp", data["temp"], "\u00b0C", "fa-temperature-half"),
+        ]
+        shown = [
+            {
+                "label": label,
+                "icon": icon if icon.startswith("fa-") else None,
+                "letter": None if icon.startswith("fa-") else icon,
+                "value": round(v),
+                "unit": unit,
+                "color": level(kind, v),
+                "width": min(100, max(2, round(v))),
+            }
+            for label, kind, v, unit, icon in bars
+            if v is not None
+        ]
+        return render(request, "_resources.html", bars=shown)
+
     @app.get("/nav/badges", response_class=HTMLResponse)
     def nav_badges(request: Request):
         """Navbar counts, swapped out of band while jobs run (see _nav_badges.html)."""

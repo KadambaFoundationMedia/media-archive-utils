@@ -43,7 +43,7 @@ from mam.tools.class_discoverer.announce import (
     find_announcements,
     set_extra_words,
 )
-from mam.tools.class_discoverer.gain import apply_gain, file_lock
+from mam.tools.class_discoverer.gain import apply_gain
 from mam.tools.class_discoverer.match import VerseMatch, match_translation
 
 log = logging.getLogger(__name__)
@@ -298,6 +298,40 @@ def transcript_path(settings: Settings, record: m.MediaFile, audio: Path) -> Pat
     return transcript_file(settings, audio)
 
 
+def run_class_loudness(ctx: JobContext) -> ToolOutcome:
+    """Step one of the Class discoverer, on the CPU pool: measure and even out the volume, then
+    queue the transcription (ML pool, one file at a time) with the result."""
+    from mam.manager.queue import enqueue, status_for
+
+    record, settings = ctx.media_file, ctx.settings
+    if record is None:
+        raise MamError("The class discoverer needs a file")
+    skip = not_a_class(record)
+    if skip:
+        return ToolOutcome("skipped", skip, {})
+    started = time.monotonic()
+    audio = source_audio(record, dry_run=ctx.dry_run)
+    report("Measuring and adjusting the loudness", 0.02)
+    try:
+        gain = apply_gain(ctx.session, record, audio, settings, dry_run=ctx.dry_run)
+    except CorruptedMedia as exc:
+        return ToolOutcome("corrupted", str(exc), {})
+    drop = ("then", "then_pipeline", "gain", "gain_s")
+    params = {k: v for k, v in ctx.params.items() if k not in drop}
+    params.update(loudness_done=True, gain=gain, gain_s=round(time.monotonic() - started, 1))
+    ctx.session.flush()
+    enqueue(
+        ctx.session,
+        ctx.params.get("then", "class-discoverer"),
+        [record.id],
+        dry_run=ctx.dry_run,
+        params=params,
+        pipeline=bool(ctx.params.get("then_pipeline")),
+    )
+    status = None if ctx.dry_run else status_for("Class discoverer", "queued")
+    return ToolOutcome("info", "Loudness done; transcription queued", {"gain": gain}, status=status)
+
+
 def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     record, settings = ctx.media_file, ctx.settings
     if record is None:
@@ -310,19 +344,13 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     audio = source_audio(record, dry_run=ctx.dry_run)
     file_ref = filename_verse(record)
     client = VedabaseClient(settings)
-    report("Measuring and adjusting the loudness", 0.02)
-    try:
-        with file_lock(audio):  # waits for the `audio-gain` job of this file, if it runs now
-            ctx.session.refresh(record)  # its new size and hash
+    gain = ctx.params.get("gain")
+    if gain is None:  # the loudness step did not run (an old queued job)
+        report("Measuring and adjusting the loudness", 0.02)
+        try:
             gain = apply_gain(ctx.session, record, audio, settings, dry_run=ctx.dry_run)
-        pre = (record.meta or {}).get("gain_pre")
-        if pre and not gain.get("applied"):
-            gain = {**pre, "done_before": True}  # the CPU job already did it
-            meta = dict(record.meta or {})
-            meta.pop("gain_pre", None)
-            record.meta = meta
-    except CorruptedMedia as exc:
-        return ToolOutcome("corrupted", str(exc), {})
+        except CorruptedMedia as exc:
+            return ToolOutcome("corrupted", str(exc), {})
     gained = time.monotonic()
     sha = record.sha256 or sha256(audio)
     if not ctx.dry_run:
@@ -350,7 +378,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         raise MamError(f"The transcript is saved, but {exc}") from exc
     finished = time.monotonic()
     timings = {
-        "gain_s": round(gained - started, 1),
+        "gain_s": ctx.params.get("gain_s", round(gained - started, 1)),
         "transcription_s": round(transcribed - gained, 1),  # 0 when the transcript was cached
         "verse_s": round(finished - transcribed, 1),
         "total_s": round(finished - started, 1),

@@ -509,3 +509,25 @@ def test_only_a_general_category_does_not_count_as_a_what():
     assert not has(None, None)
     assert has("Vyasa-puja", "Vyasa-puja")
     assert has(None, "Janmastami")
+
+
+def test_loudness_runs_first_on_the_cpu_pool_then_the_transcription(prepared):
+    from mam.manager.queue import JobQueue, enqueue
+
+    rid, copy = prepared(translation_texts(), "2008-01-04_KKS.mp3")
+    with session_scope() as s:
+        enqueue(s, "class-discoverer", [rid], dry_run=False)
+        first = s.scalar(select(m.Job))
+        assert (first.tool, first.pool) == ("class-loudness", "cpu")
+    queue = JobQueue()
+    queue.execute(queue.claim("cpu"))
+    assert abs(measure(copy).integrated + 18) <= 1.0  # the volume is done before the ML job
+    with session_scope() as s:
+        job = s.scalar(select(m.Job).where(m.Job.tool == "class-discoverer"))
+        assert job.pool == "ml" and job.params["gain"]["applied"] and job.params["loudness_done"]
+        assert s.get(m.MediaFile, rid).status == "Queued"
+    queue.execute(queue.claim("ml"))
+    with session_scope() as s:
+        record = s.get(m.MediaFile, rid)
+        assert record.meta["class_discoverer"]["gain"]["applied"]
+        assert record.meta["class_discoverer"]["timings"]["gain_s"] >= 0

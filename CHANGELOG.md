@@ -7,6 +7,13 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Added
+- The header shows CPU, GPU, memory and CPU temperature as bars (green below 60%, orange below 85%, red above), updated every 3 seconds. A bar is left out when the system does not report it (a Mac gives no CPU temperature without admin rights).
+- The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
+
+### Changed
+- The Class discoverer's loudness step now runs as its own job on the CPU pool (many files at once) and queues the transcription, which stays one at a time on the ML pool. Loudness no longer waits behind a transcription.
+
 ### Fixed
 - The Settings page no longer warns about a place option that is only another spelling (an alias) of a general place without a country, such as `Sumercamp` for `Summercamp`.
 
@@ -14,6 +21,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - An empty folder setting in `.env` (for example `MEDIA_IDENTICAL_FILES_PATH=`) now means the default folder; it used to become the repository folder, which made the Settings page count the whole repository as processed copies. The reset also refuses any folder that is or contains the repository or the folder of the local database.
 
 ### Settings
+- The header bars are marked C, G and M (CPU, GPU, memory) and a thermometer (temperature), with the full name as tooltip, instead of chip, display and memory-card icons that were hard to tell apart.
 - The Settings page spreads its blocks over both columns: the tool blocks on the left in pipeline order (Renamer, Kirtan splitter, Class discoverer, Content discoverer, as in CONTRACTS.md; the Class trimmer joins when it is built), and Review, General, Advanced, Current settings and Reset on the right.
 - `.env.example` is shortened to the private values and paths; the other options are set on the Settings page. The test now checks that every key in it is a real setting.
 
@@ -31,7 +39,6 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The file page shows the vedabase.io link of the verse once the Class discoverer has run.
 
 ### Class discoverer
-- The volume (gain and loudness) step runs ahead of the transcription as its own job on the CPU pool, so the files of a batch are evened out in parallel (up to the CPU workers) instead of one after another inside the single ML worker. The ML worker only transcribes.
 - Removed the experimental "Improve the chanted verse" option (a second transcription pass on the chanted verse); the test on real recordings was mixed.
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.
 
