@@ -23,7 +23,7 @@ from mam.helpers.local_db.app_settings import tuned
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.helpers.progress import reporting
-from mam.manager.tools import TOOLS, JobContext, ToolOutcome, next_in_pipeline
+from mam.manager.tools import PIPELINE_ORDER, TOOLS, JobContext, ToolOutcome, next_in_pipeline
 from mam.statuses import PROCESSING, QUEUED, is_busy
 
 log = logging.getLogger(__name__)
@@ -55,8 +55,13 @@ def enqueue(
     dry_run: bool = True,
     params: dict[str, Any] | None = None,
     pipeline: bool = False,
+    waiting: list[str] | None = None,
 ) -> int:
-    """Queue `tool` for each file (or once, for folder-level tools). Returns the job count."""
+    """Queue `tool` for each file (or once, for folder-level tools). Returns the job count.
+
+    A file whose earlier pipeline tool still has a review open is not queued: it waits for that
+    review (SPEC.md section 4; a dry run is not blocked). The earlier tool's label is added to
+    `waiting` for each such file."""
     spec = TOOLS[tool]
     count = 0
     if not spec.per_file:
@@ -70,6 +75,11 @@ def enqueue(
     for file_id in file_ids:
         record = session.get(m.MediaFile, file_id)
         if record is None or record.status in ("Excluded", "Deleted"):
+            continue
+        blocker = None if dry_run else review_blocking(session, file_id, tool)  # a preview is fine
+        if blocker:
+            if waiting is not None:
+                waiting.append(blocker)
             continue
         busy = session.scalar(
             select(m.Job.id).where(
@@ -94,6 +104,24 @@ def enqueue(
             set_status(session, record, status_for(spec.label, "queued"), tool=tool)
         count += 1
     return count
+
+
+def review_blocking(session: Session, file_id: int, tool: str) -> str | None:
+    """The label of an earlier pipeline tool whose review of this file is still open, if any.
+    Only tools after the first one wait; a tool outside the pipeline never does."""
+    if tool not in PIPELINE_ORDER or PIPELINE_ORDER.index(tool) == 0:
+        return None
+    earlier = PIPELINE_ORDER[: PIPELINE_ORDER.index(tool)]
+    open_tool = session.scalar(
+        select(m.Review.tool)
+        .where(
+            m.Review.media_file_id == file_id,
+            m.Review.outcome == "pending",
+            m.Review.tool.in_(earlier),
+        )
+        .limit(1)
+    )
+    return TOOLS[open_tool].label if open_tool in TOOLS else open_tool
 
 
 class Worker(threading.Thread):

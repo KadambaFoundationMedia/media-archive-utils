@@ -360,10 +360,15 @@ def create_app(start_queue: bool = True) -> FastAPI:
                 ids = queries.matching_ids(session, flt)
             else:
                 ids = [int(i) for i in form.getlist("ids")]
-            queued = enqueue(session, tool, ids, dry_run=dry_run, pipeline=pipeline)
+            waiting: list[str] = []
+            queued = enqueue(
+                session, tool, ids, dry_run=dry_run, pipeline=pipeline, waiting=waiting
+            )
         notify(request)
         label = "Full pipeline" if pipeline else TOOLS[tool].label
         msg = f"{label}: {queued} file(s) queued" + (" as a dry run" if dry_run else "")
+        if waiting:
+            msg += f"; {len(waiting)} not queued: the {waiting[0]} review is still open"
         back = re.sub(r"[?&](msg|live)=[^&]*", "", form.get("back") or "/")
         sep = "&" if "?" in back else "?"
         return RedirectResponse(f"{back}{sep}msg={msg}&live=1", status_code=303)
