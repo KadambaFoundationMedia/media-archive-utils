@@ -1068,3 +1068,15 @@ def test_verse_pass_option_autosaves_on_the_settings_page(client):
     assert transcribe_verse_pass(False) is True
     client.post("/settings/class-discoverer/verse-pass", data={"verse_pass": "off"})
     assert transcribe_verse_pass(True) is False
+
+
+def test_settings_page_options_autosave(client):
+    page = client.get("/settings")
+    assert page.status_code == 200
+    assert "Random check rate" in page.text and "Transcription workers" in page.text
+    ok = client.post("/settings/option/spot_check_rate", data={"value": "0.1"})
+    assert "saved" in ok.text
+    assert 'value="0.1"' in client.get("/settings").text
+    bad = client.post("/settings/option/vedabase_delay_s", data={"value": "3"})
+    assert "At least 10" in bad.text
+    assert client.post("/settings/option/nope", data={"value": "1"}).status_code == 404

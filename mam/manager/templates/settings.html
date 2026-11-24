@@ -2,6 +2,32 @@
 {% from "_tips.html" import tip %}
 {% block title %}Settings · Media Archive{% endblock %}
 {% block content %}
+{% macro option_rows(items) %}
+{% for o in items %}
+<div class="mt-3">
+  {% if o.kind == "bool" %}
+  <div class="form-check form-switch d-flex align-items-center gap-2 ps-0">
+    <input class="form-check-input ms-0 mt-0" type="checkbox" role="switch" id="opt_{{ o.key }}"
+           {% if values[o.key] %}checked{% endif %}
+           hx-post="/settings/option/{{ o.key }}" hx-trigger="change" hx-vals='js:{value: event.target.checked ? "on" : "off"}'
+           hx-target="#saved-{{ o.key }}" hx-swap="innerHTML">
+    <label class="form-check-label" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}</label>
+    <span id="saved-{{ o.key }}" aria-live="polite"></span>
+  </div>
+  {% else %}
+  <label class="form-label small mb-1" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}{% if o.restart %} <span class="text-body-secondary">(after restart)</span>{% endif %}</label>
+  <div class="d-flex gap-2 align-items-center">
+    <input class="form-control form-control-sm {{ 'w-auto' if o.kind != 'text' or o.key == 'operator_name' else '' }}" id="opt_{{ o.key }}" name="value"
+           value="{{ values[o.key] }}" autocomplete="off"
+           {% if o.kind != "text" %}inputmode="decimal"{% endif %}
+           hx-post="/settings/option/{{ o.key }}" hx-trigger="change, keyup changed delay:700ms" hx-include="this"
+           hx-target="#saved-{{ o.key }}" hx-swap="innerHTML">
+    <span id="saved-{{ o.key }}" aria-live="polite"></span>
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endmacro %}
 <h1 class="h5 mb-3">Settings</h1>
 {% if request.query_params.get('error') %}<div class="alert alert-danger">{{ request.query_params.get('error') }}</div>{% endif %}
 
@@ -77,10 +103,17 @@
           <label class="form-check-label" for="verse_pass">Improve the chanted verse{{ tip("On: once the verse is confirmed on vedabase.io, the stretch where it is chanted is transcribed a second time with the verse's transliteration as Whisper's prompt, and replaces the first text in the transcript. Adds about a minute. Only done for a confirmed verse (a prompt for a wrong verse would pull the text towards it), and only on macOS (mlx-whisper).") }}</label>
           <span id="saved-verse-pass" aria-live="polite"></span>
         </div>
+        {{ option_rows(option_groups['Class discoverer']) }}
       </div>
     </div>
+{% for group in ["Kirtan splitter", "Review", "General"] %}
     <div class="card mb-3">
-      <div class="card-header">Current settings <span class="small text-body-secondary">(folders and pools come from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
+      <div class="card-header">{{ group }}</div>
+      <div class="card-body pt-0">{{ option_rows(option_groups[group]) }}</div>
+    </div>
+{% endfor %}
+    <div class="card mb-3">
+      <div class="card-header">Current settings <span class="small text-body-secondary">(folders, tokens and table ids come from <code>.env</code>; restart <code>mam serve</code> after changing it)</span></div>
       <div class="card-body">
         <dl class="row small mb-0">
           <dt class="col-5">Baserow writes</dt>

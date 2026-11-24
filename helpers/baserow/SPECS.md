@@ -104,6 +104,7 @@ The table id is `BASEROW_PLACE_COUNTRY_TABLE_ID` in `.env`. It was filled once w
 ## category_terms_folder table scheme
 Column category: the main media category. This is a clone from the media.category column
 Column filename_terms: possible search terms that are found in filenames to match to their category
+column type (single select, `class` or `kirtan`): says what kind of recording belongs in the category. The tools use `kirtan` to know which categories are kirtans (Bhajans beat an event category, kirtan recordings are filed there, the splitter's mantra choices, the dropped `with <kirtan>` phrase). Only classes go in a `class` category folder. Added 2026-11-24.
 column folder_name: Final location of renamed files when the media category was determined
 Column color: label color that is used in the Baserow application for each media category. Should be used in the review portal as well!
 

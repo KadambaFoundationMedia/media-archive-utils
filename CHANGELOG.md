@@ -7,6 +7,12 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Media manager
+- Settings page: the non-secret options that were only in `.env` are now set there, with autosave: Class discoverer (glossary fix and prompt, word timestamps, chunk length and timeout, Whisper languages, delay between vedabase.io requests), Kirtan splitter (early stop, analysis in separate processes), Review (random check rate) and General (operator name, worker counts; the workers apply after a restart). The `.env` value is the starting value. `START_THRESHOLD` is removed (nothing read it).
+
+### Renamer
+- Which categories are kirtans now comes from the new `type` column of `category_terms_folder` (`class` or `kirtan`), not from a list in the code. This applies to the Bhajans-over-event rule, the Kirtan folder for kirtan recordings, the mantra choices on the splitter review and the dropped "with <kirtan>" phrase.
+
 ### Kirtan splitter
 - Clear statuses: a file the splitter handled shows `Splitter: Class` (no kirtan before the class), `Splitter: Kirtan` (singing throughout) or `Splitter: Done`, all green, instead of `Skipped` or `Kirtan splitter Done`. When a reviewer chooses *Do not split* on a recording that the splitter wanted to split, the status is `Splitter: Not split`. Existing files are converted by a database migration.
 - A kirtan recording (singing throughout) is now filed in the Kirtan folder. A name such as `Radhastami-Bhajanas` gave the category Radhastami, but only classes go in the Radhastami and Nrsimha-caturdasi folders. The splitter marks the recording and queues the Renamer, which moves the copy and sets the category Kirtan (the file keeps its splitter status). A WHAT that is itself a kirtan category (`Nrsimha-pranama`, `Jaya-radha-madhava`) keeps its own folder.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from mam.config import get_settings
@@ -18,13 +19,14 @@ def get_setting(key: str, default: Any = None) -> Any:
 
 
 def set_setting(key: str, value: Any) -> None:
+    by = operator_name()
     with session_scope() as s:
         row = s.get(m.AppSetting, key)
         if row is None:
             row = m.AppSetting(key=key, value={})
             s.add(row)
         row.value = {"value": value}
-        row.updated_by = get_settings().operator_name
+        row.updated_by = by
 
 
 def baserow_writes_enabled() -> bool:
@@ -126,3 +128,200 @@ def transcribe_verse_pass(default: bool = False) -> bool:
 
 def set_transcribe_verse_pass(enabled: bool) -> None:
     set_setting(TRANSCRIBE_VERSE_PASS, bool(enabled))
+
+
+# ------------------------------------------------------- options moved from .env
+@dataclass(frozen=True)
+class Option:
+    """A non-secret option that was in `.env` and is now set on the Settings page.
+
+    The value is stored in the local DB under `key` (the name of the Settings field); while
+    nothing is stored, the `.env` value (or its default) is used."""
+
+    key: str
+    kind: str  # bool | int | float | text
+    label: str
+    group: str  # settings card: "Class discoverer", "Kirtan splitter", "Review", "General"
+    tip: str
+    low: float | None = None
+    high: float | None = None
+    restart: bool = False  # only read at start-up
+
+
+OPTIONS: tuple[Option, ...] = (
+    Option(
+        "transcribe_glossary_fix",
+        "bool",
+        "Fix Sanskrit spellings",
+        "Class discoverer",
+        "Known Whisper misspellings (Harry Krishna) become the glossary's spelling.",
+    ),
+    Option(
+        "transcribe_glossary_prompt",
+        "bool",
+        "Give the glossary to Whisper",
+        "Class discoverer",
+        "Whisper gets the glossary terms as its prompt. Can make it invent text.",
+    ),
+    Option(
+        "transcribe_words",
+        "bool",
+        "Word timestamps",
+        "Class discoverer",
+        "Slower. Segment timestamps are enough for the tools.",
+    ),
+    Option(
+        "transcribe_chunk_s",
+        "int",
+        "Chunk length (s)",
+        "Class discoverer",
+        "The recording is transcribed in pieces of about this length.",
+        60,
+        900,
+    ),
+    Option(
+        "transcribe_chunk_timeout_s",
+        "int",
+        "Chunk timeout (s)",
+        "Class discoverer",
+        "A piece that takes longer is stopped and tried again.",
+        60,
+        1800,
+    ),
+    Option(
+        "transcribe_languages",
+        "text",
+        "Languages Whisper may choose",
+        "Class discoverer",
+        "Two-letter codes separated by commas (en,nl,de,...).",
+    ),
+    Option(
+        "vedabase_delay_s",
+        "float",
+        "Seconds between vedabase.io requests",
+        "Class discoverer",
+        "At least 10: the crawl delay in vedabase.io's robots.txt.",
+        10,
+        120,
+    ),
+    Option(
+        "analysis_early_stop",
+        "bool",
+        "Stop listening once the class is found",
+        "Kirtan splitter",
+        "The cut cannot change after that. Faster.",
+        None,
+        None,
+    ),
+    Option(
+        "analysis_in_processes",
+        "bool",
+        "Analyse in separate processes",
+        "Kirtan splitter",
+        "Several files at once. Off: in the worker threads.",
+    ),
+    Option(
+        "spot_check_rate",
+        "float",
+        "Random check rate",
+        "Review",
+        "Share of sure decisions that are shown for review anyway (0 = off, 0.05 = 1 in 20).",
+        0,
+        1,
+    ),
+    Option("operator_name", "text", "Operator name", "General", "Recorded on approvals and saves."),
+    Option(
+        "workers_ml",
+        "int",
+        "Transcription workers",
+        "General",
+        "Applies after restarting mam serve.",
+        1,
+        4,
+        True,
+    ),
+    Option(
+        "workers_cpu",
+        "int",
+        "CPU workers (ffmpeg, splitter)",
+        "General",
+        "Applies after restarting mam serve.",
+        1,
+        32,
+        True,
+    ),
+    Option(
+        "workers_io",
+        "int",
+        "Copy and Baserow workers",
+        "General",
+        "Applies after restarting mam serve.",
+        1,
+        16,
+        True,
+    ),
+)
+OPTION_BY_KEY = {o.key: o for o in OPTIONS}
+
+
+def parse_option(option: Option, raw: Any) -> Any:
+    """Validate a value from the Settings page; raises ValueError with a plain message."""
+    if option.kind == "bool":
+        return raw in (True, "on", "true", "1")
+    text = str(raw if raw is not None else "").strip()
+    if option.kind == "text":
+        if not text:
+            raise ValueError("This cannot be empty")
+        if option.key == "transcribe_languages":
+            codes = [c.strip().lower() for c in text.split(",") if c.strip()]
+            if not codes or any(not (len(c) == 2 and c.isalpha()) for c in codes):
+                raise ValueError("Use two-letter language codes separated by commas")
+            return ",".join(codes)
+        return text
+    try:
+        value = int(text) if option.kind == "int" else float(text.replace(",", "."))
+    except ValueError:
+        raise ValueError("Enter a number") from None
+    if option.low is not None and value < option.low:
+        raise ValueError(f"At least {option.low:g}")
+    if option.high is not None and value > option.high:
+        raise ValueError(f"At most {option.high:g}")
+    return value
+
+
+def option_value(option: Option, settings: Any = None) -> Any:
+    """The stored value, else the `.env` value."""
+    stored = get_setting(option.key, None)
+    if stored is not None:
+        return stored
+    return getattr(settings or get_settings(), option.key)
+
+
+def set_option(key: str, raw: Any) -> Any:
+    option = OPTION_BY_KEY[key]
+    value = parse_option(option, raw)
+    set_setting(key, value)
+    return value
+
+
+def tuned(settings: Any = None) -> Any:
+    """`settings` with the options stored on the Settings page applied (a copy)."""
+    base = settings or get_settings()
+    update = {}
+    for option in OPTIONS:
+        stored = get_setting(option.key, None)
+        if stored is not None:
+            update[option.key] = stored
+    return base.model_copy(update=update) if update else base
+
+
+def operator_name() -> str:
+    stored = get_setting("operator_name", None)
+    return str(stored) if stored else get_settings().operator_name
+
+
+def option_groups() -> dict[str, list[Option]]:
+    groups: dict[str, list[Option]] = {}
+    for option in OPTIONS:
+        groups.setdefault(option.group, []).append(option)
+    return groups

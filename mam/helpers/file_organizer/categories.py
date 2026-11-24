@@ -9,6 +9,13 @@ from typing import Any
 IGNORED_CATEGORIES = {"Unknown"}
 
 
+def _select_text(cell: Any) -> str:
+    """A Baserow single select arrives as {"id", "value", "color"}; text arrives as it is."""
+    if isinstance(cell, dict):
+        cell = cell.get("value")
+    return str(cell or "").strip().lower()
+
+
 def _tokens(text: str) -> list[str]:
     """Lowercase word tokens; dots are dropped so 'S.B.' and 'SB' compare equal."""
     text = text.lower().replace(".", "")
@@ -21,6 +28,7 @@ class Category:
     folder: str
     color: str | None
     terms: tuple[tuple[str, ...], ...]
+    kind: str | None = None  # "class" or "kirtan": the `type` column of category_terms_folder
 
 
 @dataclass(frozen=True)
@@ -44,9 +52,18 @@ class CategoryMatcher:
                     name=name,
                     folder=(row.get("folder_name") or name).strip(),
                     color=row.get("color"),
+                    kind=_select_text(row.get("type")) or None,
                     terms=tuple(t for t in terms if t),
                 )
             )
+
+    def kirtan_names(self) -> list[str]:
+        """The categories whose `type` is kirtan (Kirtan, Jaya-Radha-Madhava, ...)."""
+        return [c.name for c in self.categories if c.kind == "kirtan"]
+
+    def is_kirtan(self, name: str | None) -> bool:
+        cat = self.by_name(name) if name else None
+        return bool(cat and cat.kind == "kirtan")
 
     def by_name(self, name: str) -> Category | None:
         return next((c for c in self.categories if c.name.lower() == name.lower()), None)
@@ -88,12 +105,12 @@ class CategoryMatcher:
         recording is a Kirtan: only classes go in the Radhastami folder. Not when a scripture
         comes first (`SB-1-19-31-with-Radha-Madhava` is a class) or when the word follows
         `with`, `and` or `plus` (a class and a kirtan in one recording)."""
-        if result.category.name.lower() in KIRTAN_NAMES or _is_scripture(result.category):
+        if result.category.kind == "kirtan" or _is_scripture(result.category):
             return None
         # `Bhajanas3`: a source index glued to the word does not change what it is
         bare = [re.sub(r"(?<=[a-z])\d+$", "", t) for t in tokens]
         for category in self.categories:
-            if category.name.lower() != KIRTAN:
+            if category.kind != "kirtan":
                 continue
             for term in sorted(category.terms, key=len, reverse=True):
                 n = len(term)
@@ -106,9 +123,6 @@ class CategoryMatcher:
         return None
 
 
-KIRTAN = "kirtan"
-# the kirtan categories (see mam/tools/kirtan_splitter/phrases.py)
-KIRTAN_NAMES = {"kirtan", "jaya-radha-madhava", "jaya-jaya-sri-caitanya", "nrsimha-pranama"}
 JOINERS = {"with", "and", "plus"}
 
 

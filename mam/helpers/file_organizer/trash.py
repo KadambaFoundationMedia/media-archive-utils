@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from mam.config import Settings, get_settings
 from mam.errors import MamError
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import operator_name
 from mam.helpers.local_db.repo import record_event, set_status
 
 log = logging.getLogger(__name__)
@@ -193,8 +194,8 @@ def delete_file(
         select(m.Review).where(m.Review.media_file_id == record.id, m.Review.outcome == "pending")
     ):
         review.outcome = "deleted"
-        review.operator = settings.operator_name
-    set_status(session, record, DELETED, "media-manager", f"deleted by {settings.operator_name}")
+        review.operator = operator_name()
+    set_status(session, record, DELETED, "media-manager", f"deleted by {operator_name()}")
     log.info("Deleted file %s (%s)", record.id, record.current_name)
     message = "Moved to the Trash" if trashed else "Marked as deleted"
     if trashed and was_sole_copy:

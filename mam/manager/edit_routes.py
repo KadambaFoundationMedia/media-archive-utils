@@ -7,9 +7,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from mam.config import get_settings
 from mam.errors import MamError
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import operator_name
 from mam.helpers.local_db.db import session_scope
 
 
@@ -72,7 +72,7 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
                 record = session.get(m.MediaFile, file_id)
                 if record is None:
                     raise HTTPException(404)
-                data = save(session, record, form_values(form), get_settings().operator_name)
+                data = save(session, record, form_values(form), operator_name())
         except MamError as exc:
             return RedirectResponse(f"/details/{file_id}?error={exc}", status_code=303)
         notify(request)

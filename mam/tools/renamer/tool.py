@@ -292,15 +292,15 @@ def apply_recording_kind(proposal: Proposal, record: m.MediaFile, ref: Reference
     the Radhastami or Nrsimha-caturdasi folders (decided 2026-11-23). A WHAT that is itself a
     kirtan category (`Nrsimha-pranama`, `Jaya-radha-madhava`) is left alone. True when the
     category was changed to Kirtan."""
-    from mam.tools.kirtan_splitter.phrases import KIRTAN_CATEGORIES, MAHA_MANTRA
+    from mam.tools.kirtan_splitter.phrases import MAHA_MANTRA
 
     if (record.meta or {}).get("recording_kind") != "kirtan":
         return False
     match = ref.matcher.match(proposal.what)
-    if match and match.category.name.lower() in KIRTAN_CATEGORIES:
+    if match and match.category.kind == "kirtan":
         proposal.category = match.category.name
         return False
-    if proposal.category and proposal.category.lower() in KIRTAN_CATEGORIES:
+    if ref.matcher.is_kirtan(proposal.category):
         return False
     kirtan = ref.matcher.by_name(MAHA_MANTRA)
     if kirtan is None:
