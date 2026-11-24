@@ -29,6 +29,16 @@ BOOKS = {
 }
 # Whisper writes the canto as 'canto', 'kanto', 'kanchu', 'kantam'...
 CANTO_WORDS = {"canto", "cantos", "kanto", "kanta", "kantam", "kanchu", "cantu", "kandha"}
+# Extra words for chapter, text and canto in other languages (Settings page, Advanced block).
+EXTRA_WORDS: dict[str, set[str]] = {"chapter": set(), "verse": set(), "canto": set()}
+
+
+def set_extra_words(chapter: str = "", verse: str = "", canto: str = "") -> None:
+    """Words (comma separated, lower-cased) that count like 'chapter', 'text' and 'canto'."""
+    for key, text in (("chapter", chapter), ("verse", verse), ("canto", canto)):
+        EXTRA_WORDS[key] = {w.strip().lower() for w in text.split(",") if w.strip()}
+
+
 LILA_RE = re.compile(r"\b(adi|madhya|antya)\b")
 NOISE = {"number", "no", "the", "is", "it", "its", "of", "in"}
 
@@ -108,13 +118,17 @@ def read_window(book: str, text: str) -> tuple[VerseRef | None, dict[str, Any], 
     dotted = re.search(r"\b(\d{1,3}(?:\.\d{1,3}){1,3})\b", lower)
     if dotted:
         heard["dotted"] = dotted.group(1)
-    keywords = CANTO_WORDS | {"chapter", "text", "texts", "verse", "verses"}
+    canto_words = CANTO_WORDS | EXTRA_WORDS["canto"]
+    chapter_words = {"chapter"} | EXTRA_WORDS["chapter"]
+    keywords = (
+        canto_words | chapter_words | {"text", "texts", "verse", "verses"} | EXTRA_WORDS["verse"]
+    )
     kw = _numbers_after(tokens, keywords)
     values: dict[str, int] = {}  # the last number said for each part: a correction wins
     firsts: dict[str, int] = {}  # the first number said, kept as the alternative
     ends: dict[str, int | None] = {}
     for word, value, pos in kw:
-        key = "canto" if word in CANTO_WORDS else "chapter" if word == "chapter" else "verse"
+        key = "canto" if word in canto_words else "chapter" if word in chapter_words else "verse"
         firsts.setdefault(key, value)
         values[key] = value
         if key == "verse":

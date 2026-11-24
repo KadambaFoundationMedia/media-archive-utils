@@ -229,6 +229,28 @@ OPTIONS: tuple[Option, ...] = (
         2100,
     ),
     Option(
+        "words_chapter",
+        "text",
+        "Other words for \u201cchapter\u201d",
+        "Advanced",
+        "Words (commas) that count like chapter when a verse is announced, e.g. hoofdstuk, "
+        "capitulo. Numbers must be spoken as digits or English words.",
+    ),
+    Option(
+        "words_verse",
+        "text",
+        "Other words for \u201ctext\u201d (verse)",
+        "Advanced",
+        "Words (commas) that count like text or verse, e.g. vers, versiculo.",
+    ),
+    Option(
+        "words_canto",
+        "text",
+        "Other words for \u201ccanto\u201d",
+        "Advanced",
+        "Words (commas) that count like canto, e.g. zang, canto.",
+    ),
+    Option(
         "transcribe_languages",
         "text",
         "Languages Whisper may choose",
@@ -310,7 +332,7 @@ def parse_option(option: Option, raw: Any) -> Any:
         return raw in (True, "on", "true", "1")
     text = str(raw if raw is not None else "").strip()
     if option.kind == "text":
-        if not text:
+        if not text and option.key not in ("words_chapter", "words_verse", "words_canto"):
             raise ValueError("This cannot be empty")
         if option.key == "transcribe_languages":
             codes = [c.strip().lower() for c in text.split(",") if c.strip()]
