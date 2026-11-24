@@ -300,3 +300,54 @@ def test_review_page_through_the_portal(prepared, monkeypatch):
     with session_scope() as s:
         assert s.get(m.Review, review_id).outcome == "edited"
         assert s.get(m.MediaFile, rid).status == "Content discoverer Done"
+
+
+# ------------------------------------------------------- review remarks of 2026-11-24
+def test_broad_themes_are_dropped():
+    from mam.tools.content_discoverer.validate import broad_set
+
+    broad = broad_set("Krishna Consciousness, Devotion")
+    c = check({**GOOD, "topics": ["krishna-consciousness", "Humble Inquiry"]}, broad)
+    assert c.topics == ["Humble Inquiry"]
+    assert any("broad themes" in p for p in c.problems)
+
+
+def test_description_must_name_place_and_year():
+    c = check(GOOD, facts={"place": "Oslo", "year": "2011"})
+    assert any("place (Oslo)" in p for p in c.problems)
+    assert any("year (2011)" in p for p in c.problems)
+    ok = {**GOOD, "description": "Recorded in Oslo in 2011.\n\nMore."}
+    assert not check(ok, facts={"place": "Oslo", "year": "2011"}).problems
+
+
+def test_custom_footer_wins_over_the_file(tmp_path):
+    out = youtube_description(
+        "Body.", get_settings().content_footer_path, date(2031, 1, 1), "(c) {year} X"
+    )
+    assert out == "Body.\n\n(c) 2031 X"
+
+
+def test_facts_for_the_first_sentence():
+    assert P.spoken_date("2011-08-20") == "20 August 2011"
+    assert P.spoken_date("2011-MM-DD") is None
+    assert P.place_text("Oslo", "no") == "Oslo, Norway"
+    assert P.place_text("Zoom-livestream", None) == "Zoom livestream"
+
+
+def test_glossary_spelling_in_the_answer():
+    from mam.helpers.transcriber import glossary as G
+    from mam.tools.content_discoverer.spelling import fix_content
+
+    glossary = G.load(get_settings().sanskrit_glossary_path)
+    out = fix_content(
+        {"topics": ["Lord Chaitanya"], "title": "Chaitanya on humility", "description": "x"},
+        glossary,
+    )
+    assert out["topics"] == ["Lord Caitanya"]
+    assert out["title"].startswith("Caitanya")
+
+
+def test_new_settings_are_options():
+    assert OPTION_BY_KEY["content_footer"].kind == "textarea"
+    assert parse_option(OPTION_BY_KEY["content_footer"], " a\r\nb ") == "a\nb"
+    assert parse_option(OPTION_BY_KEY["content_broad_themes"], "A,  b ,") == "A, b"

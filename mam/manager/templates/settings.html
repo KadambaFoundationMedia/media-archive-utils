@@ -24,6 +24,14 @@
     </select>
     <span id="saved-{{ o.key }}" aria-live="polite"></span>
   </div>
+  {% elif o.kind == "textarea" %}
+  <label class="form-label small mb-1" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}</label>
+  <div class="d-flex gap-2 align-items-start">
+    <textarea class="form-control form-control-sm" rows="9" id="opt_{{ o.key }}" name="value" autocomplete="off"
+              hx-post="/settings/option/{{ o.key }}" hx-trigger="change, keyup changed delay:900ms" hx-include="this"
+              hx-target="#saved-{{ o.key }}" hx-swap="innerHTML">{{ values[o.key] }}</textarea>
+    <span id="saved-{{ o.key }}" aria-live="polite"></span>
+  </div>
   {% else %}
   <label class="form-label small mb-1" for="opt_{{ o.key }}">{{ o.label }}{{ tip(o.tip) }}{% if o.restart %} <span class="text-body-secondary">(after restart)</span>{% endif %}</label>
   <div class="d-flex gap-2 align-items-center">

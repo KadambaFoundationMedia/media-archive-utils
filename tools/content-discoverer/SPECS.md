@@ -21,10 +21,11 @@ The transcription file should be used to maximize performance. The topic(s) (gen
   - Determine 1 or more main topics, but no more than 5
   - Use the matching verse from vedabase.io to discover topics
   - A topic can never be more than 2 words
-  - A topic can never be too general or broad
+  - A topic can never be too general or broad (the Settings list "Broad themes" is never used)
+  - Use as few topics as the content needs; every topic must be covered by the description
   - The topics must be added to the `themes` column of the media table on Baserow, separated by a comma and a space (e.g. `Krishna Prema, Kali Yuga`)
   - Existing themes are never overwritten; a difference is proposed for review (see @SPEC.md section 6)
-- Generate a summary description for Youtube
+- Generate a summary description for Youtube (first sentence: the recording's type, verse, date and place in natural language; names spelled as in the Sanskrit glossary)
    - Always add our Youtube footer to each description
    - the complete description must be added to the media table on Baserow
 - Generate a short and conscise title that describes the class best
@@ -41,6 +42,8 @@ For example the file 'sample-files/2012/Radhadesh Jan 2012/2012-01-22_KKS_CC-Mad
 The class should be summarised as a description that is about 2-3 paragraphs long. The description must be interesting and captivating, but it must reflect the topics that were generated previously.
 
 ### Youtube description footer (Always include)
+The footer is edited in the Settings page (block "Content discoverer", field "YouTube footer"); this text is the starting point (`docs/references/youtube-footer.txt`). `{year}` is the current year.
+
 For more information about Kadamba Kanana Swami and the Kadamba Foundation visit
 https://kadambafoundation.com
 

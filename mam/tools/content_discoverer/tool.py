@@ -24,13 +24,16 @@ from mam.helpers.llm import LLMError, cached_reply, get_provider, store_reply
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.repo import set_status
 from mam.helpers.progress import report
+from mam.helpers.transcriber import glossary as G
 from mam.helpers.transcriber import load_transcript
 from mam.helpers.vedabase import VedabaseClient, VerseRef
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.class_discoverer.tool import filename_verse, not_a_class
 from mam.tools.content_discoverer import prompt as P
+from mam.tools.content_discoverer.spelling import fix_content, terms_in
 from mam.tools.content_discoverer.validate import (
     Content,
+    broad_set,
     check,
     filename_words,
     usable,
@@ -111,11 +114,47 @@ def verse_context(client: VedabaseClient, ref: VerseRef | None) -> dict[str, Any
     }
 
 
+def recording_facts(record: m.MediaFile, ref: VerseRef | None) -> dict[str, str]:
+    """Date, place and scripture of the recording, for the description's first sentence."""
+    proposal = (record.meta or {}).get("proposal") or {}
+    facts: dict[str, str] = {}
+    when = P.spoken_date(record.rec_date or proposal.get("when"))
+    if when:
+        facts["date"] = when
+        facts["year"] = when.split()[-1]
+    place = P.place_text(proposal.get("place_name") or proposal.get("place"), proposal.get("cc"))
+    if place:
+        facts["place"] = place
+    if ref is not None:
+        facts["scripture"] = f"{P.SCRIPTURES.get(ref.book, ref.book)} {ref.tag}"
+    return facts
+
+
+def cost_usd(settings: Settings, usage: dict[str, Any]) -> float | None:
+    if usage.get("cached") or not usage.get("input_tokens"):
+        return None
+    return round(
+        usage["input_tokens"] * settings.llm_price_in / 1e6
+        + (usage.get("output_tokens") or 0) * settings.llm_price_out / 1e6,
+        4,
+    )
+
+
 def ask(
-    session: Session, settings: Settings, system: str, user: str
+    session: Session,
+    settings: Settings,
+    system: str,
+    user: str,
+    *,
+    facts: dict[str, str] | None = None,
 ) -> tuple[Content, dict[str, Any]]:
     """Cached answer, else the model's; one more try when its answer cannot be used."""
     provider = get_provider(settings)
+    glossary = G.load(settings.sanskrit_glossary_path)
+    broad = broad_set(settings.content_broad_themes)
+    check_facts = {k: v for k, v in (facts or {}).items() if k in ("place", "year")}
+    if check_facts.get("place"):
+        check_facts["place"] = check_facts["place"].split(",")[0].strip()
     usage: dict[str, Any] = {"model": provider.model, "cached": False}
     last_problem = ""
     for attempt in (1, 2):
@@ -125,7 +164,7 @@ def ask(
         else:
             reply = provider.complete(system, user, max_tokens=4000)
         try:
-            content = check(P.parse_reply(reply.text))
+            content = check(fix_content(P.parse_reply(reply.text), glossary), broad, check_facts)
         except ValueError as exc:
             last_problem = str(exc)
             log.warning("Content answer %s not usable: %s", attempt, exc)
@@ -137,6 +176,7 @@ def ask(
             store_reply(session, P.PROMPT_VERSION, system, user, reply)
             session.commit()
         usage.update(input_tokens=reply.input_tokens, output_tokens=reply.output_tokens)
+        usage["cost_usd"] = cost_usd(settings, usage)
         return content, usage
     raise LLMError(f"The model's answer could not be used: {last_problem}")
 
@@ -145,7 +185,9 @@ def ask(
 def content_values(content: Content, settings: Settings) -> dict[str, Any]:
     return {
         "themes": ", ".join(content.topics),
-        "media_description": youtube_description(content.description, settings.content_footer_path),
+        "media_description": youtube_description(
+            content.description, settings.content_footer_path, None, settings.content_footer
+        ),
         "youtube_desc": True,
         "notes": f"Content discoverer: themes {', '.join(content.topics)}; title {content.title}",
     }
@@ -232,16 +274,22 @@ def run_content_discoverer(ctx: JobContext) -> ToolOutcome:
     what = current_what(record)
     category = proposal.get("category")
     text = P.plain_transcript(transcript, cd.get("class_start"))
+    facts = recording_facts(record, ref)
+    glossary = G.load(settings.sanskrit_glossary_path)
+    broad_list = [w.strip() for w in settings.content_broad_themes.split(",") if w.strip()]
     user = P.build_user_prompt(
         transcript_text=text,
         verse=verse,
         category=category,
         what=what,
         languages=cd.get("languages") or [],
+        facts=facts,
+        broad=broad_list,
+        terms=terms_in(text, glossary),
     )
     ctx.session.commit()  # the model takes a while; do not hold the database
     report("Asking the model", 0.3)
-    content, usage = ask(session, settings, P.SYSTEM, user)
+    content, usage = ask(session, settings, P.SYSTEM, user, facts=facts)
     report("Checking the answer", 0.9)
 
     new_what, name_note = plan_name(what, category, content.title_words, ref)
@@ -252,6 +300,8 @@ def run_content_discoverer(ctx: JobContext) -> ToolOutcome:
         "title_words": content.title_words,
         "description": content.description,
         "verse": ref.what if ref else None,
+        "verse_url": f"{settings.vedabase_url.rstrip('/')}{ref.path}" if ref else None,
+        "footer": values["media_description"][len(content.description) :].strip(),
         "new_what": new_what,
         "name_note": name_note,
         "problems": content.problems,
@@ -262,7 +312,11 @@ def run_content_discoverer(ctx: JobContext) -> ToolOutcome:
     cost = ""
     if usage.get("input_tokens"):
         cost = f" ({usage['input_tokens']:,} tokens in, {usage.get('output_tokens') or 0:,} out" + (
-            ", from the cache)" if usage["cached"] else ")"
+            ", from the cache)"
+            if usage["cached"]
+            else (
+                f", about ${usage['cost_usd']:.3f})" if usage.get("cost_usd") is not None else ")"
+            )
         )
     summary = f"Themes: {', '.join(content.topics)}. Title: {content.title}. {name_note}{cost}"
     if ctx.dry_run:
@@ -352,6 +406,8 @@ def _open_review(
                     "title_words",
                     "description",
                     "verse",
+                    "verse_url",
+                    "footer",
                     "new_what",
                     "name_note",
                     "problems",

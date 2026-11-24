@@ -425,6 +425,30 @@ def create_app(start_queue: bool = True) -> FastAPI:
         query = request.url.query
         return RedirectResponse(f"/details/{file_id}" + (f"?{query}" if query else ""), 303)
 
+    def _verse_links(record: m.MediaFile) -> list[dict[str, str]]:
+        """The vedabase.io pages of the verse the class discoverer heard or the filename has,
+        shown once the class discoverer has processed the file."""
+        from mam.config import get_settings
+        from mam.helpers.vedabase import VerseRef
+        from mam.tools.class_discoverer.tool import filename_verse
+
+        cd = (record.meta or {}).get("class_discoverer")
+        if not cd:
+            return []
+        base = get_settings().vedabase_url.rstrip("/")
+        refs: list[tuple[str, VerseRef]] = []
+        heard = VerseRef.from_what((cd.get("found") or {}).get("what"))
+        if heard is not None:
+            refs.append(("heard in the recording", heard))
+        named = filename_verse(record)
+        if named is not None and (heard is None or named.what != heard.what):
+            refs.append(("in the filename", named))
+        links = []
+        for label, ref in refs:
+            for verse in (ref.verses()[0], ref.verses()[-1]) if ref.range_end else (ref,):
+                links.append({"text": f"{verse.readable} ({label})", "url": base + verse.path})
+        return links
+
     @app.get("/details/{file_id}", response_class=HTMLResponse)
     def file_page(request: Request, file_id: int):
         with session_scope() as session:
@@ -502,6 +526,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
                     if proposal.get("class_start") is not None
                     else "",
                 }
+            verse_links = _verse_links(record)
             next_id = (
                 session.scalar(
                     select(m.Review.media_file_id)
@@ -522,6 +547,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
             review=review,
             review_id=review_id,
             review_tool=review_tool,
+            verse_links=verse_links,
             p=proposal,
             next_id=next_id,
             **splitter,

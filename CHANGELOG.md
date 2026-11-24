@@ -16,6 +16,13 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The first 20 results (Settings: "Results checked first") are reviewed on the file page, where the themes, title and description can be edited; after that it works alone, with the random check.
 - New LLM helper with a pluggable provider (the Claude API for now; set `ANTHROPIC_API_KEY` in `.env`). The model and its thinking effort are options on the Settings page. Answers are cached by input and prompt version.
 
+- Review of the first result: themes can no longer be broad words. The Settings block "Content discoverer" has a list of **Broad themes** (never used: the model is told, and a match in its answer is dropped) and a **YouTube footer** field (the text file stays the fallback). The footer is shown under the description on the review page.
+- Fewer, truer themes: the prompt asks for as many as the content needs (usually 2 or 3), each a topic the description also covers, in correct English word order ("Humble Inquiry", never "Preaching Art"). The title and description follow where most of the recording's time goes (a discussion with the listeners counts).
+- The description starts with the recording's type, verse, date and place in natural language, from the file's own data; a description without the place or year is sent to review.
+- Names are spelled as in the Sanskrit glossary ("Caitanya", not "Chaitanya"): the glossary's spellings are given to the model and its answer is corrected afterwards.
+- The run shows what it cost (tokens and dollars; the prices are Settings options). Prompt version `content-2`: earlier cached answers are not reused.
+- The file page shows the vedabase.io link of the verse once the Class discoverer has run.
+
 ### Class discoverer
 - Removed the experimental "Improve the chanted verse" option (a second transcription pass on the chanted verse); the test on real recordings was mixed.
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.

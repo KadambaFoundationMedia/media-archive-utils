@@ -92,6 +92,9 @@
           {% if confirmed and confirmed.notes_text %}
           <dt class="col-4">Notes</dt><dd class="col-8" style="white-space: pre-line">{{ confirmed.notes_text }}</dd>
           {% endif %}
+          {% if verse_links %}
+          <dt class="col-4">Vedabase</dt><dd class="col-8">{% for l in verse_links %}<div><a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.text }} <i class="fa-solid fa-arrow-up-right-from-square small"></i></a></div>{% endfor %}</dd>
+          {% endif %}
           <dt class="col-4">Baserow row</dt><dd class="col-8">{{ f.baserow_row_id or '–' }}</dd>
           <dt class="col-4">Fingerprint</dt><dd class="col-8 font-monospace text-break">{{ f.fingerprint }}</dd>
           {% if f.meta and f.meta.loudness %}

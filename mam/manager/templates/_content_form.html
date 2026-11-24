@@ -14,11 +14,16 @@
       <div class="col-12 col-lg-6">
         <label class="form-label" for="title">Title</label>
         <input class="form-control" id="title" name="title" value="{{ p.title }}">
+        {% if p.verse_url %}<div class="mt-1"><a href="{{ p.verse_url }}" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>{{ p.verse }} on vedabase.io</a></div>{% endif %}
         <div class="mt-1 text-body-secondary">{{ p.name_note }}{% if p.new_what %} In the filename: <code>{{ p.new_what }}</code>{% endif %}</div>
       </div>
       <div class="col-12">
-        <label class="form-label" for="description">YouTube description (the footer is added when it is saved)</label>
+        <label class="form-label" for="description">YouTube description</label>
         <textarea class="form-control" id="description" name="description" rows="10">{{ p.description }}</textarea>
+        {% if p.footer %}
+        <div class="form-label mt-2 mb-1 text-body-secondary">Footer, added after the description when it is saved (edit it on the Settings page)</div>
+        <div class="border-start ps-2 text-body-secondary" style="white-space: pre-wrap">{{ p.footer }}</div>
+        {% endif %}
         {% if p.conflicts and p.conflicts.media_description %}
         <details class="mt-2"><summary class="text-warning-emphasis">Baserow already has a description</summary><div class="border-start ps-2" style="white-space: pre-wrap">{{ p.conflicts.media_description[0] }}</div></details>
         <div class="form-check"><input class="form-check-input" type="checkbox" id="use_new_description" name="use_new_description"><label class="form-check-label" for="use_new_description">Replace the description in Baserow</label></div>

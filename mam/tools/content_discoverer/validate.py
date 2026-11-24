@@ -28,7 +28,19 @@ def clean_topic(raw: object) -> str:
     return re.sub(r"\s+", " ", text).strip(" -'")
 
 
-def check_topics(raw: object, problems: list[str]) -> list[str]:
+def broad_set(raw: str | None) -> frozenset[str]:
+    """The themes that are too general (Settings: "Broad themes"), compared ignoring case and
+    hyphens."""
+    return frozenset(_fold(w) for w in (raw or "").split(",") if w.strip())
+
+
+def _fold(text: str) -> str:
+    return re.sub(r"[\s\-]+", " ", text.lower()).strip()
+
+
+def check_topics(
+    raw: object, problems: list[str], broad: frozenset[str] = frozenset()
+) -> list[str]:
     if not isinstance(raw, list):
         problems.append("The model gave no list of topics")
         return []
@@ -41,6 +53,9 @@ def check_topics(raw: object, problems: list[str]) -> list[str]:
             problems.append(
                 f"Topic '{topic}' has more than {MAX_TOPIC_WORDS} words and was dropped"
             )
+            continue
+        if _fold(topic) in broad:
+            problems.append(f"Topic '{topic}' is on the broad themes list and was dropped")
             continue
         if topic.lower() not in {t.lower() for t in topics}:
             topics.append(topic)
@@ -89,24 +104,43 @@ def check_description(raw: object, problems: list[str]) -> str:
     return "\n\n".join(paragraphs)
 
 
-def check(data: dict) -> Content:
+def check_facts(description: str, facts: dict[str, str], problems: list[str]) -> None:
+    """The description names the recording's place and year when they are known."""
+    low = description.lower()
+    place = facts.get("place")
+    if place and place.lower() not in low:
+        problems.append(f"The description does not mention the place ({place})")
+    year = facts.get("year")
+    if year and year not in description:
+        problems.append(f"The description does not mention the year ({year})")
+
+
+def check(
+    data: dict, broad: frozenset[str] = frozenset(), facts: dict[str, str] | None = None
+) -> Content:
     problems: list[str] = []
-    topics = check_topics(data.get("topics"), problems)
+    topics = check_topics(data.get("topics"), problems, broad)
     if not topics:
         problems.append("No usable topic")
     title, words = check_title(data.get("title"), problems)
     description = check_description(data.get("description"), problems)
+    if description and facts:
+        check_facts(description, facts, problems)
     return Content(topics, title, words, description, problems)
 
 
-def footer(path: Path, today: date | None = None) -> str:
+def footer(path: Path, today: date | None = None, custom: str = "") -> str:
+    """The footer typed on the Settings page, else the text file; `{year}` is the current year."""
     year = (today or date.today()).year
-    return path.read_text(encoding="utf-8").strip().replace("{year}", str(year))
+    text = custom.strip() or path.read_text(encoding="utf-8").strip()
+    return text.replace("{year}", str(year))
 
 
-def youtube_description(description: str, footer_path: Path, today: date | None = None) -> str:
+def youtube_description(
+    description: str, footer_path: Path, today: date | None = None, custom_footer: str = ""
+) -> str:
     """The description followed by the footer (SPEC.md section 4: always, current year)."""
-    return f"{description.strip()}\n\n{footer(footer_path, today)}"
+    return f"{description.strip()}\n\n{footer(footer_path, today, custom_footer)}"
 
 
 def usable(content: Content) -> bool:
