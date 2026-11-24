@@ -368,3 +368,36 @@ def test_settings_blocks_follow_the_pipeline_order_in_two_columns():
     assert [h for h in heads(left) if h in tools] == tools
     assert [h.strip() for h in heads(right)][:3] == ["Review", "General", "Advanced"]
     assert "Reset the media manager" in heads(right)[-1] or "Reset" in right
+
+
+def test_long_topics_are_shortened_by_the_model_not_dropped():
+    from mam.tools.content_discoverer import tool as content_tool
+    from mam.tools.content_discoverer.validate import broad_set
+
+    c = check({**GOOD, "topics": ["Humble Inquiry", "Pure Devotional Service"]})
+    assert c.topics == ["Humble Inquiry"] and c.long_topics == ["Pure Devotional Service"]
+
+    class Shortener:
+        def complete(self, system, user, *, max_tokens=4000):
+            assert "Pure Devotional Service" in user
+            return LLMReply('{"topics": ["Devotional Service"]}', "fake", "fake-1", 50, 10)
+
+    extra = content_tool.shorten_topics(Shortener(), c, broad_set(""), None)
+    assert extra is not None
+    assert c.topics == ["Humble Inquiry", "Devotional Service"]
+    assert not any("dropped" in p for p in c.problems) and not c.long_topics
+
+
+def test_a_topic_that_stays_too_long_is_dropped_and_flagged():
+    from mam.tools.content_discoverer import tool as content_tool
+    from mam.tools.content_discoverer.validate import broad_set
+
+    c = check({**GOOD, "topics": ["Humble Inquiry", "Pure Devotional Service"]})
+
+    class Stubborn:
+        def complete(self, system, user, *, max_tokens=4000):
+            return LLMReply('{"topics": ["Pure Devotional Service"]}', "fake", "fake-1", 5, 5)
+
+    content_tool.shorten_topics(Stubborn(), c, broad_set(""), None)
+    assert c.topics == ["Humble Inquiry"]
+    assert any("could not be shortened" in p for p in c.problems)

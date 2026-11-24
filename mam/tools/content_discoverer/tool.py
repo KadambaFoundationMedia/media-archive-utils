@@ -9,6 +9,7 @@ Decisions (Edwin, 2026-11-24, see SPEC.md section 4):
 
 from __future__ import annotations
 
+import json
 import logging
 import random
 import time
@@ -140,6 +141,34 @@ def cost_usd(settings: Settings, usage: dict[str, Any]) -> float | None:
     )
 
 
+def shorten_topics(provider, content: Content, broad, glossary):
+    """Topics of more than 2 words are never kept as they are (a rule of the spec). Ask the model
+    once to shorten them; what still does not fit is dropped and stays on the review's list of
+    problems. Returns the extra reply (for the token count), or None."""
+    from mam.tools.content_discoverer.validate import check_topics
+
+    wanted = list(content.long_topics)
+    try:
+        reply = provider.complete(
+            P.SHORTEN_SYSTEM, json.dumps({"topics": wanted}, ensure_ascii=False), max_tokens=500
+        )
+        shortened = fix_content(P.parse_reply(reply.text), glossary).get("topics")
+    except (LLMError, ValueError):
+        log.warning("The model could not shorten the long topics", exc_info=True)
+        return None
+    problems: list[str] = []
+    merged = check_topics([*content.topics, *(shortened or [])], problems, broad)
+    done = [t for t in merged if t not in content.topics]
+    content.topics = merged
+    kept = [p for p in content.problems if "more than 2 words and was dropped" not in p]
+    if len(done) < len(wanted):
+        left = len(wanted) - len(done)
+        kept.append(f"{left} topic(s) of more than 2 words could not be shortened and were dropped")
+    content.problems = kept
+    content.long_topics = []
+    return reply
+
+
 def ask(
     session: Session,
     settings: Settings,
@@ -176,6 +205,11 @@ def ask(
             store_reply(session, P.PROMPT_VERSION, system, user, reply)
             session.commit()
         usage.update(input_tokens=reply.input_tokens, output_tokens=reply.output_tokens)
+        if content.long_topics:
+            extra = shorten_topics(provider, content, broad, glossary)
+            if extra:
+                usage["input_tokens"] = (usage["input_tokens"] or 0) + (extra.input_tokens or 0)
+                usage["output_tokens"] = (usage["output_tokens"] or 0) + (extra.output_tokens or 0)
         usage["cost_usd"] = cost_usd(settings, usage)
         return content, usage
     raise LLMError(f"The model's answer could not be used: {last_problem}")

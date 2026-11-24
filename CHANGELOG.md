@@ -28,6 +28,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - `.env.example` is shortened to the private values and paths; the other options are set on the Settings page. The test now checks that every key in it is a real setting.
 
 ### Content discoverer
+- A theme of more than 2 words ("Pure Devotional Service") is now shortened by the model in one extra small request ("Devotional Service") instead of being dropped. A theme that still does not fit is dropped and listed on the review.
 - New tool: reads the class transcript and writes 1 to 5 themes, a short title and a YouTube description (with the footer and the current year). Run it from the Action menu or with `mam content-discover <file>` (dry run by default; a dry run asks the model once and caches the answer, so the real run is not billed again).
 - The themes, description and `youtube_desc` go to the Baserow media row (empty fields only; a different existing value goes to review). A class with a verse and no title gets the title in its filename through the Renamer. A recording without a verse keeps its filename.
 - The first 20 results (Settings: "Results checked first") are reviewed on the file page, where the themes, title and description can be edited; after that it works alone, with the random check.

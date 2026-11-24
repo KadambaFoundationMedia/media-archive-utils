@@ -171,3 +171,12 @@ def parse_reply(text: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("the answer is not a JSON object")
     return data
+
+
+SHORTEN_SYSTEM = """\
+You shorten themes (topics) for a recording archive. Each theme you get has more than two \
+words. Rewrite each as a theme of at most 2 words that keeps its meaning, as a natural noun \
+phrase in correct English word order (for example "Pure Devotional Service" becomes \
+"Devotional Service"). Return only a JSON object: {"topics": [...]} with one entry per theme, \
+in the same order.\
+"""

@@ -21,6 +21,7 @@ class Content:
     title_words: str  # for the filename: Dont-waste-time
     description: str
     problems: list[str] = field(default_factory=list)  # repaired or dropped, shown on review
+    long_topics: list[str] = field(default_factory=list)  # dropped for length, to be shortened
 
 
 def clean_topic(raw: object) -> str:
@@ -39,7 +40,10 @@ def _fold(text: str) -> str:
 
 
 def check_topics(
-    raw: object, problems: list[str], broad: frozenset[str] = frozenset()
+    raw: object,
+    problems: list[str],
+    broad: frozenset[str] = frozenset(),
+    long_out: list[str] | None = None,
 ) -> list[str]:
     if not isinstance(raw, list):
         problems.append("The model gave no list of topics")
@@ -50,6 +54,8 @@ def check_topics(
         if not topic:
             continue
         if len(topic.split()) > MAX_TOPIC_WORDS:
+            if long_out is not None:
+                long_out.append(topic)
             problems.append(
                 f"Topic '{topic}' has more than {MAX_TOPIC_WORDS} words and was dropped"
             )
@@ -119,14 +125,15 @@ def check(
     data: dict, broad: frozenset[str] = frozenset(), facts: dict[str, str] | None = None
 ) -> Content:
     problems: list[str] = []
-    topics = check_topics(data.get("topics"), problems, broad)
+    long_topics: list[str] = []
+    topics = check_topics(data.get("topics"), problems, broad, long_topics)
     if not topics:
         problems.append("No usable topic")
     title, words = check_title(data.get("title"), problems)
     description = check_description(data.get("description"), problems)
     if description and facts:
         check_facts(description, facts, problems)
-    return Content(topics, title, words, description, problems)
+    return Content(topics, title, words, description, problems, long_topics)
 
 
 def footer(path: Path, today: date | None = None, custom: str = "") -> str:
