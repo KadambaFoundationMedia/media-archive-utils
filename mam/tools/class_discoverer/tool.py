@@ -345,7 +345,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     skip = not_a_class(record)
     if skip:
         return ToolOutcome("skipped", skip, {})
-    set_extra_words(settings.words_chapter, settings.words_verse, settings.words_canto)
+    set_extra_words(settings.words_chapter, settings.words_verse)
     started = time.monotonic()
     audio = source_audio(record, dry_run=ctx.dry_run)
     file_ref = filename_verse(record)
