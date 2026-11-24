@@ -1098,3 +1098,35 @@ def test_reset_refuses_a_folder_that_contains_the_repository(monkeypatch):
     settings = get_settings().model_copy(update={"media_identical_files_path": REPO_ROOT})
     with pytest.raises(MamError, match="repository"):
         maintenance._check_processed_roots(settings)
+
+
+def test_settings_does_not_list_an_alias_of_a_general_place_as_missing(client, monkeypatch):
+    """`Sumercamp` is a place option and an alias of Summercamp (no_country): not a gap."""
+    import time
+
+    from mam.tools.renamer import knowledge
+    from tests.renamer_fixtures import reference_raw
+
+    raw = reference_raw()
+    raw["options"]["place_location"] = [
+        *raw["options"]["place_location"],
+        "Summercamp",
+        "Sumercamp",
+    ]
+    raw["place_country"] = [
+        *raw["place_country"],
+        {
+            "id": 900,
+            "place": "Summercamp",
+            "country": "",
+            "cc": "",
+            "aliases": "Sumercamp",
+            "not_place": True,
+            "no_country": True,
+        },
+    ]
+    ref = knowledge.build_reference(raw)
+    ref.loaded_at = time.time() + 10_000
+    monkeypatch.setattr(knowledge, "_cached", ref)
+    page = client.get("/settings").text
+    assert "Sumercamp" not in page

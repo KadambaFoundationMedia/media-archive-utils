@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Settings
+- The Place → country warning no longer lists a place option that another place has as an alias (`Sumercamp` on the Summercamp row): it takes that place's country (none, on purpose).
 - A folder setting left empty in `.env` (`MEDIA_UNPROCESSED_FILES_PATH=` as in `.env.example`) now means its default folder. It used to mean the repository folder, which made the Reset page count (and offer to delete) every file in the repository. Reset also refuses a managed folder that is or contains the repository.
 - The Settings page spreads its blocks over both columns: the tool blocks on the left in pipeline order (Renamer, Kirtan splitter, Class discoverer, Content discoverer, as in CONTRACTS.md; the Class trimmer joins when it is built), and Review, General, Advanced, Current settings and Reset on the right.
 - `.env.example` is shortened to the private values and paths; the other options are set on the Settings page. The test now checks that every key in it is a real setting.
