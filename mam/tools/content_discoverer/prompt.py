@@ -37,7 +37,8 @@ a theme from the list of broad themes you are given.
 2 to 6 words: six is the most you should use, and a seventh word only when the title would \
 not be correct English without it (never more than seven). Enticing but accurate, not \
 generic, and built around one of the topics where possible. In sentence case (capital \
-letters only for names such as Krishna). No verse numbers, no place, no date, no quotation marks, no colon.
+letters only for names such as Krishna). No verse numbers, no place, no date, no \
+quotation marks, no colon.
 
 "description": a YouTube description in 2 to 3 paragraphs separated by a blank line, \
 interesting and captivating, that follows the topics. The first sentence says, in natural \
