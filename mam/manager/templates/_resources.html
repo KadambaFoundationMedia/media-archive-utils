@@ -1,7 +1,7 @@
 {# Header bars: CPU, GPU, memory and temperature, green below 60%, orange below 85%, red above. #}
 {% for bar in bars %}
 <div class="mam-res" title="{{ bar.label }}: {{ bar.value }}{{ bar.unit }}">
-  <span class="mam-res-label">{{ bar.icon }}</span>
+  <i class="fa-solid {{ bar.icon }}"></i>
   <div class="progress" role="progressbar" aria-label="{{ bar.label }}" aria-valuenow="{{ bar.value }}" aria-valuemin="0" aria-valuemax="100">
     <div class="progress-bar bg-{{ bar.color }}" style="width: {{ bar.width }}%"></div>
   </div>
