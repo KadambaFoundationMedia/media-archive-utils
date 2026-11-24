@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Class discoverer
+- A recording in which no verse is heard now goes to review when the file's only WHAT or category is a general one (`Class`, `Various`, `Unknown`), instead of being marked Done.
+
 ### Media manager
 - Settings page: the non-secret options that were only in `.env` are now set there, with autosave: Class discoverer (glossary fix and prompt, word timestamps, chunk length and timeout, Whisper languages, delay between vedabase.io requests), Kirtan splitter (early stop, analysis in separate processes), Review (random check rate) and General (operator name, worker counts; the workers apply after a restart). The `.env` value is the starting value. `START_THRESHOLD` is removed (nothing read it).
 

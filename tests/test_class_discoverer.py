@@ -511,3 +511,17 @@ def test_verse_pass_runs_only_when_switched_on(prepared, monkeypatch):
     assert out.state == "done"
     assert out.data["verse_pass"] is None  # the (fake) pass changed nothing
     assert len(called) == 1 and "karma" in called[0][3]  # the confirmed verse is the prompt
+
+
+def test_only_a_general_category_does_not_count_as_a_what():
+    from types import SimpleNamespace
+
+    def has(what, category):
+        record = SimpleNamespace(meta={"proposal": {"what": what, "category": category}})
+        return discoverer._has_what(record)
+
+    assert not has("Class", "Class")  # taken from a Lekce folder: says nothing
+    assert not has(None, "Various")
+    assert not has(None, None)
+    assert has("Vyasa-puja", "Vyasa-puja")
+    assert has(None, "Janmastami")

@@ -47,6 +47,9 @@ from mam.tools.class_discoverer.match import VerseMatch, match_translation
 
 log = logging.getLogger(__name__)
 TOOL = "class-discoverer"
+# A WHAT or category that says nothing about the content (decided 2026-11-24): with only these,
+# a recording in which no verse is heard goes to review.
+GENERIC_CATEGORIES = {"class", "various", "unknown"}
 
 LANGUAGE_NAMES = {
     "en": "English", "nl": "Dutch", "de": "German", "es": "Spanish", "hi": "Hindi",
@@ -430,7 +433,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         _open_review(ctx.session, record, data, reason, spot)
         return ToolOutcome("review", f"{summary} (needs a review)", data)
     if decision["action"] == "none" and not _has_what(record):
-        reason = "No verse was announced and the file has no WHAT at all. Choose what it is."
+        reason = "No verse was announced and the file has no specific WHAT or category (only a general one such as Class). Choose what it is."
         _open_review(ctx.session, record, data, reason, False)
         return ToolOutcome("review", reason, data)
     if decision["action"] == "name":
@@ -442,7 +445,10 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
 
 def _has_what(record: m.MediaFile) -> bool:
     proposal = (record.meta or {}).get("proposal") or {}
-    return bool(proposal.get("what") or proposal.get("category"))
+    return any(
+        value and str(value).lower() not in GENERIC_CATEGORIES
+        for value in (proposal.get("what"), proposal.get("category"))
+    )
 
 
 def _open_review(
