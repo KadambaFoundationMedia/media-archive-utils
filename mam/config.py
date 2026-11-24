@@ -83,10 +83,9 @@ class Settings(BaseSettings):
     # Renamer, Advanced: speakers other than KKS (flagged) and words dropped from names
     other_speakers: str = "SNS,BVS,KKD,KVS,BVPS,RNS"
     min_year: int = 1990
-    # Class discoverer, Advanced: words that count like chapter / text / canto in other languages
+    # Class discoverer, Advanced: words that count like chapter / text in other languages
     words_chapter: str = ""
     words_verse: str = ""
-    words_canto: str = ""
     noise_words: str = "hh,his,holiness,mp3,wav,stereo,jet,clean,copy,unedited"
 
     operator_name: str = Field(default_factory=getpass.getuser)

@@ -29,13 +29,13 @@ BOOKS = {
 }
 # Whisper writes the canto as 'canto', 'kanto', 'kanchu', 'kantam'...
 CANTO_WORDS = {"canto", "cantos", "kanto", "kanta", "kantam", "kanchu", "cantu", "kandha"}
-# Extra words for chapter, text and canto in other languages (Settings page, Advanced block).
-EXTRA_WORDS: dict[str, set[str]] = {"chapter": set(), "verse": set(), "canto": set()}
+# Extra words for chapter and text in other languages (Settings page, Advanced block).
+EXTRA_WORDS: dict[str, set[str]] = {"chapter": set(), "verse": set()}
 
 
-def set_extra_words(chapter: str = "", verse: str = "", canto: str = "") -> None:
-    """Words (comma separated, lower-cased) that count like 'chapter', 'text' and 'canto'."""
-    for key, text in (("chapter", chapter), ("verse", verse), ("canto", canto)):
+def set_extra_words(chapter: str = "", verse: str = "") -> None:
+    """Words (comma separated, lower-cased) that count like 'chapter' and 'text'."""
+    for key, text in (("chapter", chapter), ("verse", verse)):
         EXTRA_WORDS[key] = {w.strip().lower() for w in text.split(",") if w.strip()}
 
 
@@ -118,7 +118,7 @@ def read_window(book: str, text: str) -> tuple[VerseRef | None, dict[str, Any], 
     dotted = re.search(r"\b(\d{1,3}(?:\.\d{1,3}){1,3})\b", lower)
     if dotted:
         heard["dotted"] = dotted.group(1)
-    canto_words = CANTO_WORDS | EXTRA_WORDS["canto"]
+    canto_words = CANTO_WORDS
     chapter_words = {"chapter"} | EXTRA_WORDS["chapter"]
     keywords = (
         canto_words | chapter_words | {"text", "texts", "verse", "verses"} | EXTRA_WORDS["verse"]
