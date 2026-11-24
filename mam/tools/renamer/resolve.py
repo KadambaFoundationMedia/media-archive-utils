@@ -149,6 +149,17 @@ def read_tags(path: Path) -> dict[str, str]:
     return out
 
 
+def _parsed_siblings(parser: NameParser, folder: str) -> list[tuple[str, ParsedName]]:
+    """The parsed names of the files in `folder`, parsed once per folder and parser.
+
+    Every file looks at its siblings; parsing them again for each file made a folder of n
+    files cost n x n parses."""
+    cache = parser.__dict__.setdefault("_sibling_cache", {})
+    if folder not in cache:
+        cache[folder] = [(n, parser.parse(Path(n).stem)) for n in _sibling_names(folder)]
+    return cache[folder]
+
+
 RECORDER_ALBUMS = ("tascam", "zoom", "roland", "olympus", "sony", "dr-")
 
 
@@ -159,10 +170,9 @@ def build_context(
     siblings: Counter = Counter()
     sibling_places: dict[str, set[str]] = {}
     sibling_ccs: dict[str, set[str]] = {}
-    for name in _sibling_names(str(path.parent)):
+    for name, parsed in _parsed_siblings(parser, str(path.parent)):
         if name == path.name:
             continue
-        parsed = parser.parse(Path(name).stem)
         for match in parsed.dates:
             if len(match.readings) == 1 and match.readings[0].value.is_full:
                 v = match.readings[0].value
@@ -213,13 +223,6 @@ SUMMERCAMP_RE = re.compile(r"\bsumm?er ?camp")
 
 
 # ------------------------------------------------------------------- resolver
-def cc_for_name_safe(token: str) -> str | None:
-    try:
-        return cc_for_name(token)
-    except Exception:
-        return None
-
-
 class Resolver:
     def __init__(self, ref: Reference, roots: list[Path]) -> None:
         self.ref = ref
@@ -790,7 +793,7 @@ class Resolver:
             for token in norm_key(text).split():
                 if token in TITLE_STOPWORDS or token in self.ref.places:
                     continue
-                if len(token) > 3 and cc_for_name_safe(token):
+                if len(token) > 3 and cc_for_name(token):
                     continue
                 tokens.add(token)
         return tokens

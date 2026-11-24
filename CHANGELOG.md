@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Renamer
+- Faster on big folders: the names of the other files in a folder are parsed once per folder instead of once per file (a 400-file folder: 46 ms to 4 ms per file). Small clean-ups of two unused helper functions.
+
 ### Kirtan splitter
 - A kirtan split off a class is now always named `Jaya-radha-madhava` (it was `Jaya-Jaya-Sri-Caitanya` before a CC class). A recording that is singing throughout stays `Kirtan`.
 
