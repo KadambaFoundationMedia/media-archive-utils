@@ -37,8 +37,8 @@ a theme from the list of broad themes you are given.
 2 to 6 words, and no more wherever you can: long titles read badly in a file manager, \
 on a phone and on an mp3 player. Use a 7th word only when the title would otherwise not be \
 good English; never more than 7. Enticing but accurate, not generic, and built around one \
-of the topics where possible. In sentence case (capital letters only for names such as Krishna). No verse numbers, \
-no place, no date, no quotation marks, no colon.
+of the topics where possible. In sentence case (capital letters only for names such as \
+Krishna). No verse numbers, no place, no date, no quotation marks, no colon.
 
 "description": a YouTube description in 2 to 3 paragraphs separated by a blank line, \
 interesting and captivating, that follows the topics. The first sentence says, in natural \
