@@ -8,6 +8,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Renamer
+- Summercamp now comes from a row in `category_terms_folder` (add the row and its spellings in Baserow), not from a pattern in the code. A recorder file in a Summercamp folder is named `..._Summercamp_...` and is no longer flagged.
+
+### Renamer
 - Faster on big folders: the names of the other files in a folder are parsed once per folder instead of once per file (a 400-file folder: 46 ms to 4 ms per file). Small clean-ups of two unused helper functions.
 
 ### Kirtan splitter
