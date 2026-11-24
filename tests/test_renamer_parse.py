@@ -132,3 +132,11 @@ def test_recorder_prefixes_come_from_the_option(reference):
     assert custom.parse("HANDY0012").recorder
     assert not custom.parse("DSC0012").recorder
     assert custom.parse("R09_0004").recorder  # R09-style names always count
+
+
+def test_speakers_and_noise_come_from_the_options(reference):
+    from mam.tools.renamer.parse import NameParser
+
+    custom = NameParser(reference, other_speakers="ABC", noise_words="foo")
+    assert custom.other_speakers == {"ABC"}
+    assert custom.noise == {"foo"}

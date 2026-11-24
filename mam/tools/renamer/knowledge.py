@@ -194,6 +194,7 @@ def _term_rows(client, method: str, key: str) -> list[dict[str, Any]]:
                     "name": str(name).strip(),
                     "aliases": (low.get("aliases") or "").strip(),
                     "cc": (low.get("cctld") or "").strip().lower(),
+                    "whisper_code": (low.get("whisper_code") or "").strip().lower(),
                 }
             )
     return out
@@ -235,7 +236,11 @@ def build_reference(raw: dict[str, Any], learned: dict[str, str] | None = None) 
     # Language words and country words come from the Baserow tables language_terms and
     # country_terms; the language name itself counts as a word too.
     aliases["languages"] = {}
+    aliases["whisper_codes"] = {}  # Whisper's two-letter code -> the Baserow language name
     for row in raw.get("languages", []):
+        for code in re.split(r"[,;\s]+", row.get("whisper_code") or ""):
+            if code:
+                aliases["whisper_codes"].setdefault(code, row["name"])
         for word in [row["name"], *_split_aliases(row.get("aliases"))]:
             aliases["languages"].setdefault(norm_key(word), row["name"])
     country_terms: dict[str, str] = {}

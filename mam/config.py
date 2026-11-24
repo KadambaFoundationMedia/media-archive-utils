@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     # Renamer: recorder file names (set on the Settings page)
     recorder_prefixes: str = "ZOOM,STE,DSC,MVI,IMG,REC,DR,LS,VN,WS,TASCAM,DM,MOV"
     recorder_albums: str = "tascam,zoom,roland,olympus,sony,dr-"
+    # Renamer, Advanced: speakers other than KKS (flagged) and words dropped from names
+    other_speakers: str = "SNS,BVS,KKD,KVS,BVPS,RNS"
+    noise_words: str = "hh,his,holiness,mp3,wav,stereo,jet,clean,copy,unedited"
 
     operator_name: str = Field(default_factory=getpass.getuser)
 

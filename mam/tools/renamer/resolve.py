@@ -231,10 +231,12 @@ class Resolver:
         roots: list[Path],
         recorder_prefixes: str = DEFAULT_RECORDER_PREFIXES,
         recorder_albums: str = DEFAULT_RECORDER_ALBUMS,
+        other_speakers: str | None = None,
+        noise_words: str | None = None,
     ) -> None:
         self.ref = ref
         self.recorder_albums = recorder_albums
-        self.parser = NameParser(ref, recorder_prefixes)
+        self.parser = NameParser(ref, recorder_prefixes, other_speakers, noise_words)
         self.roots = [r.resolve() for r in roots]
 
     def propose(self, path: Path, tags_from: Path | None = None) -> Proposal:
