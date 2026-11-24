@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +21,20 @@ from mam.helpers.local_db.repo import record_event
 log = logging.getLogger(__name__)
 TOOL = "class-discoverer"
 
+_LOCKS: dict[str, threading.RLock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+@contextmanager
+def file_lock(audio: Path) -> Iterator[None]:
+    """One gain at a time per file. The gain runs as its own CPU job (`audio-gain`) ahead of the
+    class discoverer, which waits here when it reaches the file first. Re-entrant, so a job can
+    hold the lock around `apply_gain` and its own database commit."""
+    with _LOCKS_GUARD:
+        lock = _LOCKS.setdefault(str(audio.resolve()), threading.RLock())
+    with lock:
+        yield
+
 
 def apply_gain(
     session: Session, record: m.MediaFile, audio: Path, settings: Settings, *, dry_run: bool
@@ -26,6 +43,13 @@ def apply_gain(
 
     A recording that already meets the target is left alone: no needless re-encode.
     """
+    with file_lock(audio):
+        return _apply_gain(session, record, audio, settings, dry_run=dry_run)
+
+
+def _apply_gain(
+    session: Session, record: m.MediaFile, audio: Path, settings: Settings, *, dry_run: bool
+) -> dict[str, Any]:
     before = measure(audio)
     if before.meets_target():
         return {"applied": False, "before": before.integrated, "reason": "already at the target"}
@@ -62,3 +86,31 @@ def apply_gain(
         detail={"gain": info},
     )
     return info
+
+
+def run_audio_gain(ctx) -> ToolOutcome:  # noqa: F821 - imported lazily to avoid a cycle
+    """The gain step on its own, in the CPU pool, so the files of a batch are evened out in
+    parallel while the ML worker transcribes another file. The class discoverer runs the same
+    step again: for a file that is at the target by then it only measures."""
+    from mam.manager.tools import ToolOutcome
+    from mam.tools.class_discoverer.tool import not_a_class, source_audio
+
+    record = ctx.media_file
+    if record is None or record.status in ("Excluded", "Deleted"):
+        return ToolOutcome("skipped", "The file is not processed any more", {})
+    skip = not_a_class(record)
+    if skip:
+        return ToolOutcome("skipped", skip, {})
+    try:
+        audio = source_audio(record, dry_run=False)
+    except Exception as exc:  # noqa: BLE001 - the class discoverer reports it to the person
+        return ToolOutcome("skipped", str(exc), {})
+    with file_lock(audio):
+        info = apply_gain(ctx.session, record, audio, ctx.settings, dry_run=False)
+        if info.get("applied"):
+            meta = dict(record.meta or {})
+            meta["gain_pre"] = info  # the class discoverer reports it with its own result
+            record.meta = meta
+        ctx.session.commit()  # before the lock goes: the class discoverer reads the new hash
+    summary = "Volume evened out" if info.get("applied") else "Volume already at the target"
+    return ToolOutcome("info", summary, {"gain": info})

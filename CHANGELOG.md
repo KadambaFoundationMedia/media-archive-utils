@@ -31,6 +31,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The file page shows the vedabase.io link of the verse once the Class discoverer has run.
 
 ### Class discoverer
+- The volume (gain and loudness) step runs ahead of the transcription as its own job on the CPU pool, so the files of a batch are evened out in parallel (up to the CPU workers) instead of one after another inside the single ML worker. The ML worker only transcribes.
 - Removed the experimental "Improve the chanted verse" option (a second transcription pass on the chanted verse); the test on real recordings was mixed.
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.
 

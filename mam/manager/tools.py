@@ -52,6 +52,7 @@ class ToolSpec:
     per_file: bool = True
     changes_files: bool = True
     sets_status: bool = True  # read-only checks leave the processing status alone
+    hidden: bool = False  # a step another tool queues; not in the action menu
 
 
 def _scan(ctx: JobContext) -> ToolOutcome:
@@ -84,6 +85,12 @@ def _class_discoverer(ctx: JobContext) -> ToolOutcome:
     return run_class_discoverer(ctx)
 
 
+def _audio_gain(ctx: JobContext) -> ToolOutcome:
+    from mam.tools.class_discoverer.gain import run_audio_gain
+
+    return run_audio_gain(ctx)
+
+
 def _content_discoverer(ctx: JobContext) -> ToolOutcome:
     from mam.tools.content_discoverer.tool import run_content_discoverer
 
@@ -112,6 +119,15 @@ TOOLS: dict[str, ToolSpec] = {
         _class_discoverer,
         "Even out the volume, transcribe the class and find its verse on vedabase.io",
     ),
+    "audio-gain": ToolSpec(
+        "audio-gain",
+        "Volume",
+        "cpu",
+        _audio_gain,
+        "Even out the volume of a class ahead of the Class discoverer (queued by it)",
+        sets_status=False,
+        hidden=True,
+    ),
     "content-discoverer": ToolSpec(
         "content-discoverer",
         "Content discoverer",
@@ -133,7 +149,7 @@ TOOLS: dict[str, ToolSpec] = {
 
 
 def menu_tools() -> list[ToolSpec]:
-    return [t for t in TOOLS.values() if t.per_file]
+    return [t for t in TOOLS.values() if t.per_file and not t.hidden]
 
 
 def next_in_pipeline(tool: str) -> str | None:

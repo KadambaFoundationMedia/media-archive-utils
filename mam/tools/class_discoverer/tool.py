@@ -43,7 +43,7 @@ from mam.tools.class_discoverer.announce import (
     find_announcements,
     set_extra_words,
 )
-from mam.tools.class_discoverer.gain import apply_gain
+from mam.tools.class_discoverer.gain import apply_gain, file_lock
 from mam.tools.class_discoverer.match import VerseMatch, match_translation
 
 log = logging.getLogger(__name__)
@@ -312,7 +312,15 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     client = VedabaseClient(settings)
     report("Measuring and adjusting the loudness", 0.02)
     try:
-        gain = apply_gain(ctx.session, record, audio, settings, dry_run=ctx.dry_run)
+        with file_lock(audio):  # waits for the `audio-gain` job of this file, if it runs now
+            ctx.session.refresh(record)  # its new size and hash
+            gain = apply_gain(ctx.session, record, audio, settings, dry_run=ctx.dry_run)
+        pre = (record.meta or {}).get("gain_pre")
+        if pre and not gain.get("applied"):
+            gain = {**pre, "done_before": True}  # the CPU job already did it
+            meta = dict(record.meta or {})
+            meta.pop("gain_pre", None)
+            record.meta = meta
     except CorruptedMedia as exc:
         return ToolOutcome("corrupted", str(exc), {})
     gained = time.monotonic()

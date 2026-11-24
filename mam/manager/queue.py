@@ -88,6 +88,10 @@ def enqueue(
         if spec.sets_status and not dry_run:
             set_status(session, record, status_for(spec.label, "queued"), tool=tool)
         count += 1
+        if tool == "class-discoverer" and not dry_run:
+            # The volume step needs no ML worker: the CPU pool does it for the whole batch
+            # while the ML worker transcribes one file after another.
+            enqueue(session, "audio-gain", [file_id], dry_run=False)
     return count
 
 
