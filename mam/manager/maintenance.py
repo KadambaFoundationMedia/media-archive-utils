@@ -134,11 +134,7 @@ def sole_copies() -> int:
 def _check_processed_roots(settings: Settings) -> list[Path]:
     # the transcripts are derived from the processed copies and go with them
     roots = [*settings.managed_roots, settings.transcriptions_path.resolve()]
-    from mam.config import REPO_ROOT
-
     for root in roots:
-        if root == REPO_ROOT.resolve() or root in REPO_ROOT.resolve().parents:
-            raise MamError(f"Refusing to clear {root}: it is or contains the repository")
         for original in settings.read_only_roots:
             if root == original or original in root.parents or root in original.parents:
                 raise MamError(
@@ -146,6 +142,12 @@ def _check_processed_roots(settings: Settings) -> list[Path]:
                 )
         if root == Path(root.anchor) or root == Path.home().resolve():
             raise MamError(f"Refusing to clear {root}")
+        from mam.config import REPO_ROOT
+
+        protected = [REPO_ROOT.resolve(), settings.local_db_path.parent.resolve()]
+        for keep in protected:
+            if root == keep or root in keep.parents:
+                raise MamError(f"Refusing to clear {root}: it is or contains {keep}")
     return roots
 
 

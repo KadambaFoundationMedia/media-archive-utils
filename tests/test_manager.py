@@ -1078,28 +1078,6 @@ def test_settings_page_options_autosave(client):
     assert client.post("/settings/option/nope", data={"value": "1"}).status_code == 404
 
 
-def test_empty_folder_settings_mean_the_defaults(monkeypatch):
-    from mam.config import REPO_ROOT, Settings
-
-    monkeypatch.setenv("MEDIA_UNPROCESSED_FILES_PATH", "")
-    monkeypatch.setenv("MEDIA_IDENTICAL_FILES_PATH", "")
-    s = Settings()
-    assert s.media_unprocessed_files_path == REPO_ROOT / "unprocessed-files"
-    assert s.media_identical_files_path == REPO_ROOT / "identical-files"
-
-
-def test_reset_refuses_a_folder_that_contains_the_repository(monkeypatch):
-    import pytest
-
-    from mam.config import REPO_ROOT, get_settings
-    from mam.errors import MamError
-    from mam.manager import maintenance
-
-    settings = get_settings().model_copy(update={"media_identical_files_path": REPO_ROOT})
-    with pytest.raises(MamError, match="repository"):
-        maintenance._check_processed_roots(settings)
-
-
 def test_settings_does_not_list_an_alias_of_a_general_place_as_missing(client, monkeypatch):
     """`Sumercamp` is a place option and an alias of Summercamp (no_country): not a gap."""
     import time
@@ -1128,5 +1106,4 @@ def test_settings_does_not_list_an_alias_of_a_general_place_as_missing(client, m
     ref = knowledge.build_reference(raw)
     ref.loaded_at = time.time() + 10_000
     monkeypatch.setattr(knowledge, "_cached", ref)
-    page = client.get("/settings").text
-    assert "Sumercamp" not in page
+    assert "Sumercamp" not in client.get("/settings").text

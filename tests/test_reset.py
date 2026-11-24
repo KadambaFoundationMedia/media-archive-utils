@@ -104,6 +104,25 @@ def test_reset_refuses_when_processed_folder_overlaps_originals(worked, settings
     assert count(m.MediaFile) == 2
 
 
+def test_reset_refuses_when_a_folder_is_the_repository(worked, settings, monkeypatch):
+    from mam.config import REPO_ROOT
+
+    monkeypatch.setattr(settings, "media_identical_files_path", REPO_ROOT)
+    with pytest.raises(MamError, match="Refusing to clear"):
+        reset(ResetOptions())
+    assert count(m.MediaFile) == 2
+
+
+def test_an_empty_folder_setting_means_the_default(monkeypatch):
+    from mam.config import REPO_ROOT, Settings
+
+    monkeypatch.setenv("MEDIA_IDENTICAL_FILES_PATH", "")
+    monkeypatch.setenv("MEDIA_UNPROCESSED_FILES_PATH", "  ")
+    s = Settings()
+    assert s.media_identical_files_path == REPO_ROOT / "identical-files"
+    assert s.media_unprocessed_files_path == REPO_ROOT / "unprocessed-files"
+
+
 def test_reset_can_delete_earlier_backups_but_keeps_its_own(worked, settings):
     backup_dir = settings.local_db_path.parent / "backups"
     for name in ("mam-export-20200101-000000", "mam-export-20200102-000000"):
