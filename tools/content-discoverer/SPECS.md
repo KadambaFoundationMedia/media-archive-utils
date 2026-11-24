@@ -55,3 +55,10 @@ All music and videos are the property of Kadamba Foundation
 
 ## Generating a title
 The title should summarise the main point of the class. It should be enticing and not too general. The main point of the class is one of the generated topics
+
+
+## Decisions (Edwin, 2026-11-24; the full text is in SPEC.md section 4)
+- The Claude API writes the text through the pluggable LLM provider; a local model may follow later behind the same interface.
+- The first 20 results are reviewed on the file page, then the tool works alone (with the 5% random check). A different existing value in Baserow always goes to review.
+- Only a class with a verse gets the title in its filename. A recording without a verse keeps its name.
+- The footer is `docs/references/youtube-footer.txt` (`{year}` is the current year).

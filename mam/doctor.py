@@ -97,6 +97,18 @@ def run_checks(settings: Settings) -> list[Check]:
     if not missing:
         checks.extend(_baserow_checks(settings))
     checks.append(_baserow_switch_check())
+    has_key = bool(settings.anthropic_api_key)
+    checks.append(
+        Check(
+            "Claude API key",
+            has_key,
+            "set"
+            if has_key
+            else "ANTHROPIC_API_KEY is not in .env (needed by the content-discoverer; "
+            "`ant auth login` also works)",
+            required=False,
+        )
+    )
     if "BASEROW_APPLY" in _env_text():
         checks.append(
             Check(
