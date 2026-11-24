@@ -516,7 +516,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
             "file.html",
             menu=menu_tools(),
             mode="review"
-            if review_tool and review_tool not in ("kirtan-splitter", "class-discoverer")
+            if review_tool
+            and review_tool not in ("kirtan-splitter", "class-discoverer", "content-discoverer")
             else "file",
             review=review,
             review_id=review_id,

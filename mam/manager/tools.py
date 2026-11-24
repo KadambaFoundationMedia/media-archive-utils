@@ -84,6 +84,12 @@ def _class_discoverer(ctx: JobContext) -> ToolOutcome:
     return run_class_discoverer(ctx)
 
 
+def _content_discoverer(ctx: JobContext) -> ToolOutcome:
+    from mam.tools.content_discoverer.tool import run_content_discoverer
+
+    return run_content_discoverer(ctx)
+
+
 TOOLS: dict[str, ToolSpec] = {
     "renamer": ToolSpec(
         "renamer",
@@ -105,6 +111,13 @@ TOOLS: dict[str, ToolSpec] = {
         "ml",
         _class_discoverer,
         "Even out the volume, transcribe the class and find its verse on vedabase.io",
+    ),
+    "content-discoverer": ToolSpec(
+        "content-discoverer",
+        "Content discoverer",
+        "io",
+        _content_discoverer,
+        "Write the themes, a title and the YouTube description from the transcript",
     ),
     "scan": ToolSpec(
         "scan",
