@@ -11,8 +11,8 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from mam.config import get_settings
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import operator_name
 from mam.helpers.local_db.hashing import fingerprint, sha256
 
 AUDIO_EXTENSIONS = {
@@ -161,7 +161,7 @@ def record_event(
         dst=str(dst) if dst else None,
         dry_run=dry_run,
         detail=detail,
-        operator=get_settings().operator_name,
+        operator=operator_name(),
     )
     session.add(event)
     session.flush()

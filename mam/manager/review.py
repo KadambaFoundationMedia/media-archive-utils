@@ -6,9 +6,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from mam.config import get_settings
 from mam.errors import MamError
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import operator_name
 from mam.helpers.local_db.db import session_scope
 from mam.manager.queue import resume_after_review, stable_status
 
@@ -48,7 +48,7 @@ def register_review_routes(app: FastAPI, render, notify) -> None:
 
         form = await request.form()
         action = form.get("action")
-        operator = get_settings().operator_name
+        operator = operator_name()
         note = (form.get("note") or "").strip() or None
         messages = {
             "reject": "Result rejected: the copy was removed and the file is Not processed",

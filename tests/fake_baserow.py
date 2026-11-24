@@ -113,7 +113,8 @@ def fields(table_id: int):
             for n in ("start_date", "end_date", "place_location", "country", "original_schedule")
         ]
     return [
-        {"name": n, "type": "text"} for n in ("category", "filename_terms", "folder_name", "color")
+        {"name": n, "type": "text"}
+        for n in ("category", "filename_terms", "folder_name", "color", "type")
     ]
 
 

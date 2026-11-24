@@ -844,9 +844,17 @@ def test_a_combination_phrase_is_dropped_from_the_class_what():
 
     matcher = CategoryMatcher(
         [
-            {"category": "Kirtan", "filename_terms": "kirtan, bhajans, maha mantra"},
-            {"category": "Jaya-Radha-Madhava", "filename_terms": "JRM, radha madhava"},
-            {"category": "Class", "filename_terms": "Lecture, Class"},
+            {
+                "category": "Kirtan",
+                "filename_terms": "kirtan, bhajans, maha mantra",
+                "type": "kirtan",
+            },
+            {
+                "category": "Jaya-Radha-Madhava",
+                "filename_terms": "JRM, radha madhava",
+                "type": {"id": 2, "value": "kirtan"},  # a Baserow single select
+            },
+            {"category": "Class", "filename_terms": "Lecture, Class", "type": "class"},
         ]
     )
     assert w("SB-1-19-31-with-radha-madhava", matcher) == "SB-1-19-31"
@@ -917,9 +925,14 @@ def test_a_kirtan_recording_is_filed_under_kirtan_not_radhastami():
 
     matcher = CategoryMatcher(
         [
-            {"category": "Kirtan", "filename_terms": "kirtan, bhajans", "folder": "Kirtan"},
+            {
+                "category": "Kirtan",
+                "filename_terms": "kirtan, bhajans",
+                "folder": "Kirtan",
+                "type": "kirtan",
+            },
             {"category": "Radhastami", "filename_terms": "radhastami", "folder": "Radhastami"},
-            {"category": "Nrsimha-pranama", "filename_terms": "nrsimha pranama"},
+            {"category": "Nrsimha-pranama", "filename_terms": "nrsimha pranama", "type": "kirtan"},
         ]
     )
     ref = SimpleNamespace(matcher=matcher)
@@ -991,10 +1004,14 @@ def test_bhajans_are_always_kirtan_unless_a_class_is_part_of_it():
 
     matcher = CategoryMatcher(
         [
-            {"category": "Kirtan", "filename_terms": "kirtan, bhajan, bhajans, bhajanas"},
+            {
+                "category": "Kirtan",
+                "filename_terms": "kirtan, bhajan, bhajans, bhajanas",
+                "type": "kirtan",
+            },
             {"category": "Radhastami", "filename_terms": "radhastami"},
             {"category": "Srimad-bhagavatam", "filename_terms": "SB, Srimad Bhagavatam"},
-            {"category": "Jaya-Radha-Madhava", "filename_terms": "radha madhava"},
+            {"category": "Jaya-Radha-Madhava", "filename_terms": "radha madhava", "type": "kirtan"},
         ]
     )
     name = lambda what: (matcher.match(what) or None) and matcher.match(what).category.name  # noqa: E731

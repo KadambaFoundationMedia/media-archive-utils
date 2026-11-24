@@ -22,12 +22,17 @@ from mam.errors import MamError
 from mam.helpers.local_db import migrate, session_scope
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import (
+    OPTION_BY_KEY,
+    OPTIONS,
     default_size_setting,
     default_status_setting,
+    option_groups,
+    option_value,
     renamer_move_files,
     renamer_postfix,
     set_default_size,
     set_default_status,
+    set_option,
     set_renamer_options,
     set_transcribe_speech_only,
     set_transcribe_verse_pass,
@@ -232,9 +237,9 @@ def _region_colors(record: m.MediaFile, proposal: dict) -> dict[str, str]:
         category = ref.matcher.by_name(record.category) if record.category else None
         if category and css_color(category.color):
             colors["class"] = css_color(category.color)
-        from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES
+        from mam.tools.kirtan_splitter.phrases import mantra_choices
 
-        mantra = proposal.get("mantra") or MANTRA_CHOICES[0]
+        mantra = proposal.get("mantra") or mantra_choices(ref.matcher)[0]
         found = ref.matcher.match(mantra)
         if found and found.category and css_color(found.category.color):
             colors["kirtan"] = css_color(found.category.color)
@@ -483,11 +488,15 @@ def create_app(start_queue: bool = True) -> FastAPI:
             proposal = dict(review.proposal) if review else None
             splitter = {}
             if review and review.tool == "kirtan-splitter":
-                from mam.tools.kirtan_splitter.tool import MANTRA_CHOICES, format_time
+                from mam.tools.kirtan_splitter.phrases import mantra_choices
+                from mam.tools.kirtan_splitter.tool import format_time
+                from mam.tools.renamer.knowledge import reference_if_ready
+
+                ref = reference_if_ready()
 
                 splitter = {
                     "region_colors": _region_colors(record, proposal),
-                    "mantras": MANTRA_CHOICES,
+                    "mantras": mantra_choices(ref.matcher if ref else None),
                     "split_text": format_time(proposal["split_at"])
                     if proposal.get("split_at") is not None
                     else "",
@@ -779,6 +788,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
             renamer_postfix=renamer_postfix(),
             speech_only=transcribe_speech_only(settings.transcribe_speech_only),
             verse_pass=transcribe_verse_pass(settings.transcribe_verse_pass),
+            option_groups=option_groups(),
+            values={o.key: option_value(o, settings) for o in OPTIONS},
         )
 
     def saved(request: Request, what: str, error: str | None = None):
@@ -792,6 +803,18 @@ def create_app(start_queue: bool = True) -> FastAPI:
         form = await request.form()
         set_renamer_options(form.get("move_files") == "on", renamer_postfix())
         return saved(request, "Move files instead of copying")
+
+    @app.post("/settings/option/{key}")
+    async def settings_option(request: Request, key: str):
+        option = OPTION_BY_KEY.get(key)
+        if option is None:
+            raise HTTPException(404)
+        form = await request.form()
+        try:
+            set_option(key, form.get("value"))
+        except ValueError as error:
+            return saved(request, option.label, str(error))
+        return saved(request, option.label)
 
     @app.post("/settings/class-discoverer/speech-only")
     async def settings_speech_only(request: Request):

@@ -33,7 +33,7 @@ def mantra_for_what(what: str | None) -> str | None:
 # reads as the WHAT `SB-1-19-31-with-radha-madhava`. After the split the class is no longer a
 # combination, so the phrase goes (decided 2026-11-22). Which words name a kirtan comes from the
 # `category_terms_folder` table (the terms of the kirtan categories), not from this code.
-KIRTAN_CATEGORIES = {c.lower() for c in (MAHA_MANTRA, RADHA_MADHAVA, PANCA_TATTVA, NRSIMHA)}
+DEFAULT_MANTRAS = [MAHA_MANTRA, RADHA_MADHAVA, PANCA_TATTVA, NRSIMHA]  # until `type` is filled in
 _JOINERS = {"with", "and", "plus"}
 
 
@@ -53,9 +53,15 @@ def without_combination(what: str | None, matcher: Any) -> str | None:
             hit = matcher.match(phrase)
             if (
                 hit
-                and hit.category.name.lower() in KIRTAN_CATEGORIES
+                and hit.category.kind == "kirtan"
                 and hit.score == len([t for t in re.split(r"[\s\-_,/]+", phrase) if t])
             ):
                 cleaned = "-".join(parts[:i] + parts[end:])
                 return cleaned or None
     return None
+
+
+def mantra_choices(matcher: Any) -> list[str]:
+    """The kirtan types a reviewer can pick: the categories of type kirtan in Baserow."""
+    names = matcher.kirtan_names() if matcher is not None else []
+    return names or list(DEFAULT_MANTRAS)

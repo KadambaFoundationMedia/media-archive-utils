@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from mam.config import Settings, get_settings
 from mam.helpers.local_db import models as m
+from mam.helpers.local_db.app_settings import tuned
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
 from mam.helpers.progress import reporting
@@ -125,10 +126,11 @@ class JobQueue:
                 .where(m.Job.state == "running")
                 .values(state="queued", started_at=None, step=None, progress=None)
             )
+        pool_settings = tuned(self.settings)
         sizes = {
-            "ml": self.settings.workers_ml,
-            "cpu": self.settings.workers_cpu,
-            "io": self.settings.workers_io,
+            "ml": pool_settings.workers_ml,
+            "cpu": pool_settings.workers_cpu,
+            "io": pool_settings.workers_io,
         }
         for pool, size in sizes.items():
             for i in range(max(1, size)):
@@ -221,7 +223,7 @@ class JobQueue:
         try:
             with session_scope() as session:
                 record = session.get(m.MediaFile, job.media_file_id) if job.media_file_id else None
-                ctx = JobContext(job_id, session, self.settings, dry_run, params, record)
+                ctx = JobContext(job_id, session, tuned(self.settings), dry_run, params, record)
                 with reporting(self._reporter(job_id)):
                     outcome = spec.run(ctx)
                 self._finish(session, job_id, record, outcome)

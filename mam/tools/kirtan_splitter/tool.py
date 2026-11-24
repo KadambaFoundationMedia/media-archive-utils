@@ -33,12 +33,6 @@ from mam.tools.kirtan_splitter.features import Analysis, analyse_audio
 log = logging.getLogger(__name__)
 TOOL = "kirtan-splitter"
 TOLERANCE_S = 1.5  # SPEC.md section 9
-MANTRA_CHOICES = [
-    phrases.MAHA_MANTRA,
-    phrases.RADHA_MADHAVA,
-    phrases.PANCA_TATTVA,
-    phrases.NRSIMHA,
-]
 
 
 # ------------------------------------------------------------------ timestamps

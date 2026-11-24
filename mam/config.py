@@ -76,7 +76,6 @@ class Settings(BaseSettings):
 
     # Auto/review decisions (SPEC.md section 10)
     spot_check_rate: float = 0.05
-    start_threshold: float = 0.9
 
     operator_name: str = Field(default_factory=getpass.getuser)
 
