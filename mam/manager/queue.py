@@ -47,6 +47,32 @@ def status_for(label: str, state: str) -> str:
     }[state]
 
 
+def blocking_review(session: Session, file_id: int, tool: str) -> str | None:
+    """The label of an earlier pipeline tool whose review is still open on the file, if any.
+
+    A file that one tool flagged for review (Kirtan splitter, Renamer, ...) waits: the later
+    tools only run on it after the review is decided, because the decision can change the
+    recording itself (a cut) or its name.
+    """
+    from mam.manager.tools import PIPELINE_ORDER
+
+    name = {"class-loudness": "class-discoverer"}.get(tool, tool)
+    if name not in PIPELINE_ORDER:
+        return None
+    earlier = PIPELINE_ORDER[: PIPELINE_ORDER.index(name)]
+    found = session.scalar(
+        select(m.Review.tool)
+        .where(
+            m.Review.media_file_id == file_id,
+            m.Review.outcome == "pending",
+            m.Review.tool.in_(earlier),
+        )
+        .order_by(m.Review.id)
+        .limit(1)
+    )
+    return TOOLS[found].label if found in TOOLS else found
+
+
 def enqueue(
     session: Session,
     tool: str,
@@ -55,8 +81,12 @@ def enqueue(
     dry_run: bool = True,
     params: dict[str, Any] | None = None,
     pipeline: bool = False,
+    blocked: list[tuple[int, str]] | None = None,
 ) -> int:
-    """Queue `tool` for each file (or once, for folder-level tools). Returns the job count."""
+    """Queue `tool` for each file (or once, for folder-level tools). Returns the job count.
+
+    A real run on a file with an open review of an earlier tool is not queued; the file and
+    that tool's label are added to `blocked`. Dry runs change nothing and always run."""
     spec = TOOLS[tool]
     count = 0
     if not spec.per_file:
@@ -70,6 +100,11 @@ def enqueue(
     for file_id in file_ids:
         record = session.get(m.MediaFile, file_id)
         if record is None or record.status in ("Excluded", "Deleted"):
+            continue
+        waiting_for = None if dry_run else blocking_review(session, file_id, tool)
+        if waiting_for:
+            if blocked is not None:
+                blocked.append((file_id, waiting_for))
             continue
         busy = session.scalar(
             select(m.Job.id).where(
@@ -272,8 +307,21 @@ class JobQueue:
             with session_scope() as session:
                 record = session.get(m.MediaFile, job.media_file_id) if job.media_file_id else None
                 ctx = JobContext(job_id, session, tuned(self.settings), dry_run, params, record)
+                waiting_for = (
+                    blocking_review(session, job.media_file_id, tool)
+                    if job.media_file_id and not dry_run
+                    else None
+                )
                 with reporting(self._reporter(job_id)):
-                    outcome = spec.run(ctx)
+                    outcome = (
+                        ToolOutcome(
+                            "info",
+                            f"Waiting for the {waiting_for} review: not run. Run it again after "
+                            "the review is decided.",
+                        )
+                        if waiting_for
+                        else spec.run(ctx)
+                    )
                 self._finish(session, job_id, record, outcome)
         except Exception as exc:
             log.exception("Job %s (%s) failed", job_id, tool)
