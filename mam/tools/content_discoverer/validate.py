@@ -10,7 +10,7 @@ from pathlib import Path
 
 MAX_TOPICS = 5
 MAX_TOPIC_WORDS = 2
-MAX_TITLE_WORDS = 6
+MAX_TITLE_WORDS = 7  # the prompt asks for 6 and allows a 7th only when the grammar needs it
 MAX_TITLE_CHARS = 48  # the whole filename stays between 25 and 128 characters
 
 
