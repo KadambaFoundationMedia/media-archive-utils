@@ -133,6 +133,8 @@ class Settings(BaseSettings):
     # stop analysing a recording once the class is found (the cut cannot change after that)
     analysis_early_stop: bool = True
     workers_io: int = 4
+    # CPU and copy workers scale between 1 and the numbers above with the machine's load
+    autoscale_workers: bool = True
 
     @model_validator(mode="before")
     @classmethod

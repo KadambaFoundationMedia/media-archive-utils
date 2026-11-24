@@ -264,3 +264,8 @@
 /* Scan job result: collapsible lists of identical copies and ignored files */
 .scan-detail > summary { cursor: pointer; color: var(--bs-body-color); }
 .scan-detail ul { max-height: 20rem; overflow-y: auto; }
+
+/* Header resource bars */
+.mam-res { display: inline-flex; align-items: center; gap: .35rem; margin-right: .9rem; font-size: .8rem; }
+.mam-res .progress { width: 3.5rem; height: .5rem; }
+.mam-res-value { min-width: 2.6rem; font-variant-numeric: tabular-nums; }

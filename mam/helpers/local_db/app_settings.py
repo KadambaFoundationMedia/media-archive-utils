@@ -332,6 +332,14 @@ OPTIONS: tuple[Option, ...] = (
     ),
     Option("operator_name", "text", "Operator name", "General", "Recorded on approvals and saves."),
     Option(
+        "autoscale_workers",
+        "bool",
+        "Scale CPU and copy workers automatically",
+        "General",
+        "Starts more workers while the computer has spare CPU and memory, fewer when it is busy. "
+        "The worker counts below are the most it will use.",
+    ),
+    Option(
         "workers_ml",
         "int",
         "Transcription workers",
