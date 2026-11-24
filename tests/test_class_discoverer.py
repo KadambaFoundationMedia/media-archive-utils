@@ -542,3 +542,22 @@ def test_gain_never_edits_a_video_file(settings, tmp_path):
         out = apply_gain(s, m.MediaFile(), video, settings, dry_run=False)
     assert out["applied"] is False and "video" in out["reason"]
     assert video.read_bytes() == b"not real media"
+
+
+def test_a_file_with_an_open_earlier_review_is_not_queued(prepared):
+    from mam.manager.queue import enqueue
+
+    rid, _ = prepared(translation_texts(), "2008-01-04_KKS.mp3")
+    with session_scope() as s:
+        review = m.Review(media_file_id=rid, tool="kirtan-splitter", reason="check", proposal={})
+        s.add(review)
+    waiting: list[str] = []
+    with session_scope() as s:
+        assert enqueue(s, "class-discoverer", [rid], dry_run=False, waiting=waiting) == 0
+        assert enqueue(s, "content-discoverer", [rid], dry_run=False) == 0
+        assert enqueue(s, "renamer", [rid], dry_run=False) == 1  # the first tool never waits
+    assert waiting == ["Kirtan splitter"]
+    with session_scope() as s:
+        s.scalar(select(m.Review)).outcome = "approved"
+    with session_scope() as s:
+        assert enqueue(s, "class-discoverer", [rid], dry_run=False) == 1

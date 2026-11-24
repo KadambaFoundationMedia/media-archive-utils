@@ -84,6 +84,7 @@ These clarify docs/references/filenaming-convention.md.
 Pipeline order: **renamer → kirtan-splitter → class-discoverer → content-discoverer → class-trimmer**.
 
 - Each tool can run on its own (one file or a batch) or as part of a pipeline coordinated by the media manager.
+- **A file with an open review waits (decided 2026-11-24):** a tool does not start on a file while an earlier pipeline tool's review of it is still open, whether it is started from the Action menu or by the pipeline; the Action menu message says how many files were not queued and why. The tool can run once the review is decided.
 - In a batch, a flagged file pauses on its own while the other files continue. After approval it resumes automatically at the next step, and the approval message says which tool was queued (with the live spinner, decided 2026-11-07).
 - Kirtan-only outputs are `Skipped` for steps 3 to 5.
 - **Video:** the pipeline is audio-only. Video files are renamed and copied but never edited.
