@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from mam.helpers.local_db.hashing import fingerprint
 from mam.helpers.local_db.repo import media_kind, register_original
 
 log = logging.getLogger(__name__)
@@ -60,6 +64,51 @@ def iter_media(root: Path):
             yield Path(dirpath) / name
 
 
+READ_AHEAD = 32  # files whose fingerprints are read at once (the NAS answers slowly, not busy)
+READ_THREADS = 6
+
+
+def _batches(paths, size: int):
+    batch: list[Path] = []
+    for path in paths:
+        batch.append(path)
+        if len(batch) >= size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def _fingerprints(session: Session, batch: list[Path]) -> dict[Path, str]:
+    """Fingerprints of the new media files of a batch, read in parallel. Files that are known
+    already, or cannot be read, are left out (the registration handles them)."""
+    from mam.helpers.local_db import models as m
+
+    todo = [p for p in batch if media_kind(p) is not None]
+    if not todo:
+        return {}
+    known = set()
+    for i in range(0, len(todo), 500):
+        chunk = [str(p.resolve()) for p in todo[i : i + 500]]
+        known |= set(
+            session.scalars(
+                select(m.MediaFile.original_path).where(m.MediaFile.original_path.in_(chunk))
+            )
+        )
+        known |= set(session.scalars(select(m.FileAlias.path).where(m.FileAlias.path.in_(chunk))))
+    new = [p for p in todo if str(p.resolve()) not in known]
+    out: dict[Path, str] = {}
+
+    def read(path: Path) -> None:
+        with contextlib.suppress(OSError):  # the registration reports unreadable files
+            out[path] = fingerprint(path)
+
+    if len(new) > 1:
+        with ThreadPoolExecutor(READ_THREADS) as pool:
+            list(pool.map(read, new))
+    return out
+
+
 def scan_folder(session: Session, root: Path, commit_every: int = 50) -> ScanResult:
     """Register every audio/video file below `root`. Other files are ignored."""
     from mam.helpers.local_db import models as m
@@ -69,7 +118,14 @@ def scan_folder(session: Session, root: Path, commit_every: int = 50) -> ScanRes
     ignored: dict[str, list[str]] = defaultdict(list)
     dupes: dict[str, list[dict]] = defaultdict(list)
     listed_ignored = listed_dupes = 0
-    for path in iter_media(root):
+
+    def paths():
+        for batch in _batches(iter_media(root), READ_AHEAD):
+            prints.update(_fingerprints(session, batch))
+            yield from batch
+
+    prints: dict[Path, str] = {}
+    for path in paths():
         if media_kind(path) is None:
             result.ignored += 1
             if listed_ignored < MAX_LISTED:
@@ -78,7 +134,7 @@ def scan_folder(session: Session, root: Path, commit_every: int = 50) -> ScanRes
             continue
         result.found += 1
         try:
-            record = register_original(session, path)
+            record = register_original(session, path, prints.pop(path, None))
             if record is None:
                 continue
             if record.original_path != str(path.resolve()):

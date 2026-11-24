@@ -51,11 +51,12 @@ def media_kind(path: Path) -> str | None:
     return None
 
 
-def register_original(session: Session, path: Path) -> m.MediaFile | None:
+def register_original(session: Session, path: Path, fp: str | None = None) -> m.MediaFile | None:
     """Register an original media file, or return the existing record.
 
     Byte-identical files found at another path are linked as aliases.
-    Returns None for files that are not audio or video (they are ignored).
+    Returns None for files that are not audio or video (they are ignored). `fp` is a fingerprint
+    computed earlier (the scanner reads several files at once).
     """
     path = path.resolve()
     kind = media_kind(path)
@@ -69,7 +70,7 @@ def register_original(session: Session, path: Path) -> m.MediaFile | None:
         return alias.media_file
 
     stat = path.stat()
-    fp = fingerprint(path)
+    fp = fp or fingerprint(path)
     for candidate in session.scalars(
         select(m.MediaFile).where(m.MediaFile.fingerprint == fp, m.MediaFile.parent_id.is_(None))
     ):

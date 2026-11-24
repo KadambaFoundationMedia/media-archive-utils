@@ -11,6 +11,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.
 
 ### Media manager
+- Scanning and importing reads the fingerprints of new files several at a time, so a folder on the NAS is registered about 5 times faster (measured with 0.2 s per file read).
 - Reset keeps the values set on the Settings page; only the Baserow writes switch is turned off again.
 
 ### Renamer
