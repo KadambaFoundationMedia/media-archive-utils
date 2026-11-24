@@ -229,3 +229,40 @@ def test_the_first_row_that_lists_an_alias_keeps_it():
         if row["place"] == "Berlin":
             row["aliases"] = "Hovedstad"
     assert build_reference(raw).find_place("Hovedstad").name == "Oslo"
+
+
+def test_settings_does_not_warn_about_a_spelling_of_a_general_place(monkeypatch):
+    """`Sumercamp` is a place option that Summercamp (no country) lists as an alias."""
+    import time
+
+    from fastapi.testclient import TestClient
+
+    from mam.manager.app import create_app
+    from mam.tools.renamer import knowledge
+
+    raw = reference_raw()
+    raw["options"]["place_location"] = [
+        *raw["options"]["place_location"],
+        "Summercamp",
+        "Sumercamp",
+        "Nowhere-land",
+    ]
+    raw["place_country"] = [
+        *raw["place_country"],
+        {
+            "id": 97,
+            "place": "Summercamp",
+            "country": "",
+            "cc": "",
+            "aliases": "Sumercamp",
+            "not_place": True,
+            "no_country": True,
+        },
+    ]
+    ref = build_reference(raw)
+    ref.loaded_at = time.time() + 10_000
+    monkeypatch.setattr(knowledge, "_cached", ref)
+    with TestClient(create_app(start_queue=False)) as client:
+        html = client.get("/settings").text
+    assert "Nowhere-land" in html  # a real place without a country is still reported
+    assert "Sumercamp" not in html.split("without a country")[1].split("</details>")[0]

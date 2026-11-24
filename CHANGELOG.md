@@ -7,6 +7,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ## [Unreleased]
 
+### Fixed
+- The Settings page no longer warns about a place option that is only another spelling (an alias) of a general place without a country, such as `Sumercamp` for `Summercamp`.
+
 ### Safety
 - An empty folder setting in `.env` (for example `MEDIA_IDENTICAL_FILES_PATH=`) now means the default folder; it used to become the repository folder, which made the Settings page count the whole repository as processed copies. The reset also refuses any folder that is or contains the repository or the folder of the local database.
 
