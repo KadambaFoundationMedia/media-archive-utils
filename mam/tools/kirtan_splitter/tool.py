@@ -96,8 +96,7 @@ def analyse(
 ) -> tuple[Decision, float]:
     """Local audio analysis (no transcript). Returns (decision, duration)."""
     info = probe(audio)
-    proposal = (record.meta or {}).get("proposal") or {}
-    mantra = phrases.mantra_for_what(proposal.get("what"))
+    mantra = phrases.RADHA_MADHAVA  # the one kirtan sung in full before a class (2026-11-24)
     settings = settings or get_settings()
     found = run_analysis(audio, info.duration, settings)
     decision = detect(found.speech, info.duration, found.silences, mantra, found.sound)

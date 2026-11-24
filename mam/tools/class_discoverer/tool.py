@@ -433,7 +433,10 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
         _open_review(ctx.session, record, data, reason, spot)
         return ToolOutcome("review", f"{summary} (needs a review)", data)
     if decision["action"] == "none" and not _has_what(record):
-        reason = "No verse was announced and the file has no specific WHAT or category (only a general one such as Class). Choose what it is."
+        reason = (
+            "No verse was announced and the file has no specific WHAT or category (only a "
+            "general one such as Class). Choose what it is."
+        )
         _open_review(ctx.session, record, data, reason, False)
         return ToolOutcome("review", reason, data)
     if decision["action"] == "name":
