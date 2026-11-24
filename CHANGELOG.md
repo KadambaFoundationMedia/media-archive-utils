@@ -15,6 +15,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The Class discoverer's loudness step now runs as its own job on the CPU pool (many files at once) and queues the transcription, which stays one at a time on the ML pool. Loudness no longer waits behind a transcription.
 
 ### Fixed
+- The Class discoverer no longer fails with "No encoder configured for source codec 'ac3'": AC3 and E-AC3 tracks can be adjusted, and a video file's sound is only read, never rewritten (a video is never edited).
 - The Settings page no longer warns about a place option that is only another spelling (an alias) of a general place without a country, such as `Sumercamp` for `Summercamp`.
 
 ### Safety
