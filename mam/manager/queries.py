@@ -201,7 +201,6 @@ def counts(session: Session) -> dict[str, int]:
 _SHORT_STEPS = (
     ("Measuring and adjusting", "Loudness"),
     ("Transcribing: preparing", "Preparing audio"),
-    ("Transcribing the chanted verse", "Verse pass"),
     ("Looking for the verse", "Verse check"),
     ("Listening", "Listening"),
     ("Cutting", "Cutting"),

@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Class discoverer
+- Removed the experimental "Improve the chanted verse" option (a second transcription pass on the chanted verse); the test on real recordings was mixed.
 - Other-language words for chapter and text can be added in the Advanced block of the Settings page, so a verse announced in Dutch, Spanish and so on can be read when the numbers are spoken as digits or English words. Accented letters in the transcript are no longer split.
 
 ### Media manager
