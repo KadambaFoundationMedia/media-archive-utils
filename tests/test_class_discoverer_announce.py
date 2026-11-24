@@ -131,3 +131,17 @@ def test_a_correction_wins_and_the_first_reading_is_the_alternative():
     best, _ = best_announcement(find_announcements(t))
     assert best.ref.what == "SB-1-19-31"
     assert best.partial["alternatives"] == ["SB-1-9-31"]
+
+
+def test_extra_words_for_other_languages():
+    from mam.tools.class_discoverer import announce
+
+    assert read_window("BG", "Bhagavad-gita hoofdstuk 2 vers 51")[0] is None
+    try:
+        announce.set_extra_words(chapter="hoofdstuk", verse="vers")
+        ref, _, _ = read_window("BG", "Bhagavad-gita hoofdstuk 2 vers 51")
+        assert ref is not None and ref.what == "BG-2-51"
+        ref, _, _ = read_window("BG", "Bhagavad-gita capítulo 2 texto 51")
+        assert ref is None
+    finally:
+        announce.set_extra_words()

@@ -41,6 +41,7 @@ from mam.tools.class_discoverer.announce import (
     Announcement,
     best_announcement,
     find_announcements,
+    set_extra_words,
 )
 from mam.tools.class_discoverer.gain import apply_gain
 from mam.tools.class_discoverer.match import VerseMatch, match_translation
@@ -344,6 +345,7 @@ def run_class_discoverer(ctx: JobContext) -> ToolOutcome:
     skip = not_a_class(record)
     if skip:
         return ToolOutcome("skipped", skip, {})
+    set_extra_words(settings.words_chapter, settings.words_verse, settings.words_canto)
     started = time.monotonic()
     audio = source_audio(record, dry_run=ctx.dry_run)
     file_ref = filename_verse(record)

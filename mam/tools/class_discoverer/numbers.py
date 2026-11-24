@@ -43,7 +43,7 @@ ORDINALS = {
     "fourteenth": 14, "fifteenth": 15, "sixteenth": 16, "seventeenth": 17, "eighteenth": 18,
     "nineteenth": 19, "twentieth": 20, "thirtieth": 30, "fortieth": 40, "fiftieth": 50,
 }  # fmt: skip
-TOKEN_RE = re.compile(r"\d+(?:\.\d+)*|[a-z]+", re.IGNORECASE)
+TOKEN_RE = re.compile(r"\d+(?:\.\d+)*|[^\W\d_]+", re.IGNORECASE)
 
 
 ORDINAL_SUFFIX_RE = re.compile(r"\b(\d+)(?:st|nd|rd|th)\b", re.IGNORECASE)
