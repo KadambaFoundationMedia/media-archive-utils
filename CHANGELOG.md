@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Added
+- Renamer: writes ID3 tags (title, artist, album, genre, album artist, composer, year, comment) to the processed copy of mp3, m4a and wma files, and updates them whenever the file is renamed again. The genre comes from the new `idv3_genre` column of `category_terms_folder`.
 - The header shows CPU, GPU, memory and CPU temperature as labelled bars (CPU, GPU, MEM, TEMP; green below 60%, orange below 85%, red above), updated every 3 seconds. A bar is left out when the system does not report it (a Mac gives no CPU temperature without admin rights).
 - The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
 

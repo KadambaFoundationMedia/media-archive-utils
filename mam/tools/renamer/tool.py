@@ -36,6 +36,7 @@ from mam.tools.renamer.knowledge import (
 )
 from mam.tools.renamer.naming import build_name, format_where
 from mam.tools.renamer.resolve import Proposal, Resolver
+from mam.tools.renamer.tags import apply_tags
 
 log = logging.getLogger(__name__)
 TOOL = "renamer"
@@ -460,6 +461,13 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
             f"Same name and size as an existing file; saved as {placed.dst.name}."
         )
     data = proposal.to_dict(dry_run=ctx.dry_run, final_name=placed.dst.name, target=str(placed.dst))
+    tagged = apply_tags(
+        placed.dst, data, res.ref, dry_run=ctx.dry_run, media_file_id=record.id, tool=TOOL
+    )
+    data["tags"] = tagged["tags"]
+    if tagged["warning"]:
+        proposal.notes.append(tagged["warning"])
+        data["notes"] = list(proposal.notes)
     dupes = place_duplicates(ctx, organizer, record, move_files)
     if dupes:
         data["duplicates"] = [
@@ -535,6 +543,10 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         )
     for warning in placed.warnings:
         summary += f"; {warning}"
+    if tagged["tags"]:
+        summary += "; tags " + ("would be written" if ctx.dry_run else "written")
+    if tagged["warning"]:
+        summary += f"; {tagged['warning']}"
     if dupes:
         verb = "move" if move_files else "copy"
         past = verb[:-1] + "ed" if verb == "move" else "copied"
