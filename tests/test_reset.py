@@ -121,3 +121,18 @@ def test_reset_can_delete_earlier_backups_but_keeps_its_own(worked, settings):
 
     assert Path(result.backup).is_dir()
     assert (backup_dir / "mine.txt").exists()
+
+
+def test_reset_keeps_settings_but_turns_baserow_writes_off(client, worked):
+    from mam.helpers.local_db.app_settings import (
+        baserow_writes_enabled,
+        get_setting,
+        set_baserow_writes,
+        set_option,
+    )
+
+    set_option("min_year", 1980)
+    set_baserow_writes(True)
+    reset(ResetOptions(processed_files=False))
+    assert get_setting("min_year") == 1980
+    assert not baserow_writes_enabled()
