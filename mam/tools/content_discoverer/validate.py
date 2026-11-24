@@ -10,8 +10,8 @@ from pathlib import Path
 
 MAX_TOPICS = 5
 MAX_TOPIC_WORDS = 2
-MAX_TITLE_WORDS = 6
-MAX_TITLE_CHARS = 48  # the whole filename stays between 25 and 128 characters
+MAX_TITLE_WORDS = 7  # aim for 6; a 7th only when the phrase needs it to read right (2026-11-24)
+MAX_TITLE_CHARS = 56  # the whole filename stays between 25 and 128 characters
 
 
 @dataclass

@@ -368,3 +368,11 @@ def test_settings_blocks_follow_the_pipeline_order_in_two_columns():
     assert [h for h in heads(left) if h in tools] == tools
     assert [h.strip() for h in heads(right)][:3] == ["Review", "General", "Advanced"]
     assert "Reset the media manager" in heads(right)[-1] or "Reset" in right
+
+
+def test_seven_word_titles_pass_and_eight_are_cut():
+    seven = check({**GOOD, "title": "Taking shelter at the time of initiation"})
+    assert not any("too long" in p for p in seven.problems)
+    eight = check({**GOOD, "title": "Taking shelter at the very time of the initiation"})
+    assert any("too long" in p for p in eight.problems)
+    assert len(eight.title_words.split("-")) <= 7
