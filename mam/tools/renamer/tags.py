@@ -7,6 +7,7 @@ recorder's old tag never survives. Other tags (cover art, lyrics) are left alone
 from __future__ import annotations
 
 import logging
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -33,15 +34,30 @@ def _date_parts(when: str | None) -> tuple[str | None, str]:
     return year, "-".join(known) if year else ""
 
 
+# ID3 wants ISO 639-2 codes (three lowercase letters); Whisper's codes have two.
+ISO_639_2 = {
+    "en": "eng", "nl": "dut", "de": "ger", "es": "spa", "hi": "hin", "fr": "fre", "cs": "cze",
+    "sk": "slo", "ru": "rus", "pt": "por", "it": "ita", "pl": "pol", "hr": "hrv", "sl": "slv",
+    "sr": "srp", "hu": "hun", "lt": "lit", "lv": "lav", "et": "est", "fi": "fin", "sv": "swe",
+    "no": "nor", "da": "dan", "bn": "ben", "ta": "tam", "uk": "ukr", "ro": "rum", "bg": "bul",
+    "tr": "tur", "zh": "chi", "sa": "san",
+}  # fmt: skip
+
+
 def language_codes(names: list[str] | None, ref: Any = None) -> str:
-    """Two-letter codes (`en`) of the language names, comma separated: the `whisper_code`
-    column of `language_terms`, else the built-in list."""
+    """ISO 639-2 codes (`eng`) of the language names, comma separated. The language name is
+    found through the `whisper_code` column of `language_terms`, else the built-in list; a
+    language with no ISO 639-2 code here is left out."""
     from mam.tools.class_discoverer.tool import FALLBACK_LANGUAGE_NAMES
 
     table = dict(FALLBACK_LANGUAGE_NAMES)
     table.update(getattr(ref, "aliases", {}).get("whisper_codes") or {})
     by_name = {name.lower(): code for code, name in table.items()}
-    codes = [by_name[n.lower()] for n in names or [] if n and n.lower() in by_name]
+    codes = [
+        ISO_639_2[by_name[n.lower()]]
+        for n in names or []
+        if n and by_name.get(n.lower()) in ISO_639_2
+    ]
     return ",".join(dict.fromkeys(codes))
 
 
@@ -86,7 +102,7 @@ def build_tags(
         "year": year or "",
         "comment": comment,
         "publisher": PUBLISHER,
-        "copyright": PUBLISHER,
+        "copyright": f"{year or date.today().year} {PUBLISHER}",  # ID3: must begin with a year
         "language": languages or "",
     }
     return {k: v for k, v in tags.items() if v}
