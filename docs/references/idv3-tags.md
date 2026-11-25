@@ -11,7 +11,7 @@ Comment
 Track
 
 ## How the Renamer fills them (decided 2026-11-24)
-The Renamer writes these tags to the processed copy of mp3, m4a and wma files (not video), every time it renames the file. The nine fields are always overwritten; a field with no value is removed. Other tags such as cover art stay.
+The Renamer writes these tags to the processed copy of mp3, m4a and wma files (not video), every time it renames the file. The listed fields are always overwritten; a field with no value is removed. Other tags such as cover art stay.
 
 - **Title:** the verse as in titles, then the title: `SB 9.20.20-27 - The King Refused to Accept`; only the verse while there is no title; without a verse the WHAT as words.
 - **Artist, Album Artist, Composer:** `Kadamba Kanana Swami`.
@@ -19,6 +19,8 @@ The Renamer writes these tags to the processed copy of mp3, m4a and wma files (n
 - **Genre:** the `idv3_genre` column of the category in `category_terms_folder` (the category name when that is empty).
 - **Album:** SB: `SB Canto <canto>` (the first number of the verse, so SB 1.9.31 is `SB Canto 1`); BG: `BG chapter <chapter>`; CC: `CC <Lila>-lila`; every recording without a verse: `<category> - <year>` (`Janmastami - 2019`).
 - **Comment:** `date, place, country` (`2013-11-14, Vrindavan, India`); unknown parts are left out.
+- **Publisher and Copyright:** `Kadamba Foundation` (decided 2026-11-25).
+- **Language:** the two-letter code of the file's language (`en`; several languages are all written, e.g. `en,nl`).
 - **Track:** empty.
 
 ## Tags example
