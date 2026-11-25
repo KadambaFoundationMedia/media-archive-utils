@@ -62,6 +62,6 @@ The title should summarise the main point of the class. It should be enticing an
 
 ## Decisions (Edwin, 2026-11-24; the full text is in SPEC.md section 4)
 - The Claude API writes the text through the pluggable LLM provider; a local model may follow later behind the same interface.
-- The first 20 results are reviewed on the file page, then the tool works alone (with the 5% random check). A different existing value in Baserow always goes to review.
+- The tool works on its own (with the 5% random check); the review of the first 20 results was removed on 2026-11-25. A different existing value in Baserow always goes to review.
 - Only a class with a verse gets the title in its filename. A recording without a verse keeps its name.
 - The footer is `docs/references/youtube-footer.txt` (`{year}` or `<current year>` is the current year).

@@ -3,8 +3,8 @@
 Decisions (Edwin, 2026-11-24, see SPEC.md section 4):
 - The Claude API writes the text (pluggable provider, results cached by input and prompt version).
 - Existing themes or descriptions in Baserow are never overwritten: a difference goes to review.
-- The first N results (Settings: content_review_first, 20) go to review, then it works alone,
-  with the 5% random check.
+- It works on its own: a result goes to review only when something is wrong or differs in
+  Baserow, plus the 5% random check (no review of the first results, 2026-11-25).
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mam.config import Settings
@@ -279,12 +279,6 @@ def baserow_summary(baserow: dict[str, Any] | None) -> str:
 
 
 # --------------------------------------------------------------------- the job
-def review_count(session: Session) -> int:
-    return (
-        session.scalar(select(func.count()).select_from(m.Review).where(m.Review.tool == TOOL)) or 0
-    )
-
-
 def run_content_discoverer(ctx: JobContext) -> ToolOutcome:
     record, settings, session = ctx.media_file, ctx.settings, ctx.session
     if record is None:
@@ -358,13 +352,6 @@ def run_content_discoverer(ctx: JobContext) -> ToolOutcome:
         return ToolOutcome("info", f"Would: {summary}", data)
 
     reasons: list[str] = []
-    n_reviews = review_count(session)
-    if n_reviews < settings.content_review_first:
-        reasons.append(
-            f"Trial: the first {settings.content_review_first} results are checked by a person "
-            f"before the content discoverer works on its own ({n_reviews + 1} of "
-            f"{settings.content_review_first})."
-        )
     quality = cd.get("quality") or {}
     if quality.get("unreliable"):
         reasons.append("The transcript looks unreliable (many repeated or invented lines).")

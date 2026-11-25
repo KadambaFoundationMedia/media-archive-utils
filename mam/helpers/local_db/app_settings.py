@@ -263,15 +263,6 @@ OPTIONS: tuple[Option, ...] = (
         choices=("low", "medium", "high"),
     ),
     Option(
-        "content_review_first",
-        "int",
-        "Results checked first",
-        "Content discoverer",
-        "The first results go to review before it works alone (0 = never).",
-        0,
-        100000,
-    ),
-    Option(
         "content_broad_themes",
         "text",
         "Broad themes (never used)",

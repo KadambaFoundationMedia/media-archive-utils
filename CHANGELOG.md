@@ -16,6 +16,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
 
 ### Changed
+- Content discoverer: the first 20 results are no longer sent to review, and the "Results checked first" setting is gone. Reviews still happen when something is wrong, when Baserow already has other values, and for the 5% random check.
 - Content discoverer titles: 6 words at most, a 7th only when the grammar needs it (a 7-word title no longer goes to review). New prompt version, so earlier answers are asked again.
 - A tool no longer starts on a file while an earlier tool's review of that file is still open (for example the Content discoverer on a file the Kirtan splitter flagged). The Action menu says how many files were not queued.
 - The Class discoverer's loudness step now runs as its own job on the CPU pool (many files at once) and queues the transcription, which stays one at a time on the ML pool. Loudness no longer waits behind a transcription.
@@ -37,7 +38,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ### Content discoverer
 - New tool: reads the class transcript and writes 1 to 5 themes, a short title and a YouTube description (with the footer and the current year). Run it from the Action menu or with `mam content-discover <file>` (dry run by default; a dry run asks the model once and caches the answer, so the real run is not billed again).
 - The themes, description and `youtube_desc` go to the Baserow media row (empty fields only; a different existing value goes to review). A class with a verse and no title gets the title in its filename through the Renamer. A recording without a verse keeps its filename.
-- The first 20 results (Settings: "Results checked first") are reviewed on the file page, where the themes, title and description can be edited; after that it works alone, with the random check.
+- It works on its own, with the random check; a result that needs a person is reviewed on the file page, where the themes, title and description can be edited.
 - New LLM helper with a pluggable provider (the Claude API for now; set `ANTHROPIC_API_KEY` in `.env`). The model and its thinking effort are options on the Settings page. Answers are cached by input and prompt version.
 
 - Review of the first result: themes can no longer be broad words. The Settings block "Content discoverer" has a list of **Broad themes** (never used: the model is told, and a match in its answer is dropped) and a **YouTube footer** field (the text file stays the fallback). The footer is shown under the description on the review page.

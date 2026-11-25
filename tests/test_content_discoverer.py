@@ -111,7 +111,6 @@ class FakeProvider:
 @pytest.fixture
 def prepared(settings, monkeypatch, reference, no_baserow):
     monkeypatch.setenv("SPOT_CHECK_RATE", "0")
-    monkeypatch.setenv("CONTENT_REVIEW_FIRST", "0")
     get_settings.cache_clear()
     monkeypatch.setattr(content, "VedabaseClient", lambda settings=None: object())
     monkeypatch.setattr(content, "verse_context", lambda client, ref: None)
@@ -184,20 +183,28 @@ def test_two_bad_answers_fail_the_job(prepared):
         run(rid)
 
 
-def test_first_results_go_to_review(prepared, monkeypatch):
-    monkeypatch.setenv("CONTENT_REVIEW_FIRST", "1")
+def test_the_first_result_needs_no_review(prepared):
+    rid, _ = prepared()
+    assert run(rid).state == "done"
+    with session_scope() as s:
+        assert s.scalar(select(m.Review).where(m.Review.tool == "content-discoverer")) is None
+    assert "content_review_first" not in OPTION_BY_KEY
+
+
+def test_a_review_writes_nothing_yet(prepared, monkeypatch):
+    monkeypatch.setenv("SPOT_CHECK_RATE", "1")
     get_settings.cache_clear()
     rid, _ = prepared()
-    out = run(rid)
-    assert out.state == "review"
+    assert run(rid).state == "review"
     with session_scope() as s:
         review = s.scalar(select(m.Review).where(m.Review.tool == "content-discoverer"))
-        assert "Trial" in review.reason and review.proposal["new_what"].endswith("Dont-waste-time")
+        assert "Random check" in review.reason
+        assert review.proposal["new_what"].endswith("Dont-waste-time")
         assert s.scalar(select(m.Job).where(m.Job.tool == "renamer")) is None  # nothing yet
 
 
 def test_approval_edits_and_queues_the_renamer(prepared, monkeypatch):
-    monkeypatch.setenv("CONTENT_REVIEW_FIRST", "1")
+    monkeypatch.setenv("SPOT_CHECK_RATE", "1")
     get_settings.cache_clear()
     rid, _ = prepared()
     run(rid)
@@ -277,7 +284,7 @@ def test_review_page_through_the_portal(prepared, monkeypatch):
 
     from mam.manager.app import create_app
 
-    monkeypatch.setenv("CONTENT_REVIEW_FIRST", "1")
+    monkeypatch.setenv("SPOT_CHECK_RATE", "1")
     get_settings.cache_clear()
     rid, _ = prepared()
     run(rid)
@@ -420,8 +427,8 @@ class RowClient:
 
 @pytest.fixture
 def in_review(prepared, monkeypatch):
-    """A file in the trial review whose Baserow row already has themes and a description."""
-    monkeypatch.setenv("CONTENT_REVIEW_FIRST", "1")
+    """A file in review (random check) whose Baserow row already has themes and a description."""
+    monkeypatch.setenv("SPOT_CHECK_RATE", "1")
     get_settings.cache_clear()
     monkeypatch.setattr("mam.helpers.baserow.BaserowClient", RowClient)
     RowClient.row = {"themes": "Old theme", "media_description": "Old text.", "youtube_desc": True}
@@ -448,7 +455,7 @@ def approve(*, use_new=(), description=None):
         return msg, review.outcome
 
 
-def test_trial_review_shows_the_values_already_in_baserow(in_review):
+def test_a_review_shows_the_values_already_in_baserow(in_review):
     with session_scope() as s:
         review = s.scalar(select(m.Review).where(m.Review.tool == "content-discoverer"))
         assert review.proposal["conflicts"]["themes"][0] == "Old theme"
