@@ -19,8 +19,9 @@ The Renamer writes these tags to the processed copy of mp3, m4a and wma files (n
 - **Genre:** the `idv3_genre` column of the category in `category_terms_folder` (the category name when that is empty).
 - **Album:** SB: `SB Canto <canto>` (the first number of the verse, so SB 1.9.31 is `SB Canto 1`); BG: `BG chapter <chapter>`; CC: `CC <Lila>-lila`; every recording without a verse: `<category> - <year>` (`Janmastami - 2019`).
 - **Comment:** `date, place, country` (`2013-11-14, Vrindavan, India`); unknown parts are left out.
-- **Publisher and Copyright:** `Kadamba Foundation` (decided 2026-11-25).
-- **Language:** the two-letter code of the file's language (`en`; several languages are all written, e.g. `en,nl`).
+- **Publisher:** `Kadamba Foundation` (decided 2026-11-25).
+- **Copyright:** the year of the recording and the publisher, `2013 Kadamba Foundation` (ID3 requires a year first; this year when the recording's year is unknown).
+- **Language:** the ISO 639-2 code, three lowercase letters (`eng`; several languages are all written, e.g. `eng,dut`).
 - **Track:** empty.
 
 ## Tags example
