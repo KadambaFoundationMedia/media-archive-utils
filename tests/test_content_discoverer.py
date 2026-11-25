@@ -7,6 +7,8 @@ import pytest
 from sqlalchemy import select
 
 from mam.config import get_settings
+from mam.helpers.baserow.client import WriteResult
+from mam.helpers.baserow.merge import merge_update
 from mam.helpers.llm import LLMError, LLMReply
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db import session_scope
@@ -371,3 +373,145 @@ def test_settings_blocks_follow_the_pipeline_order_in_two_columns():
     assert [h for h in heads(left) if h in tools] == tools
     assert [h.strip() for h in heads(right)][:3] == ["Review", "General", "Advanced"]
     assert "Reset the media manager" in heads(right)[-1] or "Reset" in right
+
+
+# ------------------------------------------------------ results after approval (2026-11-25)
+class RowClient:
+    """A Baserow client over one media row, with the real fill-empty merge policy."""
+
+    media_table = 1
+    row: dict = {}
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def get_row(self, table, row_id):
+        return dict(RowClient.row)
+
+    def update_row(self, table, row_id, values, *, tool, media_file_id, dry_run, overwrite):
+        merged = merge_update(
+            RowClient.row, values, multi_select_fields=set(), tool=tool, overwrite=overwrite
+        )
+        if not dry_run:
+            RowClient.row.update(merged.payload)
+        return WriteResult(1, dry_run, row_id, merged.payload, None, merged.conflicts)
+
+
+@pytest.fixture
+def in_review(prepared, monkeypatch):
+    """A file in the trial review whose Baserow row already has themes and a description."""
+    monkeypatch.setenv("CONTENT_REVIEW_FIRST", "1")
+    get_settings.cache_clear()
+    monkeypatch.setattr("mam.helpers.baserow.BaserowClient", RowClient)
+    RowClient.row = {"themes": "Old theme", "media_description": "Old text.", "youtube_desc": True}
+    rid, _ = prepared()
+    with session_scope() as s:
+        s.get(m.MediaFile, rid).baserow_row_id = 5
+    run(rid)
+    return rid
+
+
+def approve(*, use_new=(), description=None):
+    with session_scope() as s:
+        review = s.scalar(select(m.Review).where(m.Review.tool == "content-discoverer"))
+        msg = content.decide_review(
+            s,
+            review,
+            topics=", ".join(review.proposal["topics"]),
+            title=review.proposal["title"],
+            description=description or review.proposal["description"],
+            use_new=set(use_new),
+            operator="t",
+            note=None,
+        )
+        return msg, review.outcome
+
+
+def test_trial_review_shows_the_values_already_in_baserow(in_review):
+    with session_scope() as s:
+        review = s.scalar(select(m.Review).where(m.Review.tool == "content-discoverer"))
+        assert review.proposal["conflicts"]["themes"][0] == "Old theme"
+        assert review.proposal["conflicts"]["media_description"][0] == "Old text."
+
+
+def test_approval_says_what_baserow_kept(in_review):
+    msg, _ = approve()
+    assert "keeps its own themes and description" in msg and "written" not in msg
+    assert RowClient.row["themes"] == "Old theme"
+
+
+def test_approval_says_what_was_written_and_what_kept(in_review):
+    msg, _ = approve(use_new={"themes"})
+    assert "themes written (row 5)" in msg and "keeps its own description" in msg
+    assert RowClient.row["themes"] == "Krishna Prema, Kali Yuga, Humility"
+
+
+def test_browser_line_endings_are_not_an_edit(in_review):
+    msg, outcome = approve(description=GOOD["description"].replace("\n", "\r\n"))
+    assert outcome == "approved"
+    with session_scope() as s:
+        saved = s.get(m.MediaFile, in_review).meta["content_discoverer"]["approved"]
+        assert saved["description"] == GOOD["description"]
+
+
+def test_file_page_shows_the_approved_results(in_review):
+    from fastapi.testclient import TestClient
+
+    from mam.manager.app import create_app
+
+    approve(use_new={"themes"}, description="Edited first.\n\nEdited second.")
+    with TestClient(create_app(start_queue=False)) as client:
+        page = client.get(f"/details/{in_review}").text
+    assert 'id="content-results"' in page
+    assert "Krishna Prema, Kali Yuga, Humility" in page and "Don&#39;t waste time" in page
+    assert "Edited first." in page and "kadambafoundation.com/donations" in page
+    assert "Baserow keeps its own description" in page
+
+
+def test_file_page_shows_results_that_needed_no_review(prepared):
+    from fastapi.testclient import TestClient
+
+    from mam.manager.app import create_app
+
+    rid, _ = prepared()
+    run(rid)
+    with TestClient(create_app(start_queue=False)) as client:
+        page = client.get(f"/details/{rid}").text
+    assert 'id="content-results"' in page and "Second paragraph about humility." in page
+
+
+def test_file_page_shows_an_approval_stored_without_its_description(in_review):
+    """Approvals made before 2026-11-25 stored only the topics and title."""
+    from fastapi.testclient import TestClient
+
+    from mam.manager.app import create_app
+
+    approve()
+    with session_scope() as s:
+        record = s.get(m.MediaFile, in_review)
+        meta = dict(record.meta)
+        cd = dict(meta["content_discoverer"])
+        cd["approved"] = {"topics": ["Time"], "title": "Use time"}
+        record.meta = {**meta, "content_discoverer": cd}
+    with TestClient(create_app(start_queue=False)) as client:
+        page = client.get(f"/details/{in_review}").text
+    assert "Time" in page and "First paragraph about the class." in page
+
+
+def test_the_title_rename_keeps_the_content_discoverer_status(prepared):
+    rid, _ = prepared()
+    run(rid)
+    with session_scope() as s:
+        job = s.scalar(select(m.Job).where(m.Job.tool == "renamer"))
+        assert job.params["keep_status"] is True
+
+
+def test_footer_accepts_current_year_as_the_spec_writes_it(tmp_path):
+    out = youtube_description("x", tmp_path / "none", date(2031, 1, 1), "© <current year> X")
+    assert out.endswith("© 2031 X")

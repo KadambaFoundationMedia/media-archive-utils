@@ -130,10 +130,11 @@ def check(
 
 
 def footer(path: Path, today: date | None = None, custom: str = "") -> str:
-    """The footer typed on the Settings page, else the text file; `{year}` is the current year."""
-    year = (today or date.today()).year
+    """The footer typed on the Settings page, else the text file; `{year}` (or `<current year>`,
+    as the tool spec writes it) is the current year."""
+    year = str((today or date.today()).year)
     text = custom.strip() or path.read_text(encoding="utf-8").strip()
-    return text.replace("{year}", str(year))
+    return text.replace("{year}", year).replace("<current year>", year)
 
 
 def youtube_description(

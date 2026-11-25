@@ -1,0 +1,18 @@
+{# What the content discoverer wrote or a person approved (read only). #}
+{% set r = content_results %}
+<div class="card mb-3" id="content-results">
+  <div class="card-header">Themes, title and description</div>
+  <div class="card-body small">
+    {% if r.not_replaced %}
+    <div class="alert alert-warning py-2">Baserow keeps its own {{ r.not_replaced | join(' and ') }}: it was not replaced. The values below are the approved ones.</div>
+    {% endif %}
+    <dl class="row mb-0">
+      <dt class="col-sm-2">Themes</dt><dd class="col-sm-10">{{ r.topics | join(', ') }}</dd>
+      <dt class="col-sm-2">Title</dt><dd class="col-sm-10">{{ r.title }}</dd>
+      <dt class="col-sm-2">YouTube description</dt>
+      <dd class="col-sm-10 mb-0 text-break" style="white-space: pre-wrap">{{ r.description }}{% if r.footer %}
+
+{{ r.footer }}{% endif %}</dd>
+    </dl>
+  </div>
+</div>

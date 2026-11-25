@@ -236,12 +236,46 @@ def write_content(
     }
 
 
+def existing_conflicts(
+    record: m.MediaFile, values: dict[str, Any], settings: Settings
+) -> dict[str, list[Any]]:
+    """The media row's own themes and description where they differ from the new ones, so a
+    review can show them before anything is written. Reads only."""
+    from mam.helpers.baserow import BaserowClient
+    from mam.helpers.baserow.merge import merge_update
+
+    if not record.baserow_row_id:
+        return {}
+    with BaserowClient(settings) as client:
+        row = client.get_row(client.media_table, record.baserow_row_id)
+    compared = {k: values[k] for k in ("themes", "media_description")}
+    merged = merge_update(row, compared, multi_select_fields=set(), tool=TOOL)
+    return {k: list(v) for k, v in merged.conflicts.items()}
+
+
+FIELD_LABELS = {"themes": "themes", "media_description": "description"}
+
+
+def kept_by_baserow(baserow: dict[str, Any]) -> list[str]:
+    """'themes' and 'description' where the row's own value stayed."""
+    conflicts = baserow.get("conflicts") or {}
+    return [label for key, label in FIELD_LABELS.items() if key in conflicts]
+
+
 def baserow_summary(baserow: dict[str, Any] | None) -> str:
     if not baserow or baserow.get("action") == "none":
         return "Baserow: no row yet, the results are kept with the file"
     if baserow.get("dry_run"):
         return "Baserow: themes and description logged only (Baserow writes are off)"
-    return f"Baserow: themes and description written (row {baserow['row_id']})"
+    kept = kept_by_baserow(baserow)
+    row = baserow["row_id"]
+    if not kept:
+        return f"Baserow: themes and description written (row {row})"
+    own = f"keeps its own {' and '.join(kept)} (not replaced)"
+    written = [label for label in FIELD_LABELS.values() if label not in kept]
+    if written:
+        return f"Baserow: {written[0]} written (row {row}); it {own}"
+    return f"Baserow: row {row} {own}"
 
 
 # --------------------------------------------------------------------- the job
@@ -348,6 +382,9 @@ def run_content_discoverer(ctx: JobContext) -> ToolOutcome:
     meta["content_discoverer"] = {**data, "run_at": datetime.now(UTC).isoformat()}
     record.meta = meta
     if reasons:
+        # Nothing is written yet: read the row, so the review can show what is there already.
+        conflicts = existing_conflicts(record, values, settings)
+        data["baserow"] = {"action": "none", "dry_run": True, "conflicts": conflicts}
         _open_review(session, record, data, "\n".join(reasons), spot)
         return ToolOutcome("review", f"{summary} (needs a review)", data)
 
@@ -376,8 +413,9 @@ def queue_name(
 
     if not record.original_path:
         return []
-    evidence = evidence_for(new_what, ref, title)
-    enqueue(session, "renamer", [record.id], dry_run=False, params={"evidence": evidence})
+    # keep_status: adding the title must not turn "Content discoverer Done" into "Renamer Done".
+    params = {"evidence": evidence_for(new_what, ref, title), "keep_status": True}
+    enqueue(session, "renamer", [record.id], dry_run=False, params=params)
     return [record.id]
 
 
@@ -420,6 +458,19 @@ def _open_review(
     )
 
 
+# ------------------------------------------------------------------- file page
+def stored_results(record: m.MediaFile) -> dict[str, Any] | None:
+    """What the file details page shows: the approved values, else what the run wrote."""
+    cd = (record.meta or {}).get("content_discoverer")
+    if not cd:
+        return None
+    shown = {k: cd.get(k) for k in ("topics", "title", "description", "footer")}
+    approved = cd.get("approved") or {}
+    shown.update({k: v for k, v in approved.items() if v is not None})
+    shown.setdefault("not_replaced", [])
+    return shown
+
+
 # -------------------------------------------------------------------- reviews
 def decide_review(
     session: Session,
@@ -445,7 +496,7 @@ def decide_review(
 
     new_topics = check_topics([t for t in topics.split(",")], problems)
     new_title, words = check_title(title, problems)
-    body = description.strip()
+    body = description.replace("\r\n", "\n").strip()  # a browser form sends CRLF
     if not new_topics or not words or not body:
         raise MamError("Topics, title and description cannot be empty. " + " ".join(problems))
     content = Content(new_topics, new_title, words, body)
@@ -457,9 +508,10 @@ def decide_review(
     overwrite = frozenset(
         {"themes": "themes", "description": "media_description"}[k] for k in use_new
     )
+    values = content_values(content, settings)
     baserow = write_content(
         record,
-        content_values(content, settings),
+        values,
         settings,
         dry_run=False,
         live=True,
@@ -472,6 +524,8 @@ def decide_review(
             "topics": new_topics,
             "title": new_title,
             "description": body,
+            "footer": values["media_description"][len(body) :].strip(),
+            "not_replaced": kept_by_baserow(baserow),
         },
     }
     record.meta = meta
