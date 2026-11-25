@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 
 import pytest
@@ -299,6 +300,8 @@ def test_review_page_through_the_portal(prepared, monkeypatch):
         )
         assert done.status_code == 303
         assert client.get("/settings").status_code == 200
+        after = name_form(client.get(f"/details/{rid}").text)
+        assert 'name="themes" value="Time"' in after and "A.\n\nB." in after
     with session_scope() as s:
         assert s.get(m.Review, review_id).outcome == "edited"
         assert s.get(m.MediaFile, rid).status == "Content discoverer Done"
@@ -457,48 +460,122 @@ def test_browser_line_endings_are_not_an_edit(in_review):
         assert saved["description"] == GOOD["description"]
 
 
-def test_file_page_shows_the_approved_results(in_review):
+def details(rid):
     from fastapi.testclient import TestClient
 
     from mam.manager.app import create_app
 
-    approve(use_new={"themes"}, description="Edited first.\n\nEdited second.")
     with TestClient(create_app(start_queue=False)) as client:
-        page = client.get(f"/details/{in_review}").text
-    assert 'id="content-results"' in page
-    assert "Krishna Prema, Kali Yuga, Humility" in page and "Don&#39;t waste time" in page
-    assert "Edited first." in page and "kadambafoundation.com/donations" in page
-    assert "Baserow keeps its own description" in page
+        return client.get(f"/details/{rid}").text
 
 
-def test_file_page_shows_results_that_needed_no_review(prepared):
+def name_form(page):
+    return page[page.index('id="edit-form"') :].split("</form>")[0]
+
+
+def save_form(rid, **fields):
     from fastapi.testclient import TestClient
 
     from mam.manager.app import create_app
 
+    data = {
+        "filename": "2012-01-01_KKS_BG-2-51_Oslo-no.mp3",
+        "when": "2012-01-01",
+        "category": "Bhagavad-gita",
+        "baserow_row_id": "skip",
+        **fields,
+    }
+    with TestClient(create_app(start_queue=False)) as client:
+        done = client.post(f"/files/{rid}/edit", data=data, follow_redirects=False)
+    assert done.status_code == 303 and "error=" not in done.headers["location"]
+
+
+def approved_values(rid):
+    with session_scope() as s:
+        return s.get(m.MediaFile, rid).meta["content_discoverer"]["approved"]
+
+
+def test_the_name_form_holds_themes_and_description(in_review):
+    approve(use_new={"themes"}, description="Edited first.\n\nEdited second.")
+    page = details(in_review)
+    form = name_form(page)
+    assert 'name="themes"' in form and "Krishna Prema, Kali Yuga, Humility" in form
+    assert re.search(r'<textarea[^>]*name="description"[^>]*data-autogrow', form)
+    assert "Edited first." in form
+    assert "Themes, title and description" not in page  # no second, read-only block
+    assert "Baserow keeps its own description" in form
+
+
+def test_results_that_needed_no_review_are_in_the_form(prepared):
     rid, _ = prepared()
     run(rid)
-    with TestClient(create_app(start_queue=False)) as client:
-        page = client.get(f"/details/{rid}").text
-    assert 'id="content-results"' in page and "Second paragraph about humility." in page
+    assert "Second paragraph about humility." in name_form(details(rid))
 
 
-def test_file_page_shows_an_approval_stored_without_its_description(in_review):
+def test_an_approval_stored_without_its_description_shows_the_proposed_one(in_review):
     """Approvals made before 2026-11-25 stored only the topics and title."""
-    from fastapi.testclient import TestClient
-
-    from mam.manager.app import create_app
-
     approve()
     with session_scope() as s:
         record = s.get(m.MediaFile, in_review)
-        meta = dict(record.meta)
-        cd = dict(meta["content_discoverer"])
+        cd = dict(record.meta["content_discoverer"])
         cd["approved"] = {"topics": ["Time"], "title": "Use time"}
-        record.meta = {**meta, "content_discoverer": cd}
-    with TestClient(create_app(start_queue=False)) as client:
-        page = client.get(f"/details/{in_review}").text
-    assert "Time" in page and "First paragraph about the class." in page
+        record.meta = {**record.meta, "content_discoverer": cd}
+    form = name_form(details(in_review))
+    assert 'value="Time"' in form and "First paragraph about the class." in form
+
+
+def test_no_content_fields_without_results_or_during_their_review(prepared, in_review):
+    assert 'name="themes"' not in name_form(details(in_review))  # the review form edits them
+    assert details(in_review).count('name="description"') == 1
+
+
+def test_save_keeps_edited_themes_and_description(prepared, no_baserow):
+    rid, _ = prepared()
+    run(rid)
+    save_form(rid, themes="Time,  Humble Inquiry ,", description="New one.\r\n\r\nNew two.")
+    saved = approved_values(rid)
+    assert saved["topics"] == ["Time", "Humble Inquiry"]
+    assert saved["description"] == "New one.\n\nNew two."
+    form = name_form(details(rid))
+    assert "Time, Humble Inquiry" in form and "New two." in form
+    assert not no_baserow  # "Do not create row": nothing is sent to Baserow
+
+
+def test_save_to_a_row_sends_themes_and_description_with_the_footer(prepared, no_baserow):
+    rid, _ = prepared()
+    run(rid)
+    save_form(rid, themes="Time", description="New one.", baserow_row_id="5")
+    values = no_baserow[-1]["values"]
+    assert values["themes"] == "Time" and no_baserow[-1]["live"]
+    assert values["media_description"].startswith("New one.\n\n")
+    assert "kadambafoundation.com/donations" in values["media_description"]
+    assert approved_values(rid)["not_replaced"] == []
+    with session_scope() as s:  # not part of the name values the Renamer keeps
+        assert "media_description" not in s.get(m.MediaFile, rid).meta["confirmed"]
+
+
+def test_baserow_values_carry_the_content_only_when_given(reference, tmp_path):
+    from mam.tools.renamer.tool import PERSON_FIELDS, baserow_values
+
+    proposal = {
+        "title": "t",
+        "languages": ["English"],
+        "original_path": "/a/o.mp3",
+        "when": "2012-01-01",
+    }
+    final = get_settings().media_processed_files_path / "x.mp3"
+    ref = reference
+    plain = baserow_values(proposal, final, "audio", ref, get_settings())
+    assert not {"themes", "media_description", "youtube_desc"} & plain.keys()
+    full = baserow_values(
+        {**proposal, "themes": "A, B", "media_description": "D"},
+        final,
+        "audio",
+        ref,
+        get_settings(),
+    )
+    assert (full["themes"], full["media_description"], full["youtube_desc"]) == ("A, B", "D", True)
+    assert {"themes", "media_description"} <= PERSON_FIELDS
 
 
 def test_the_title_rename_keeps_the_content_discoverer_status(prepared):

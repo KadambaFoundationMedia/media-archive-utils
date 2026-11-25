@@ -19,7 +19,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The Class discoverer's loudness step now runs as its own job on the CPU pool (many files at once) and queues the transcription, which stays one at a time on the ML pool. Loudness no longer waits behind a transcription.
 
 ### Fixed
-- Content discoverer: the file details page shows the themes, title and YouTube description after the review is approved (and for results that needed no review).
+- Content discoverer: the themes and YouTube description are fields in the file page's name and media table form, so they can be seen and edited after the review; saving writes them to the chosen Baserow row. The description box grows with its text.
 - Content discoverer: a review now shows the themes and description Baserow already has, with the "Replace" boxes, also for the first checked results. Before, an approval silently kept the old Baserow values and said the new ones were written; the message now says what was written and what Baserow kept.
 - Content discoverer: adding the title to the filename keeps the status "Content discoverer Done" (it became "Renamer Done"); an unchanged description is no longer recorded as edited; `<current year>` in the YouTube footer is replaced by the year, like `{year}`.
 - The Class discoverer no longer fails with "No encoder configured for source codec 'ac3'": AC3 and E-AC3 tracks can be adjusted, and a video file's sound is only read, never rewritten (a video is never edited).

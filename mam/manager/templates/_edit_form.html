@@ -63,6 +63,21 @@
       </div>
     </div>
 
+    {# The content discoverer's values. While its review is open, the review form edits them. #}
+    {% if ev.themes is defined and review_tool != 'content-discoverer' %}
+    <div class="mt-3">
+      <label class="form-label small mb-0" for="themes">Themes{{ tip("Separated by commas. Saved to the themes column of the media row chosen below; an empty field leaves Baserow as it is.") }}</label>
+      <input class="form-control form-control-sm" id="themes" name="themes" value="{{ ev.themes }}">
+    </div>
+    <div class="mt-3">
+      <label class="form-label small mb-0" for="description">YouTube description{{ tip("Saved to the media_description column of the media row chosen below, with the footer from the Settings page added after it; an empty field leaves Baserow as it is.") }}</label>
+      <textarea class="form-control form-control-sm" id="description" name="description" rows="4" data-autogrow>{{ ev.description }}</textarea>
+    </div>
+    {% if ev.not_replaced %}
+    <div class="small text-warning-emphasis mt-1">Baserow keeps its own {{ ev.not_replaced | join(' and ') }}. Saving with the row chosen below replaces that with what is typed above.</div>
+    {% endif %}
+    {% endif %}
+
     <div class="mt-3">
       <label class="form-label small mb-0" for="notes">Notes{{ tip("Kept with the file and added to the Baserow notes column with your name.") }}</label>
       <textarea class="form-control form-control-sm" id="notes" name="notes" rows="2"

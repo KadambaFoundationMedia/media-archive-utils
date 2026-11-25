@@ -532,9 +532,6 @@ def create_app(start_queue: bool = True) -> FastAPI:
                     else "",
                 }
             verse_links = _verse_links(record)
-            from mam.tools.content_discoverer.tool import stored_results
-
-            content_results = stored_results(record)
             next_id = (
                 session.scalar(
                     select(m.Review.media_file_id)
@@ -556,7 +553,6 @@ def create_app(start_queue: bool = True) -> FastAPI:
             review_id=review_id,
             review_tool=review_tool,
             verse_links=verse_links,
-            content_results=content_results,
             p=proposal,
             next_id=next_id,
             **splitter,

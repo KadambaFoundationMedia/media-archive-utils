@@ -52,6 +52,19 @@ document.addEventListener("click", (event) => {
 document.getElementById("filters")?.addEventListener("input", syncClearButtons);
 document.getElementById("filters")?.addEventListener("change", syncClearButtons);
 
+// Text areas marked data-autogrow are as tall as their text (and follow the window width).
+function growTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
+}
+const growTextareas = () => document.querySelectorAll("textarea[data-autogrow]").forEach(growTextarea);
+growTextareas();
+window.addEventListener("load", growTextareas);
+window.addEventListener("resize", growTextareas);
+document.addEventListener("input", (event) => {
+  if (event.target.matches?.("textarea[data-autogrow]")) growTextarea(event.target);
+});
+
 // Edit form (file and review pages): keep the filename and the table fields in step.
 // Only values come back from the server and are filled into the existing fields, so the
 // form and its buttons are never replaced while you click. Save waits for a running sync.

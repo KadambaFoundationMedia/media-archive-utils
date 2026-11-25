@@ -30,6 +30,7 @@ from mam.helpers.vedabase import VedabaseClient, VerseRef
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.class_discoverer.tool import filename_verse, not_a_class
 from mam.tools.content_discoverer import prompt as P
+from mam.tools.content_discoverer.results import clean_description
 from mam.tools.content_discoverer.spelling import fix_content, terms_in
 from mam.tools.content_discoverer.validate import (
     Content,
@@ -458,19 +459,6 @@ def _open_review(
     )
 
 
-# ------------------------------------------------------------------- file page
-def stored_results(record: m.MediaFile) -> dict[str, Any] | None:
-    """What the file details page shows: the approved values, else what the run wrote."""
-    cd = (record.meta or {}).get("content_discoverer")
-    if not cd:
-        return None
-    shown = {k: cd.get(k) for k in ("topics", "title", "description", "footer")}
-    approved = cd.get("approved") or {}
-    shown.update({k: v for k, v in approved.items() if v is not None})
-    shown.setdefault("not_replaced", [])
-    return shown
-
-
 # -------------------------------------------------------------------- reviews
 def decide_review(
     session: Session,
@@ -496,7 +484,7 @@ def decide_review(
 
     new_topics = check_topics([t for t in topics.split(",")], problems)
     new_title, words = check_title(title, problems)
-    body = description.replace("\r\n", "\n").strip()  # a browser form sends CRLF
+    body = clean_description(description)
     if not new_topics or not words or not body:
         raise MamError("Topics, title and description cannot be empty. " + " ".join(problems))
     content = Content(new_topics, new_title, words, body)

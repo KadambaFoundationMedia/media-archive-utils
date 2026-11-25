@@ -19,7 +19,7 @@
       </div>
       <div class="col-12">
         <label class="form-label" for="description">YouTube description</label>
-        <textarea class="form-control" id="description" name="description" rows="10">{{ p.description }}</textarea>
+        <textarea class="form-control" id="description" name="description" rows="10" data-autogrow>{{ p.description }}</textarea>
         {% if p.footer %}
         <div class="form-label mt-2 mb-1 text-body-secondary">Footer, added after the description when it is saved (edit it on the Settings page)</div>
         <div class="border-start ps-2 text-body-secondary" style="white-space: pre-wrap">{{ p.footer }}</div>
