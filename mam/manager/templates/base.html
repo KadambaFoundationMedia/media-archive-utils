@@ -61,7 +61,8 @@
        {% if request.query_params.get('live') %}id="flash-live"{% endif %}>
     <span class="flash-spinner spinner-border spinner-border-sm flex-shrink-0" aria-hidden="true" {% if not live %}hidden{% endif %}></span>
     <div>
-      {% if live %}{% include "_activity.html" %}{% endif %}
+      {# "is defined": a portal still running the old code reads this new page until its restart #}
+      {% if live and activity is defined %}{% include "_activity.html" %}{% endif %}
       <div class="flash-text{% if live %} small text-body-secondary{% endif %}">
         <span class="flash-done fw-semibold me-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}><i class="fa-solid fa-check me-1"></i>Finished:</span>
         {{ request.query_params.get('msg') }}
