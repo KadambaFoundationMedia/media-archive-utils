@@ -24,14 +24,7 @@ from mam.config import get_settings
 from mam.errors import MamError
 from mam.helpers.file_organizer import FileOrganizer
 from mam.helpers.local_db import models as m
-from mam.helpers.local_db.app_settings import tuned
 from mam.helpers.local_db.repo import set_status
-from mam.tools.content_discoverer.results import (
-    clean_description,
-    parse_themes,
-    stored_results,
-)
-from mam.tools.content_discoverer.validate import youtube_description
 from mam.tools.renamer.knowledge import (
     PLACEMENT_MAX_AGE_S,
     Place,
@@ -261,7 +254,7 @@ def initial_values(record: m.MediaFile) -> dict[str, Any]:
     title = source.get("title") or derived["title"]
     # A title the Renamer suggested may follow the filename; a title someone saved may not.
     auto_title = derived["title"] if meta.get("confirmed") else title
-    values = {
+    return {
         "filename": filename,
         "when": source.get("when") or derived["when"],
         "title": title,
@@ -274,12 +267,6 @@ def initial_values(record: m.MediaFile) -> dict[str, Any]:
         "baserow_row_id": source.get("baserow_row_id") or record.baserow_row_id or "",
         "notes": source.get("notes_text") or "",
     }
-    content = stored_results(record)
-    if content:  # only a file the content discoverer has processed has these fields
-        values["themes"] = ", ".join(content["topics"] or [])
-        values["description"] = content["description"] or ""
-        values["not_replaced"] = content["not_replaced"]
-    return values
 
 
 SKIP_ROW = "skip"  # value of the "Do not create row" choice on the edit form
@@ -357,33 +344,14 @@ def save(
         "flags": [],
         "dry_run": False,
     }
-    # The content discoverer's fields, when the form had them. They go to the media row, but
-    # are not name values: `data` (the confirmed proposal) never holds them.
-    content, fields = None, {}
-    if "themes" in values and stored_results(record):
-        topics = parse_themes(values["themes"])
-        body = clean_description(values.get("description"))
-        full = ""
-        if body:
-            options = tuned(settings)
-            full = youtube_description(
-                body, options.content_footer_path, None, options.content_footer
-            )
-        content = {"topics": topics, "description": body, "footer": full[len(body) :].strip()}
-        fields = {"themes": ", ".join(topics), "media_description": full}
     # A person's decision: write the media row live, also when the Baserow switch is off,
     # unless they chose not to create or change a row.
     if skip_row:
         data["baserow"] = {"action": "skip", "row_id": None, "dry_run": True, "skipped": True}
     else:
         data["baserow"] = write_baserow(
-            record, {**data, **fields}, placed.dst, settings, dry_run=False, live=True
+            record, data, placed.dst, settings, dry_run=False, live=True
         )
-    sent = {
-        label
-        for label, key in (("themes", "themes"), ("description", "media_description"))
-        if fields.get(key) and not data["baserow"].get("dry_run")
-    }
     data["place_country"] = remember_place_country(place, cc, ref)
     tagged = apply_tags(
         placed.dst, data, ref, dry_run=False, media_file_id=record.id, tool="manual-edit"
@@ -397,13 +365,6 @@ def save(
     meta["proposal"] = data
     meta["confirmed"] = {**data, "by": operator, "at": now.isoformat()}
     meta["reserved"] = str(placed.dst)
-    if content is not None:
-        results = meta["content_discoverer"]
-        approved = results.get("approved") or {}
-        content["not_replaced"] = [
-            label for label in approved.get("not_replaced") or [] if label not in sent
-        ]
-        meta["content_discoverer"] = {**results, "approved": {**approved, **content}}
     record.meta = meta
     _apply_display(record, data, placed.dst)
     if data["baserow"].get("row_id"):

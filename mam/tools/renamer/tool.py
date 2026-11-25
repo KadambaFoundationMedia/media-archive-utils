@@ -116,12 +116,6 @@ def baserow_values(
     country = ref.country_option(proposal.get("cc"))
     if country:
         values["country"] = country
-    # Only a person's save of a file with content discoverer results sends these.
-    if proposal.get("themes"):
-        values["themes"] = proposal["themes"]
-    if proposal.get("media_description"):
-        values["media_description"] = proposal["media_description"]
-        values["youtube_desc"] = True
     values = {k: v for k, v in values.items() if v not in (None, "", [])}
     if clear_unknown_place and proposal.get("place") and "place_location" not in values:
         values["place_location"] = None  # e.g. was ISKCON-Amsterdam, now the new place Amsterdam
@@ -134,10 +128,7 @@ def _date_parts(text: str) -> tuple[int | None, int | None, int | None]:
 
 
 LOCATION_FIELDS = frozenset({"audio_file_location", "video_file_location"})
-PERSON_FIELDS = frozenset(
-    {"title", "date", "category", "tag", "place_location", "country"}
-    | {"themes", "media_description"}
-)
+PERSON_FIELDS = frozenset({"title", "date", "category", "tag", "place_location", "country"})
 
 
 def write_baserow(

@@ -5,7 +5,7 @@ import shutil
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db import session_scope
@@ -1076,3 +1076,72 @@ def test_settings_page_options_autosave(client):
         in client.post("/settings/option/recorder_prefixes", data={"value": "a b!"}).text
     )
     assert client.post("/settings/option/nope", data={"value": "1"}).status_code == 404
+
+
+def _queue_renamer(client):
+    client.post("/import", data={"root": 0, "path": ""}, follow_redirects=False)
+    run_queue()
+    with session_scope() as s:
+        ids = [f.id for f in s.scalars(select(m.MediaFile).order_by(m.MediaFile.id))]
+        enqueue(s, "renamer", ids, dry_run=False)
+    return ids
+
+
+def test_stop_one_file_cancels_its_queued_job_and_restores_the_status(client, archive):
+    first, second = _queue_renamer(client)
+    page = client.get("/", params={"status": "__all"}).text
+    assert f'hx-post="/files/{first}/stop"' in page and "Stop processing" in page
+    assert client.post(f"/files/{first}/stop", headers={"HX-Request": "true"}).status_code == 204
+    with session_scope() as s:
+        assert s.get(m.MediaFile, first).status == "Not processed"
+        assert s.get(m.MediaFile, second).status == "Queued"
+        jobs = {
+            j.media_file_id: j.state
+            for j in s.scalars(select(m.Job).where(m.Job.tool == "renamer"))
+        }
+        assert jobs == {first: "cancelled", second: "queued"}
+
+
+def test_stop_all_cancels_every_queued_job(client, archive):
+    ids = _queue_renamer(client)
+    assert client.post("/jobs/cancel", follow_redirects=False).status_code == 303
+    run_queue()  # nothing is left to run
+    with session_scope() as s:
+        assert {s.get(m.MediaFile, i).status for i in ids} == {"Not processed"}
+        assert s.scalars(select(m.Job).where(m.Job.state == "queued")).all() == []
+
+
+def test_a_running_job_ends_at_its_next_report_and_nothing_follows(client, archive, monkeypatch):
+    import dataclasses
+
+    from mam.helpers.progress import report
+    from mam.manager import tools as tools_mod
+
+    reached = []
+
+    def slow(ctx):
+        report("Step one", 0.1)  # the operator presses Stop while this step runs
+        queue.cancel_jobs(ctx.media_file.id)
+        report("Step two", 0.5)
+        reached.append("step two")  # must not be reached
+        return tools_mod.ToolOutcome("done", "finished", {})
+
+    monkeypatch.setitem(
+        tools_mod.TOOLS, "renamer", dataclasses.replace(tools_mod.TOOLS["renamer"], run=slow)
+    )
+    queue = JobQueue()
+    first, _ = _queue_renamer(client)
+    with session_scope() as s:
+        s.execute(update(m.Job).where(m.Job.media_file_id != first).values(state="cancelled"))
+        s.get(
+            m.Job,
+            s.scalar(select(m.Job.id).where(m.Job.media_file_id == first, m.Job.tool == "renamer")),
+        ).pipeline = True
+    job_id = queue.claim("io")
+    queue.execute(job_id)
+    assert reached == []
+    with session_scope() as s:
+        job = s.get(m.Job, job_id)
+        assert job.state == "cancelled" and job.step is None
+        assert s.get(m.MediaFile, first).status == "Not processed"
+        assert s.scalars(select(m.Job).where(m.Job.state == "queued")).all() == []

@@ -36,16 +36,16 @@ def test_the_example_of_the_reference_file():
         "year": "2013",
         "comment": "2013-11-14, Vrindavan, India",
         "publisher": "Kadamba Foundation",
-        "copyright": "Kadamba Foundation",
+        "copyright": "2013 Kadamba Foundation",
     }
 
 
 def test_language_is_the_two_letter_code():
     from mam.tools.renamer.tags import language_codes
 
-    assert language_codes(["English"]) == "en"
-    assert language_codes(["English", "Dutch", "Klingon"]) == "en,nl"
-    assert build_tags(proposal(), None, None, "en")["language"] == "en"
+    assert language_codes(["English"]) == "eng"
+    assert language_codes(["English", "Dutch", "Klingon"]) == "eng,dut"
+    assert build_tags(proposal(), None, None, "eng")["language"] == "eng"
 
 
 def test_album_is_the_canto_not_the_chapter():
@@ -71,6 +71,14 @@ def test_no_verse_gives_category_and_year_and_the_what_as_title():
     assert tags["album"] == "Janmastami - 2019"
     assert tags["title"] == "Janmastami evening lecture"
     assert tags["genre"] == "Janmastami"  # the category when idv3_genre is empty
+
+
+def test_copyright_begins_with_a_year_and_falls_back_to_this_year():
+    from datetime import date
+
+    assert build_tags(proposal(), None, None)["copyright"] == "2013 Kadamba Foundation"
+    tags = build_tags(proposal(when="YYYY-MM-DD"), None, None)
+    assert tags["copyright"] == f"{date.today().year} Kadamba Foundation"
 
 
 def test_unknown_parts_are_left_out():
@@ -110,7 +118,9 @@ def test_mp3_tags_are_overwritten_and_other_frames_kept(copy):
     assert str(out["TCON"]) == "Srimad Bhagavatam" and str(out["TDRC"]) == "2013"
     assert out.getall("COMM")[0].text == ["2013-11-14, Vrindavan, India"]
     assert "TRCK" not in out and out.getall("APIC")
-    assert str(out["TPUB"]) == str(out["TCOP"]) == "Kadamba Foundation"
+    assert (
+        str(out["TPUB"]) == "Kadamba Foundation" and str(out["TCOP"]) == "2013 Kadamba Foundation"
+    )
 
 
 def test_m4a_tags(settings):
@@ -120,7 +130,7 @@ def test_m4a_tags(settings):
     write_tags(path, build_tags(proposal(), "Srimad Bhagavatam", "India"))
     tags = MP4(path).tags
     assert tags["\xa9alb"] == ["SB Canto 9"] and tags["\xa9day"] == ["2013"]
-    assert tags["cprt"] == ["Kadamba Foundation"]
+    assert tags["cprt"] == ["2013 Kadamba Foundation"]
 
 
 def test_video_is_not_tagged(settings):

@@ -52,19 +52,6 @@ document.addEventListener("click", (event) => {
 document.getElementById("filters")?.addEventListener("input", syncClearButtons);
 document.getElementById("filters")?.addEventListener("change", syncClearButtons);
 
-// Text areas marked data-autogrow are as tall as their text (and follow the window width).
-function growTextarea(el) {
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`;
-}
-const growTextareas = () => document.querySelectorAll("textarea[data-autogrow]").forEach(growTextarea);
-growTextareas();
-window.addEventListener("load", growTextareas);
-window.addEventListener("resize", growTextareas);
-document.addEventListener("input", (event) => {
-  if (event.target.matches?.("textarea[data-autogrow]")) growTextarea(event.target);
-});
-
 // Edit form (file and review pages): keep the filename and the table fields in step.
 // Only values come back from the server and are filled into the existing fields, so the
 // form and its buttons are never replaced while you click. Save waits for a running sync.
@@ -139,10 +126,15 @@ function finishLiveFlash() {
   if (!flash || !poll || poll.dataset.active !== "0") return;
   flash.classList.replace("alert-info", "alert-success");
   flash.querySelector(".flash-spinner")?.setAttribute("hidden", "");
+  flash.querySelector(".flash-stop")?.setAttribute("hidden", "");
   flash.querySelectorAll(".flash-done, .flash-hint").forEach((el) => el.removeAttribute("hidden"));
 }
 document.body.addEventListener("htmx:oobAfterSwap", (event) => {
-  if (event.detail.target?.id === "nav-poll") finishLiveFlash();
+  if (event.detail.target?.id !== "nav-poll") return;
+  // the Stop icon in the navbar is only there while jobs are queued or running
+  const idle = event.detail.target.dataset.active === "0";
+  document.getElementById("nav-stop")?.toggleAttribute("hidden", idle);
+  finishLiveFlash();
 });
 
 // The message is shown once: a reload or a bookmark does not bring it back.

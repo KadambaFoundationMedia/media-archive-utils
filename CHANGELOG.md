@@ -8,7 +8,9 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Added
-- Renamer: the ID3 tags also get Publisher and Copyright (Kadamba Foundation) and the Language code (`en`).
+- Stop icon ("Stop processing") in the top bar, in the live message about queued work and next to each file in the list that has a queued or running job (also on the file page): queued jobs are cancelled at once, a running job ends at the start of its next step, and the file gets its earlier status back. The Jobs page's cancel button now stops running jobs too.
+- File details page: after the Content discoverer ran, the themes and the YouTube description are editable fields in the Name and media table form (growing textarea, footer with the current year); Save stores them and writes them to the Baserow row.
+- Renamer: the ID3 tags also get Publisher (Kadamba Foundation), Copyright (the recording's year and Kadamba Foundation, as ID3 requires: `2015 Kadamba Foundation`) and the Language as an ISO 639-2 code (`eng`).
 - Renamer: writes ID3 tags (title, artist, album, genre, album artist, composer, year, comment) to the processed copy of mp3, m4a and wma files, and updates them whenever the file is renamed again. The genre comes from the new `idv3_genre` column of `category_terms_folder`.
 - The header shows CPU, GPU, memory and CPU temperature as labelled bars (CPU, GPU, MEM, TEMP; green below 60%, orange below 85%, red above), updated every 3 seconds. A bar is left out when the system does not report it (a Mac gives no CPU temperature without admin rights).
 - The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
@@ -19,7 +21,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The Class discoverer's loudness step now runs as its own job on the CPU pool (many files at once) and queues the transcription, which stays one at a time on the ML pool. Loudness no longer waits behind a transcription.
 
 ### Fixed
-- Content discoverer: the themes and YouTube description are fields in the file page's name and media table form, so they can be seen and edited after the review; saving writes them to the chosen Baserow row. The description box grows with its text.
+- Content discoverer: the file details page shows the themes, title and YouTube description after the review is approved (and for results that needed no review).
 - Content discoverer: a review now shows the themes and description Baserow already has, with the "Replace" boxes, also for the first checked results. Before, an approval silently kept the old Baserow values and said the new ones were written; the message now says what was written and what Baserow kept.
 - Content discoverer: adding the title to the filename keeps the status "Content discoverer Done" (it became "Renamer Done"); an unchanged description is no longer recorded as edited; `<current year>` in the YouTube footer is replaced by the year, like `{year}`.
 - The Class discoverer no longer fails with "No encoder configured for source codec 'ac3'": AC3 and E-AC3 tracks can be adjusted, and a video file's sound is only read, never rewritten (a video is never edited).
