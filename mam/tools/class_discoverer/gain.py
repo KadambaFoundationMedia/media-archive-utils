@@ -33,7 +33,11 @@ def apply_gain(
     if before.meets_target():
         return {"applied": False, "before": before.integrated, "reason": "already at the target"}
     tmp = audio.with_name(f".{audio.stem}.gain{audio.suffix}")
-    result = normalize_whole(audio, tmp, dry_run=dry_run)
+    try:
+        result = normalize_whole(audio, tmp, dry_run=dry_run)
+    except BaseException:  # also a stopped job: leave no hidden temporary file behind
+        tmp.unlink(missing_ok=True)
+        raise
     info = {
         "applied": not dry_run,
         "before": result.before.integrated,

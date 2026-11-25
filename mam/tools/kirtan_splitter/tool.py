@@ -22,7 +22,7 @@ from mam.helpers.file_organizer.organizer import assert_writable
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import fingerprint, sha256
 from mam.helpers.local_db.repo import record_event, register_derived, set_status
-from mam.helpers.progress import check_cancelled, report
+from mam.helpers.progress import check_cancelled, report, uninterruptible
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.statuses import SPLITTER_CLASS, SPLITTER_KIRTAN, SPLITTER_NOT_SPLIT, SPLITTER_SPLIT
 from mam.tools.kirtan_splitter import phrases
@@ -283,7 +283,12 @@ def apply_split(
     video = record.kind == "video"
     assert_writable(kirtan_dst, settings)
 
-    cmds = stream_cut(audio, kirtan_dst, [(start, split_at)], dry_run=dry_run)
+    try:
+        cmds = stream_cut(audio, kirtan_dst, [(start, split_at)], dry_run=dry_run)
+    except BaseException:  # also a stopped job: no kirtan file without a record
+        if not dry_run:
+            kirtan_dst.unlink(missing_ok=True)
+        raise
     result: dict[str, Any] = {
         "kirtan_file": kirtan_dst.name,
         "class_file": class_dst.name,
@@ -292,8 +297,22 @@ def apply_split(
     if dry_run:
         result["summary"] = f"Would write {kirtan_dst.name} and {class_dst.name}."
         return result
-    stream_cut(audio, class_dst, [(split_at, None)], dry_run=False)
+    try:
+        stream_cut(audio, class_dst, [(split_at, None)], dry_run=False)
+    except BaseException:  # the combined copy is still whole: drop the kirtan cut too
+        kirtan_dst.unlink(missing_ok=True)
+        raise
+    with uninterruptible():  # the files are written: the bookkeeping must finish
+        return _register_split(
+            session, record, audio, kirtan_dst, class_dst, split_at, start, mantra, match,
+            operator, video, result, proposal, settings,
+        )  # fmt: skip
 
+
+def _register_split(
+    session, record, audio, kirtan_dst, class_dst, split_at, start, mantra, match, operator,
+    video, result, proposal, settings,
+):  # fmt: skip
     record_event(
         session,
         action="split",

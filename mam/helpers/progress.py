@@ -80,9 +80,25 @@ def clear_cancel(job_id: int) -> None:
         _kill_hooks.pop(job_id, None)
 
 
+_protected: ContextVar[bool] = ContextVar("mam_job_protected", default=False)
+
+
+@contextmanager
+def uninterruptible() -> Iterator[None]:
+    """A stretch of work that must finish once begun (the bookkeeping after a file was
+    written): Stop does not interrupt it, and nothing in it is killed."""
+    token = _protected.set(True)
+    try:
+        yield
+    finally:
+        _protected.reset(token)
+
+
 def check_cancelled() -> None:
     """Raise `JobCancelled` when the running job was stopped (does nothing outside a job)."""
     job_id = _job_id.get()
+    if _protected.get():
+        return
     if job_id is not None and job_id in _cancelled:
         raise JobCancelled("Stopped by the operator")
 
@@ -91,7 +107,7 @@ def kill_on_stop(kill: Callable[[], None]) -> None:
     """Like `killable`, without a block: `kill` stays registered until the job ends (killing a
     program that has already finished does nothing). Pair it with `check_cancelled()`."""
     job_id = _job_id.get()
-    if job_id is None:
+    if job_id is None or _protected.get():
         return
     with _lock:
         _kill_hooks.setdefault(job_id, set()).add(kill)
@@ -108,7 +124,7 @@ def killable(kill: Callable[[], None]) -> Iterator[None]:
     killed never passes for one that failed or finished.
     """
     job_id = _job_id.get()
-    if job_id is None:
+    if job_id is None or _protected.get():
         yield
         return
     with _lock:

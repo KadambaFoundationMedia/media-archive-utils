@@ -1090,7 +1090,7 @@ def _queue_renamer(client):
 def test_stop_one_file_cancels_its_queued_job_and_restores_the_status(client, archive):
     first, second = _queue_renamer(client)
     page = client.get("/", params={"status": "__all"}).text
-    assert f'hx-post="/files/{first}/stop"' in page and "Stop processing" in page
+    assert f'hx-post="/files/{first}/stop"' not in page  # the icon is only for running jobs
     assert client.post(f"/files/{first}/stop", headers={"HX-Request": "true"}).status_code == 204
     with session_scope() as s:
         assert s.get(m.MediaFile, first).status == "Not processed"
@@ -1183,3 +1183,30 @@ def test_the_stop_icon_is_only_in_the_live_message_and_next_to_files(client, arc
     assert 'hx-post="/jobs/cancel"' not in client.get("/").text
     page = client.get("/", params={"msg": "Renamer: 1 file(s) queued", "live": 1}).text
     assert 'class="flash-stop ms-2" hidden' in page  # no job is running: the icon is hidden
+
+
+def test_stop_during_the_gain_encode_leaves_no_temporary_file(tmp_path, monkeypatch):
+    import mam.tools.class_discoverer.gain as gain_mod
+    from mam.errors import JobCancelled
+
+    (tmp_path / "gain").mkdir()
+    audio = tmp_path / "gain" / "x.mp3"
+    audio.write_bytes(b"x")
+
+    class Before:
+        integrated = -30.0
+
+        def meets_target(self):
+            return False
+
+    monkeypatch.setattr(gain_mod, "measure", lambda path: Before())
+    monkeypatch.setattr(gain_mod, "media_kind", lambda path: "audio")
+
+    def stopped(src, tmp, dry_run):
+        tmp.write_bytes(b"partial")  # a first pass was written, the next was stopped
+        raise JobCancelled("stop")
+
+    monkeypatch.setattr(gain_mod, "normalize_whole", stopped)
+    with pytest.raises(JobCancelled):
+        gain_mod.apply_gain(None, None, audio, None, dry_run=False)
+    assert [p.name for p in audio.parent.iterdir()] == ["x.mp3"]
