@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from mam.errors import MamError
-from mam.helpers.progress import report
+from mam.helpers.progress import check_cancelled, kill_on_stop, report
 from mam.helpers.transcriber.chunking import SAMPLE_RATE, pick_boundaries
 
 log = logging.getLogger(__name__)
@@ -172,6 +172,8 @@ class MlxRunner:
         parent, child = ctx.Pipe()
         self.proc = ctx.Process(target=_worker, args=(child, *self.args), daemon=True)
         self.proc.start()
+        proc = self.proc
+        kill_on_stop(proc.kill)  # the Stop button ends the transcription at once
         child.close()
         self.conn = parent
         message = self._wait(timeout, "loading the audio and the model")
@@ -275,6 +277,7 @@ def run_chunks(
                     result = runner.run_chunk(idx, start, end, options, limit)
                     break
                 except MamError as exc:
+                    check_cancelled()  # a stopped job must not retry the chunk
                     events.append(
                         {"chunk": idx, "start": start, "attempt": attempt, "problem": str(exc)}
                     )
@@ -299,6 +302,7 @@ def run_chunks(
                         chunk_timeout * 2,
                     )  # fmt: skip
                 except MamError as exc:
+                    check_cancelled()
                     events.append({"chunk": idx, "start": start, "problem": str(exc)})
             if result is None and fallback_chunk is not None:
                 result = fallback_chunk(start, end)
@@ -333,6 +337,7 @@ def run_chunks(
                 options = {**REPAIR_OPTIONS, "language": dominant_language(results)}
                 fixed = runner.run_chunk(1000 + n, start, end, options, chunk_timeout)
             except MamError as exc:
+                check_cancelled()
                 events.append({"gap": gap_start, "problem": str(exc)})
                 continue
             if fixed["segments"]:

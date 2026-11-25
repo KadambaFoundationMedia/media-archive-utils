@@ -16,6 +16,7 @@ from typing import Any
 
 from mam.config import Settings
 from mam.errors import MamError
+from mam.helpers.progress import killable
 from mam.helpers.transcriber.models import Segment, Transcript
 
 log = logging.getLogger(__name__)
@@ -247,14 +248,22 @@ def transcribe_whispercpp(audio: Path, settings: Settings, language: str | None)
 
         def attempt(extra: list[str]) -> subprocess.CompletedProcess:
             try:
-                return subprocess.run(
-                    [cli, "-m", str(model), "-f", str(wav), "-oj", "-of", str(out),
-                     "-l", language or "auto", "-t", str(threads), "-tp", "0.0", "-mc", "0",
-                     *extra],
-                    capture_output=True, text=True, check=False, timeout=limit,
-                )  # fmt: skip
-            except subprocess.TimeoutExpired as exc:
-                raise MamError(f"whisper-cli made no result in {limit:.0f} s") from exc
+                cmd = [cli, "-m", str(model), "-f", str(wav), "-oj", "-of", str(out),
+                       "-l", language or "auto", "-t", str(threads), "-tp", "0.0", "-mc", "0",
+                       *extra]  # fmt: skip
+                popen = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                with killable(popen.kill):  # the Stop button ends it at once
+                    try:
+                        stdout, stderr = popen.communicate(timeout=limit)
+                    except subprocess.TimeoutExpired as exc:
+                        popen.kill()
+                        popen.communicate()
+                        raise MamError(f"whisper-cli made no result in {limit:.0f} s") from exc
+                return subprocess.CompletedProcess(cmd, popen.returncode, stdout, stderr)
+            except OSError as exc:
+                raise MamError(f"whisper-cli could not start: {exc}") from exc
 
         fallback = None
         proc = attempt([])

@@ -1145,3 +1145,41 @@ def test_a_running_job_ends_at_its_next_report_and_nothing_follows(client, archi
         assert job.state == "cancelled" and job.step is None
         assert s.get(m.MediaFile, first).status == "Not processed"
         assert s.scalars(select(m.Job).where(m.Job.state == "queued")).all() == []
+
+
+def test_stop_kills_the_program_a_running_job_waits_for(client, archive, monkeypatch):
+    """Stop must not wait for a long ffmpeg: the program is killed and the job is cancelled."""
+    import dataclasses
+    import threading
+    import time
+
+    from mam.helpers.audio_optimizer.ffmpeg import run as run_program
+    from mam.manager import tools as tools_mod
+
+    def long_step(ctx):
+        run_program(["sleep", "30"])  # stands for an ffmpeg that runs for minutes
+        return tools_mod.ToolOutcome("done", "finished", {})
+
+    monkeypatch.setitem(
+        tools_mod.TOOLS, "renamer", dataclasses.replace(tools_mod.TOOLS["renamer"], run=long_step)
+    )
+    queue = JobQueue()
+    first, second = _queue_renamer(client)
+    with session_scope() as s:
+        s.execute(update(m.Job).where(m.Job.media_file_id == second).values(state="cancelled"))
+    job_id = queue.claim("io")
+    threading.Timer(0.5, lambda: queue.cancel_jobs(first)).start()
+    began = time.monotonic()
+    queue.execute(job_id)
+    assert time.monotonic() - began < 10
+    with session_scope() as s:
+        job = s.get(m.Job, job_id)
+        assert job.state == "cancelled" and job.error is None
+        assert s.get(m.MediaFile, first).status == "Not processed"
+
+
+def test_the_stop_icon_is_only_in_the_live_message_and_next_to_files(client, archive):
+    assert 'id="nav-stop"' not in client.get("/").text
+    assert 'hx-post="/jobs/cancel"' not in client.get("/").text
+    page = client.get("/", params={"msg": "Renamer: 1 file(s) queued", "live": 1}).text
+    assert 'class="flash-stop ms-2" hidden' in page  # no job is running: the icon is hidden

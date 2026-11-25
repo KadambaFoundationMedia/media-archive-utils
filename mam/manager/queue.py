@@ -23,7 +23,7 @@ from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import tuned
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
-from mam.helpers.progress import reporting
+from mam.helpers.progress import bound_job, clear_cancel, reporting, request_cancel
 from mam.manager.tools import PIPELINE_ORDER, TOOLS, JobContext, ToolOutcome, next_in_pipeline
 from mam.statuses import PROCESSING, QUEUED, is_busy
 
@@ -285,6 +285,7 @@ class JobQueue:
                     cancelled += 1
                 else:
                     self.stop_requested.add(job.id)
+                    request_cancel(job.id)  # kills ffmpeg, whisper... the job is waiting for
                     job.step = "Stopping"
                     asking += 1
         return cancelled, asking
@@ -326,36 +327,41 @@ class JobQueue:
             with session_scope() as session:
                 record = session.get(m.MediaFile, job.media_file_id) if job.media_file_id else None
                 ctx = JobContext(job_id, session, tuned(self.settings), dry_run, params, record)
-                with reporting(self._reporter(job_id)):
+                with bound_job(job_id), reporting(self._reporter(job_id)):
                     outcome = spec.run(ctx)
                 self._finish(session, job_id, record, outcome)
-        except JobCancelled:
-            log.info("Job %s (%s) stopped by the operator", job_id, tool)
-            self.stop_requested.discard(job_id)
-            with session_scope() as session:
-                job = session.get(m.Job, job_id)
-                job.state, job.finished_at = "cancelled", now()
-                job.step = job.progress = None
-                _restore_status(session, job)
-                # a step that queued its follower before it was stopped
-                self._cancel_followers(session, job)
-            return
         except Exception as exc:
+            # a killed program may raise any error on its way out: a stopped job is not a failure
+            stopped = isinstance(exc, JobCancelled) or job_id in self.stop_requested
             self.stop_requested.discard(job_id)
-            log.exception("Job %s (%s) failed", job_id, tool)
+            clear_cancel(job_id)
+            if stopped:
+                log.info("Job %s (%s) stopped by the operator", job_id, tool)
+            else:
+                log.exception("Job %s (%s) failed", job_id, tool)
             with session_scope() as session:
                 job = session.get(m.Job, job_id)
-                job.state, job.finished_at = "failed", now()
+                job.finished_at = now()
                 job.step = job.progress = None
-                job.error = f"{exc}\n\n{traceback.format_exc()[-3000:]}"
-                if job.media_file_id and spec.sets_status and not dry_run:
-                    record = session.get(m.MediaFile, job.media_file_id)
-                    set_status(session, record, status_for(spec.label, "failed"), tool, str(exc))
+                if stopped:
+                    job.state = "cancelled"
+                    _restore_status(session, job)
+                    self._cancel_followers(session, job)  # a follower queued before the stop
+                else:
+                    job.state = "failed"
+                    job.error = f"{exc}\n\n{traceback.format_exc()[-3000:]}"
+                    if job.media_file_id and spec.sets_status and not dry_run:
+                        record = session.get(m.MediaFile, job.media_file_id)
+                        set_status(
+                            session, record, status_for(spec.label, "failed"), tool, str(exc)
+                        )
             return
 
+        clear_cancel(job_id)
         if job_id in self.stop_requested:
             # stopped, but the job had no step left to stop at: it finished, nothing follows
             self.stop_requested.discard(job_id)
+            clear_cancel(job_id)
             with session_scope() as session:
                 self._cancel_followers(session, session.get(m.Job, job_id))
             return
