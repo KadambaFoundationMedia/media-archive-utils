@@ -141,7 +141,7 @@ def write_baserow(
     live: bool = False,
 ) -> dict[str, Any]:
     """Create or update the media row. Runs follow the "Baserow writes" switch; `live` (a
-    reviewer's approval) always writes for real."""
+    person's save, only passed while the switch is on) makes their values win."""
     from mam.helpers.baserow import BaserowClient
 
     ref = get_reference()

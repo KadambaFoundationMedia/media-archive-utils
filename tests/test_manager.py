@@ -238,7 +238,7 @@ def test_renamer_run_copies_flags_and_reviews(client, archive, reference, no_bas
         assert rec.status == "Renamer Done" and rec.current_name == moved.name
         assert s.get(m.Review, review.id).outcome == "edited"
     assert len(no_baserow) == 2  # written once approved
-    assert no_baserow[0]["live"] is False and no_baserow[1]["live"] is True  # approval is live
+    assert no_baserow[0]["live"] is False and no_baserow[1]["live"] is False  # switch off
 
 
 def test_approving_a_review_in_the_pipeline_says_that_the_next_tool_runs(
@@ -573,7 +573,7 @@ def ids_of_review(review_id):
         return s.get(m.Review, review_id).media_file_id
 
 
-def test_approve_writes_baserow_live_even_in_dry_run_mode(
+def test_approve_writes_baserow_when_the_switch_is_on(
     client, archive, reference, settings, monkeypatch
 ):
     import httpx
@@ -599,7 +599,10 @@ def test_approve_writes_baserow_live_even_in_dry_run_mode(
         review_id = s.scalars(select(m.Review.id)).one()
         # the run itself did not write (the Baserow writes switch is off)
         assert not s.scalars(select(m.BaserowWriteLog)).all()
-    assert "writes the media row live" in client.get(f"/details/{ids_of_review(review_id)}").text
+    assert "Baserow writes is on" in client.get(f"/details/{ids_of_review(review_id)}").text
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
     with respx.mock(base_url="https://baserow.test/api/database") as api:
         create = api.post("/rows/table/1/").mock(return_value=httpx.Response(200, json={"id": 999}))
         response = client.post(

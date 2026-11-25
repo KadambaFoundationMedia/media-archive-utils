@@ -17,7 +17,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 
 ### Changed
 - The live message about queued work says which tool is doing what while it runs, for example `Kirtan splitter: listening to the recording (music or speech)` or `Renamer: copying and renaming the file`, with the file's name and how many jobs wait. The Renamer now reports its steps, and the Stop and close icons are level with the text.
-- Content discoverer: approving a review and saving the themes or description now follow the Baserow writes switch. With the switch off nothing is written to Baserow (it is only logged and kept with the file); before, they wrote live and could replace existing values.
+- Nothing is written to Baserow while the Baserow writes switch is off: this now also holds for saves and approvals on the file page (Renamer, Content discoverer, and adding a place to place_country). They are only logged and the values are kept in the local database. Before, a person's save or approval wrote live and could replace existing values.
 - Content discoverer: "Results checked first" is 0 by default, so no result is forced into review (a reset started the count again).
 - Content discoverer titles: 6 words at most, a 7th only when the grammar needs it (a 7-word title no longer goes to review). New prompt version, so earlier answers are asked again.
 - A tool no longer starts on a file while an earlier tool's review of that file is still open (for example the Content discoverer on a file the Kirtan splitter flagged). The Action menu says how many files were not queued.
