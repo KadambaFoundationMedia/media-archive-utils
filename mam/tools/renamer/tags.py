@@ -18,8 +18,8 @@ from mam.tools.renamer.parse import find_verse
 log = logging.getLogger(__name__)
 
 PERSON = "Kadamba Kanana Swami"
+PUBLISHER = "Kadamba Foundation"  # Publisher and Copyright (decided 2026-11-25)
 FORMATS = {"mp3", "m4a", "wma"}
-FIELDS = ("title", "artist", "album", "genre", "album_artist", "composer", "year", "comment")
 
 
 def _spaces(text: str | None) -> str:
@@ -33,7 +33,21 @@ def _date_parts(when: str | None) -> tuple[str | None, str]:
     return year, "-".join(known) if year else ""
 
 
-def build_tags(data: dict[str, Any], genre: str | None, country: str | None) -> dict[str, str]:
+def language_codes(names: list[str] | None, ref: Any = None) -> str:
+    """Two-letter codes (`en`) of the language names, comma separated: the `whisper_code`
+    column of `language_terms`, else the built-in list."""
+    from mam.tools.class_discoverer.tool import FALLBACK_LANGUAGE_NAMES
+
+    table = dict(FALLBACK_LANGUAGE_NAMES)
+    table.update(getattr(ref, "aliases", {}).get("whisper_codes") or {})
+    by_name = {name.lower(): code for code, name in table.items()}
+    codes = [by_name[n.lower()] for n in names or [] if n and n.lower() in by_name]
+    return ",".join(dict.fromkeys(codes))
+
+
+def build_tags(
+    data: dict[str, Any], genre: str | None, country: str | None, languages: str | None = None
+) -> dict[str, str]:
     """The tag values for a Renamer proposal. Fields with no value are left out."""
     what = data.get("what") or ""
     year, date_text = _date_parts(data.get("when"))
@@ -71,6 +85,9 @@ def build_tags(data: dict[str, Any], genre: str | None, country: str | None) -> 
         "composer": PERSON,
         "year": year or "",
         "comment": comment,
+        "publisher": PUBLISHER,
+        "copyright": PUBLISHER,
+        "language": languages or "",
     }
     return {k: v for k, v in tags.items() if v}
 
@@ -112,11 +129,16 @@ def _write_mp3(path: Path, tags: dict[str, str]) -> None:
         "album_artist": ("TPE2", id3.TPE2),
         "composer": ("TCOM", id3.TCOM),
         "year": ("TDRC", id3.TDRC),
+        "publisher": ("TPUB", id3.TPUB),
+        "copyright": ("TCOP", id3.TCOP),
     }
     for key, (name, cls) in frames.items():
         audio.delall(name)
         if key in tags:
             audio.add(cls(encoding=3, text=[tags[key]]))
+    audio.delall("TLAN")
+    if "language" in tags:
+        audio.add(id3.TLAN(encoding=3, text=tags["language"].split(",")))
     audio.delall("COMM")
     if "comment" in tags:
         audio.add(id3.COMM(encoding=3, lang="eng", desc="", text=[tags["comment"]]))
@@ -125,7 +147,7 @@ def _write_mp3(path: Path, tags: dict[str, str]) -> None:
 
 
 def _write_m4a(path: Path, tags: dict[str, str]) -> None:
-    from mutagen.mp4 import MP4
+    from mutagen.mp4 import MP4, MP4FreeForm
 
     audio = MP4(path)
     keys = {
@@ -137,14 +159,19 @@ def _write_m4a(path: Path, tags: dict[str, str]) -> None:
         "composer": "\xa9wrt",
         "year": "\xa9day",
         "comment": "\xa9cmt",
+        "copyright": "cprt",
+        "publisher": "----:com.apple.iTunes:PUBLISHER",
+        "language": "----:com.apple.iTunes:LANGUAGE",
     }
     if audio.tags is None:
         audio.add_tags()
     for key, atom in keys.items():
-        if key in tags:
-            audio.tags[atom] = [tags[key]]
-        else:
+        if key not in tags:
             audio.tags.pop(atom, None)
+        elif atom.startswith("----"):  # free-form atoms hold bytes
+            audio.tags[atom] = [MP4FreeForm(tags[key].encode("utf-8"))]
+        else:
+            audio.tags[atom] = [tags[key]]
     audio.tags.pop("trkn", None)
     audio.save()
 
@@ -162,6 +189,9 @@ def _write_wma(path: Path, tags: dict[str, str]) -> None:
         "composer": "WM/Composer",
         "year": "WM/Year",
         "comment": "Description",
+        "publisher": "WM/Publisher",
+        "copyright": "Copyright",
+        "language": "WM/Language",
     }
     for key, atom in keys.items():
         if key in tags:
@@ -194,7 +224,12 @@ def apply_tags(
     if ext not in FORMATS:
         return {"tags": {}, "written": False, "warning": None, "skipped": f"no tags for .{ext}"}
     cat = ref.matcher.by_name(data.get("category") or "") if data.get("category") else None
-    tags = build_tags(data, getattr(cat, "genre", None), country_for(data, ref.country_options))
+    tags = build_tags(
+        data,
+        getattr(cat, "genre", None),
+        country_for(data, ref.country_options),
+        language_codes(data.get("languages"), ref),
+    )
     result: dict[str, Any] = {"tags": tags, "written": False, "warning": None}
     if dry_run:
         return result

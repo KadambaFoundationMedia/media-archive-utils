@@ -35,7 +35,17 @@ def test_the_example_of_the_reference_file():
         "composer": "Kadamba Kanana Swami",
         "year": "2013",
         "comment": "2013-11-14, Vrindavan, India",
+        "publisher": "Kadamba Foundation",
+        "copyright": "Kadamba Foundation",
     }
+
+
+def test_language_is_the_two_letter_code():
+    from mam.tools.renamer.tags import language_codes
+
+    assert language_codes(["English"]) == "en"
+    assert language_codes(["English", "Dutch", "Klingon"]) == "en,nl"
+    assert build_tags(proposal(), None, None, "en")["language"] == "en"
 
 
 def test_album_is_the_canto_not_the_chapter():
@@ -100,6 +110,7 @@ def test_mp3_tags_are_overwritten_and_other_frames_kept(copy):
     assert str(out["TCON"]) == "Srimad Bhagavatam" and str(out["TDRC"]) == "2013"
     assert out.getall("COMM")[0].text == ["2013-11-14, Vrindavan, India"]
     assert "TRCK" not in out and out.getall("APIC")
+    assert str(out["TPUB"]) == str(out["TCOP"]) == "Kadamba Foundation"
 
 
 def test_m4a_tags(settings):
@@ -109,6 +120,7 @@ def test_m4a_tags(settings):
     write_tags(path, build_tags(proposal(), "Srimad Bhagavatam", "India"))
     tags = MP4(path).tags
     assert tags["\xa9alb"] == ["SB Canto 9"] and tags["\xa9day"] == ["2013"]
+    assert tags["cprt"] == ["Kadamba Foundation"]
 
 
 def test_video_is_not_tagged(settings):
