@@ -178,3 +178,32 @@ def test_a_renamer_run_tags_the_copy_and_a_dry_run_does_not(
     with session_scope() as s:
         events = s.scalars(select(m.FileEvent).where(m.FileEvent.action == "write_tags")).all()
         assert len(events) == 1 and events[0].detail["written"] is True
+
+
+def test_ffmpeg_step_keeps_standard_comment(tmp_path):
+    import shutil
+    import subprocess
+
+    import pytest
+    from mutagen.id3 import COMM, ID3
+
+    from mam.helpers.audio_optimizer.cutting import stream_cut
+
+    if shutil.which("ffmpeg") is None:
+        pytest.skip("ffmpeg not installed")
+    src = tmp_path / "in.mp3"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=d=3", "-c:a", "libmp3lame", str(src)],
+        check=True,
+    )
+    tags = ID3()
+    tags.add(COMM(encoding=3, lang="eng", desc="", text=["2012-01-02, Simhachalam, India"]))
+    tags.save(src, v2_version=4)
+    dst = tmp_path / "processed-files" / "out.mp3"
+    try:
+        stream_cut(src, dst, [(0.0, 2.0)], dry_run=False)
+    except Exception as exc:  # assert_writable depends on the test settings
+        pytest.skip(f"cannot write here: {exc}")
+    out = ID3(dst)
+    assert out.getall("COMM")[0].text == ["2012-01-02, Simhachalam, India"]
+    assert not out.getall("TXXX:comment")

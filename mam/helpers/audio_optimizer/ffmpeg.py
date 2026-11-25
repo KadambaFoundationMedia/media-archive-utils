@@ -115,3 +115,30 @@ def verify_decode(path: Path) -> list[str]:
     if proc.returncode != 0 and not errors:
         errors = [f"ffmpeg exited with {proc.returncode}"]
     return errors
+
+
+def keep_id3_comment(src: Path, dst: Path) -> None:
+    """Give the mp3 `dst` the standard Comment (COMM) frames of `src`.
+
+    ffmpeg copies a comment as a custom `TXXX:comment` frame, which players and taggers show as
+    a second, separate field. Best effort: a failure never fails the audio step.
+    """
+    if src.suffix.lower() != ".mp3" or dst.suffix.lower() != ".mp3":
+        return
+    try:
+        from mutagen.id3 import ID3, ID3NoHeaderError
+
+        try:
+            comments = [f for f in ID3(src).getall("COMM")]
+        except ID3NoHeaderError:
+            return
+        if not comments:
+            return
+        tags = ID3(dst)
+        tags.delall("COMM")
+        tags.delall("TXXX:comment")
+        for frame in comments:
+            tags.add(frame)
+        tags.save(dst, v2_version=4)
+    except Exception:  # noqa: BLE001 - tags are a courtesy here
+        return
