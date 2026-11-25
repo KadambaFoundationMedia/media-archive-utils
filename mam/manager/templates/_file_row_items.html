@@ -29,6 +29,7 @@
         <span class="ms-1 job-live text-nowrap" aria-label="{{ job.text }}">
           {% if job.running %}<i class="fa-solid fa-spinner fa-spin text-primary"></i>{% else %}<i class="fa-regular fa-clock text-body-secondary"></i>{% endif %}
           <span class="small text-body-secondary">{{ job.short }}{% if job.percent is not none %} {{ job.percent }}%{% endif %}</span>
+          <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-1 align-baseline" hx-post="/files/{{ f.id }}/stop" hx-swap="none" aria-label="Stop processing" data-bs-toggle="tooltip" data-bs-title="Stop processing"><i class="fa-solid fa-stop"></i></button>
         </span>
         {% endif %}</td>
       <td class="small text-nowrap">{{ f.rec_date or (proposal.when if proposal else '') or '' }}</td>

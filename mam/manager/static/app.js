@@ -126,10 +126,15 @@ function finishLiveFlash() {
   if (!flash || !poll || poll.dataset.active !== "0") return;
   flash.classList.replace("alert-info", "alert-success");
   flash.querySelector(".flash-spinner")?.setAttribute("hidden", "");
+  flash.querySelector(".flash-stop")?.setAttribute("hidden", "");
   flash.querySelectorAll(".flash-done, .flash-hint").forEach((el) => el.removeAttribute("hidden"));
 }
 document.body.addEventListener("htmx:oobAfterSwap", (event) => {
-  if (event.detail.target?.id === "nav-poll") finishLiveFlash();
+  if (event.detail.target?.id !== "nav-poll") return;
+  // the Stop icon in the navbar is only there while jobs are queued or running
+  const idle = event.detail.target.dataset.active === "0";
+  document.getElementById("nav-stop")?.toggleAttribute("hidden", idle);
+  finishLiveFlash();
 });
 
 // The message is shown once: a reload or a bookmark does not bring it back.

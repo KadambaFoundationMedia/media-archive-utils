@@ -48,7 +48,6 @@ from mam.statuses import (
     SPLITTER_SPLIT,
     SPLITTER_STATUSES,
     is_busy,
-    is_queued,
 )
 
 log = logging.getLogger(__name__)
@@ -703,23 +702,27 @@ def create_app(start_queue: bool = True) -> FastAPI:
         notify(request)
         return RedirectResponse("/jobs", status_code=303)
 
+    def _stop(request: Request, file_id: int | None = None) -> tuple[int, int]:
+        queue: JobQueue | None = getattr(request.app.state, "queue", None)
+        if queue is None:
+            queue = JobQueue(settings)  # no workers here (tests): queued jobs can still be stopped
+        return queue.cancel_jobs(file_id)
+
     @app.post("/jobs/cancel")
     def cancel_queued(request: Request):
-        with session_scope() as session:
-            for job in session.scalars(select(m.Job).where(m.Job.state == "queued")):
-                job.state = "cancelled"
-                if job.media_file_id and not job.dry_run and TOOLS[job.tool].sets_status:
-                    record = session.get(m.MediaFile, job.media_file_id)
-                    if is_queued(record.status):
-                        from mam.helpers.local_db.repo import set_status
-
-                        last = session.scalar(
-                            select(m.StatusHistory.old_status)
-                            .where(m.StatusHistory.media_file_id == record.id)
-                            .order_by(m.StatusHistory.id.desc())
-                        )
-                        set_status(session, record, last or "Not processed", job.tool, "cancelled")
+        """Stop all processing (the navbar, the live banner and the Jobs page)."""
+        _stop(request)
+        if request.headers.get("HX-Request"):
+            return Response(status_code=204)
         return RedirectResponse("/jobs", status_code=303)
+
+    @app.post("/files/{file_id}/stop")
+    def stop_file(request: Request, file_id: int):
+        """Stop the queued and running jobs of one file (the Stop icon in the file list)."""
+        _stop(request, file_id)
+        if request.headers.get("HX-Request"):
+            return Response(status_code=204)
+        return RedirectResponse(f"/details/{file_id}", status_code=303)
 
     # ---------------------------------------------------------------- import
     @app.get("/import", response_class=HTMLResponse)

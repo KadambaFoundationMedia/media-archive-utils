@@ -2,7 +2,8 @@
 
 The job queue installs a reporter for the thread that runs a job; any tool or helper below it
 calls `report("Transcribing, part 3 of 14", 0.2)` without knowing about jobs. Outside a job
-(the command line, tests) `report` does nothing.
+(the command line, tests) `report` does nothing. A report is also the safe point where a job
+the operator stopped ends: the reporter raises `JobCancelled` there (queue.py).
 """
 
 from __future__ import annotations
