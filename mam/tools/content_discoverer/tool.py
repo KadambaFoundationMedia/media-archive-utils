@@ -3,8 +3,8 @@
 Decisions (Edwin, 2026-11-24, see SPEC.md section 4):
 - The Claude API writes the text (pluggable provider, results cached by input and prompt version).
 - Existing themes or descriptions in Baserow are never overwritten: a difference goes to review.
-- The first N results (Settings: content_review_first, 20) go to review, then it works alone,
-  with the 5% random check.
+- The first N results (Settings: content_review_first, default 0 = never) go to review, then
+  it works alone, with the 5% random check.
 """
 
 from __future__ import annotations

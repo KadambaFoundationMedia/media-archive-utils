@@ -16,6 +16,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
 
 ### Changed
+- Content discoverer: "Results checked first" is 0 by default, so no result is forced into review (a reset started the count again).
 - Content discoverer titles: 6 words at most, a 7th only when the grammar needs it (a 7-word title no longer goes to review). New prompt version, so earlier answers are asked again.
 - A tool no longer starts on a file while an earlier tool's review of that file is still open (for example the Content discoverer on a file the Kirtan splitter flagged). The Action menu says how many files were not queued.
 - The Class discoverer's loudness step now runs as its own job on the CPU pool (many files at once) and queues the transcription, which stays one at a time on the ML pool. Loudness no longer waits behind a transcription.
