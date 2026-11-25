@@ -297,6 +297,9 @@ def test_review_page_through_the_portal(prepared, monkeypatch):
         )
         assert done.status_code == 303
         assert client.get("/settings").status_code == 200
+        after = client.get(f"/details/{rid}").text
+        assert "Themes, title and description" in after
+        assert "Use time well" in after and "A." in after and "Time" in after
     with session_scope() as s:
         assert s.get(m.Review, review_id).outcome == "edited"
         assert s.get(m.MediaFile, rid).status == "Content discoverer Done"

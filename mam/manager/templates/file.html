@@ -45,6 +45,21 @@
 </div>
 {% endif %}
 
+{% set cd = (f.meta or {}).get('content_discoverer') %}
+{% if cd and review_tool != 'content-discoverer' %}
+{% set shown = cd.get('approved') or cd %}
+<div class="card mb-3">
+  <div class="card-header"><i class="fa-solid fa-align-left me-1"></i>Themes, title and description{% if cd.get('approved') %}<span class="float-end small text-body-secondary">approved</span>{% endif %}</div>
+  <div class="card-body small">
+    <div class="mb-2"><strong>Themes:</strong> {{ (shown.get('topics') or []) | join(', ') or '–' }}</div>
+    <div class="mb-2"><strong>Title:</strong> {{ shown.get('title') or '–' }}{% if cd.get('verse_url') %} · <a href="{{ cd.verse_url }}" target="_blank" rel="noopener">{{ cd.verse }} on vedabase.io</a>{% endif %}</div>
+    <div class="mb-1"><strong>YouTube description</strong></div>
+    <div style="white-space: pre-wrap">{{ shown.get('description') or cd.get('description') or '–' }}</div>
+    {% if cd.get('footer') %}<div class="border-start ps-2 mt-2 text-body-secondary" style="white-space: pre-wrap">{{ cd.footer }}</div>{% endif %}
+  </div>
+</div>
+{% endif %}
+
 {% if not review_tool %}
 <form method="post" action="/actions" class="card mb-3 run-card">
       <div class="card-header">Run a tool on this file</div>
