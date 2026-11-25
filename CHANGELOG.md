@@ -8,7 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Added
-- Stop icon ("Stop processing") in the top bar, in the live message about queued work and next to each file in the list that has a queued or running job (also on the file page): queued jobs are cancelled at once, a running job ends at the start of its next step, and the file gets its earlier status back. The Jobs page's cancel button now stops running jobs too.
+- Stop icon ("Stop processing") in the live message about queued work, next to each file in the list that is being processed, on the file page and on the Jobs page: queued jobs are cancelled at once, a running job ends right away (also during ffmpeg or the transcription) without leaving half-written files, and the file gets its earlier status back.
 - File details page: after the Content discoverer ran, the themes and the YouTube description are editable fields in the Name and media table form (growing textarea, footer with the current year); Save stores them and writes them to the Baserow row.
 - Renamer: the ID3 tags also get Publisher (Kadamba Foundation), Copyright (the recording's year and Kadamba Foundation, as ID3 requires: `2015 Kadamba Foundation`) and the Language as an ISO 639-2 code (`eng`).
 - Renamer: writes ID3 tags (title, artist, album, genre, album artist, composer, year, comment) to the processed copy of mp3, m4a and wma files, and updates them whenever the file is renamed again. The genre comes from the new `idv3_genre` column of `category_terms_folder`.
@@ -16,6 +16,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
 
 ### Changed
+- The live message about queued work says which tool is doing what while it runs, for example `Kirtan splitter: listening to the recording (music or speech)` or `Renamer: copying and renaming the file`, with the file's name and how many jobs wait. The Renamer now reports its steps, and the Stop and close icons are level with the text.
 - Nothing is written to Baserow while the Baserow writes switch is off: this now also holds for saves and approvals on the file page (Renamer, Content discoverer, and adding a place to place_country). They are only logged and the values are kept in the local database. Before, a person's save or approval wrote live and could replace existing values.
 - Content discoverer: "Results checked first" is 0 by default, so no result is forced into review (a reset started the count again).
 - Content discoverer titles: 6 words at most, a 7th only when the grammar needs it (a 7-word title no longer goes to review). New prompt version, so earlier answers are asked again.

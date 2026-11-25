@@ -25,6 +25,7 @@ from mam.helpers.local_db.app_settings import (
 )
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
+from mam.helpers.progress import report
 from mam.helpers.transcriber import follow_audio
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.tools.renamer.dates import DateValue, set_min_year
@@ -402,6 +403,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
         approved = latest_approval(ctx.session, record.id)
         if approved is not None:
             confirmed = {**approved.final, "by": approved.operator}
+    report("Reading the name, folders and tags")
     res = resolver(settings)
     # The name evidence comes from the import path; the file itself (ID3 tags) is read from
     # wherever it is now, because a move or the postfix may have changed its location.
@@ -429,6 +431,10 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
     ctx.session.commit()
     organizer = FileOrganizer(res.ref.matcher, settings)
     move_files, postfix = renamer_move_files(), renamer_postfix()
+    if ctx.dry_run:
+        report("Working out the new name")
+    else:  # the last point where a stopped job may end: nothing has been changed yet
+        report(f"{'Moving' if move_files else 'Copying'} and renaming the file")
     origin = Path(record.original_path)
     folder, _ = organizer.target_folder(folder_what, proposal.category, origin)
     unique, other = reserve_name(record.id, folder, proposal.new_name)
@@ -461,6 +467,8 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
             f"Same name and size as an existing file; saved as {placed.dst.name}."
         )
     data = proposal.to_dict(dry_run=ctx.dry_run, final_name=placed.dst.name, target=str(placed.dst))
+    if not ctx.dry_run:
+        report("Writing the ID3 tags", safe_to_stop=False)
     tagged = apply_tags(
         placed.dst, data, res.ref, dry_run=ctx.dry_run, media_file_id=record.id, tool=TOOL
     )
@@ -513,6 +521,7 @@ def run_renamer(ctx: JobContext) -> ToolOutcome:
                     )
                 )
         if not proposal.flags:
+            report("Writing the Baserow row", safe_to_stop=False)
             data["baserow"] = write_baserow(record, data, placed.dst, settings, dry_run=False)
     else:
         data["baserow"] = {

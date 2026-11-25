@@ -1213,3 +1213,175 @@ def test_stop_during_the_gain_encode_leaves_no_temporary_file(tmp_path, monkeypa
     with pytest.raises(JobCancelled):
         gain_mod.apply_gain(None, None, audio, None, dry_run=False)
     assert [p.name for p in audio.parent.iterdir()] == ["x.mp3"]
+
+
+# ------------------------------------------------------------- what the running job is doing
+def _spy_steps(monkeypatch):
+    steps: list[str] = []
+    real = JobQueue._reporter
+
+    def spy(self, job_id):
+        write = real(self, job_id)
+
+        def record(step, fraction):
+            steps.append(step)
+            write(step, fraction)
+
+        return record
+
+    monkeypatch.setattr(JobQueue, "_reporter", spy)
+    return steps
+
+
+def _import_one(client, name):
+    client.post("/import", data={"root": 0, "path": ""}, follow_redirects=False)
+    run_queue()
+    with session_scope() as s:
+        return next(f.id for f in s.scalars(select(m.MediaFile)) if f.original_path.endswith(name))
+
+
+CLEAN = "KKS_S.B. 1.19.30_28.8.11_Oslo_ .mp3"
+
+
+@pytest.mark.parametrize(
+    ("dry_run", "expected"),
+    [
+        (
+            False,
+            [
+                "Reading the name, folders and tags",
+                "Copying and renaming the file",
+                "Writing the ID3 tags",
+                "Writing the Baserow row",
+            ],
+        ),
+        (True, ["Reading the name, folders and tags", "Working out the new name"]),
+    ],
+)
+def test_the_renamer_says_what_it_is_doing(
+    client, archive, reference, no_baserow, monkeypatch, dry_run, expected
+):
+    file_id = _import_one(client, CLEAN)
+    steps = _spy_steps(monkeypatch)
+    with session_scope() as s:
+        enqueue(s, "renamer", [file_id], dry_run=dry_run)
+    run_queue()
+    assert steps == expected
+
+
+def test_stop_before_the_renamer_copies_changes_nothing(
+    client, archive, reference, no_baserow, settings, monkeypatch
+):
+    from mam.tools.renamer import tool as renamer
+
+    file_id = _import_one(client, CLEAN)
+    queue = JobQueue()
+    real = renamer.resolver
+
+    def stop_then_resolve(*args):
+        queue.cancel_jobs(file_id)  # pressed while the name is being read
+        return real(*args)
+
+    monkeypatch.setattr(renamer, "resolver", stop_then_resolve)
+    with session_scope() as s:
+        enqueue(s, "renamer", [file_id], dry_run=False)
+    job_id = queue.claim("io")
+    queue.execute(job_id)
+    assert not [p for p in settings.media_processed_files_path.rglob("*") if p.is_file()]
+    with session_scope() as s:
+        assert s.get(m.Job, job_id).state == "cancelled"
+        assert s.get(m.MediaFile, file_id).processed_path is None
+
+
+def test_stop_after_the_renamer_copied_lets_it_finish(
+    client, archive, reference, no_baserow, monkeypatch
+):
+    from mam.tools.renamer import tool as renamer
+
+    file_id = _import_one(client, CLEAN)
+    queue = JobQueue()
+    real = renamer.apply_tags
+
+    def stop_then_tag(*args, **kwargs):
+        queue.cancel_jobs(file_id)  # pressed after the file was copied
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(renamer, "apply_tags", stop_then_tag)
+    with session_scope() as s:
+        enqueue(s, "renamer", [file_id], dry_run=False)
+    job_id = queue.claim("io")
+    queue.execute(job_id)
+    with session_scope() as s:
+        assert s.get(m.Job, job_id).state == "done"  # copied, so its record is completed
+        assert s.get(m.MediaFile, file_id).processed_path
+    assert len(no_baserow) == 1
+
+
+def test_a_new_step_is_shown_at_once(settings):
+    with session_scope() as s:
+        s.add(m.Job(tool="renamer", pool="io", state="running"))
+    with session_scope() as s:
+        job_id = s.scalar(select(m.Job.id))
+    write = JobQueue()._reporter(job_id)
+    write("Step one", None)
+    write("Step two", None)  # right after: it must not be swallowed
+    with session_scope() as s:
+        assert s.get(m.Job, job_id).step == "Step two"
+
+
+def _banner(page):
+    return page[page.index('id="flash-activity"') :].split('class="flash-stop')[0]
+
+
+def test_the_banner_says_which_tool_is_doing_what(client, archive):
+    first, second = _queue_renamer(client)
+    live = {"msg": "Full pipeline: 2 file(s) queued", "live": "1"}
+    waiting = client.get("/jobs/activity").text
+    assert "2 waiting in the queue" in waiting and 'hx-get="/jobs/activity"' in waiting
+    job_id = JobQueue().claim("io")
+    with session_scope() as s:
+        s.get(m.Job, job_id).step = "Copying and renaming the file"
+        name = s.get(m.MediaFile, first).original_path.rsplit("/", 1)[-1]
+    for text in (client.get("/jobs/activity").text, _banner(client.get("/", params=live).text)):
+        assert "Renamer: copying and renaming the file" in text
+        assert name.replace("&", "&amp;") in text and "1 waiting in the queue" in text
+    assert "Full pipeline: 2 file(s) queued" in client.get("/", params=live).text
+
+
+def test_the_banner_activity_shows_progress_and_stops_asking_when_idle(client, settings):
+    with session_scope() as s:
+        s.add(
+            m.Job(
+                tool="class-loudness",
+                pool="cpu",
+                state="running",
+                dry_run=False,
+                step="Measuring and adjusting the loudness",
+                progress=0.02,
+            )
+        )
+    text = client.get("/jobs/activity").text
+    assert "Class discoverer: measuring and adjusting the loudness (2%)" in text
+    with session_scope() as s:
+        s.execute(update(m.Job).values(state="done"))
+    idle = client.get("/jobs/activity").text
+    assert "hx-get" not in idle and "Class discoverer" not in idle
+
+
+def test_the_live_banner_centres_its_stop_icon_with_the_text(client, archive):
+    _queue_renamer(client)
+    page = client.get("/", params={"msg": "x", "live": "1"}).text
+    opening = page[: page.index('id="flash-live"')].rsplit("<div", 1)[1]
+    opening += page[page.index('id="flash-live"') :].split(">", 1)[0]
+    assert "d-flex" in opening and "align-items-center" in opening
+
+
+def test_short_steps_of_the_renamer():
+    from mam.manager.queries import short_step
+
+    assert short_step("Reading the name, folders and tags") == "Reading"
+    assert short_step("Copying and renaming the file") == "Copying"
+    assert short_step("Moving and renaming the file") == "Moving"
+    assert short_step("Writing the ID3 tags") == "Tags"
+    assert short_step("Writing the Baserow row") == "Baserow"
+    assert short_step("Working out the new name") == "Naming"

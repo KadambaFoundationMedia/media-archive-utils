@@ -21,10 +21,16 @@ Reporter = Callable[[str, float | None], None]
 _reporter: ContextVar[Reporter | None] = ContextVar("mam_progress_reporter", default=None)
 
 
-def report(step: str, fraction: float | None = None) -> None:
-    """Say what the job is doing now; `fraction` (0 to 1) is how far the whole job is."""
+def report(step: str, fraction: float | None = None, *, safe_to_stop: bool = True) -> None:
+    """Say what the job is doing now; `fraction` (0 to 1) is how far the whole job is.
+
+    Pass `safe_to_stop=False` for a step that comes after files were changed: a stopped job
+    must finish there, so that the change is recorded.
+    """
     reporter = _reporter.get()
-    if reporter is not None:
+    if reporter is None:
+        return
+    with contextlib.nullcontext() if safe_to_stop else uninterruptible():
         reporter(step, None if fraction is None else max(0.0, min(1.0, fraction)))
 
 
@@ -92,6 +98,11 @@ def uninterruptible() -> Iterator[None]:
         yield
     finally:
         _protected.reset(token)
+
+
+def is_protected() -> bool:
+    """Inside a stretch of work that a stopped job must finish."""
+    return _protected.get()
 
 
 def check_cancelled() -> None:

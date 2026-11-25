@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from mam.config import Settings
 from mam.helpers.local_db import models as m
+from mam.helpers.progress import report
 
 # Full processing order (CONTRACTS.md). Tools not built yet are skipped by the pipeline.
 PIPELINE_ORDER = [
@@ -59,6 +60,7 @@ class ToolSpec:
 def _scan(ctx: JobContext) -> ToolOutcome:
     from mam.manager.scanner import scan_folder
 
+    report("Looking for media files in the folder")
     result = scan_folder(ctx.session, Path(ctx.params["path"]))
     return ToolOutcome(
         "info",

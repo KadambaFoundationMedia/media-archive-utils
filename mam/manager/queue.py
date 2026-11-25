@@ -23,7 +23,13 @@ from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import tuned
 from mam.helpers.local_db.db import session_scope
 from mam.helpers.local_db.repo import set_status
-from mam.helpers.progress import bound_job, clear_cancel, reporting, request_cancel
+from mam.helpers.progress import (
+    bound_job,
+    clear_cancel,
+    is_protected,
+    reporting,
+    request_cancel,
+)
 from mam.manager.tools import PIPELINE_ORDER, TOOLS, JobContext, ToolOutcome, next_in_pipeline
 from mam.statuses import PROCESSING, QUEUED, is_busy
 
@@ -388,20 +394,23 @@ class JobQueue:
             _restore_status(session, follower)
 
     def _reporter(self, job_id: int):
-        """Writes what the running job is doing to the job row, a few times a second at most.
+        """Writes what the running job is doing to the job row: a new step at once, progress
+        within a step a few times a second at most.
 
         It uses its own short transaction and never fails the job: a busy database only means
         one update is skipped.
         """
-        last = [0.0]
+        last: list = [0.0, None]  # when and which step was written last
 
         def write(step: str, fraction: float | None) -> None:
             if job_id in self.stop_requested:
-                raise JobCancelled("Stopped by the operator")
+                if not is_protected():
+                    raise JobCancelled("Stopped by the operator")
+                return  # it has to finish first; the row keeps saying "Stopping"
             moment = time.monotonic()
-            if moment - last[0] < 0.3:
-                return
-            last[0] = moment
+            if step == last[1] and moment - last[0] < 0.3:
+                return  # only the percentage moved: not worth a write
+            last[:] = moment, step
             try:
                 with session_scope() as session:
                     session.execute(

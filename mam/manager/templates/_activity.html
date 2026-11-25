@@ -1,0 +1,9 @@
+{# The live message's "which tool is doing what". It asks again every second while jobs are queued
+   or running; the last answer (nothing left) has no trigger, so it stops. #}
+<div id="flash-activity"{% if activity.running or activity.waiting %} hx-get="/jobs/activity" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  {% for j in activity.running %}
+  <div class="fw-semibold">{{ j.text }}{% if j.file %} <span class="fw-normal small text-body-secondary text-break ms-1">{{ j.file }}</span>{% endif %}</div>
+  {% endfor %}
+  {% if activity.more %}<div class="small">and {{ activity.more }} more running</div>{% endif %}
+  {% if activity.waiting %}<div class="small text-body-secondary">{{ activity.waiting }} waiting in the queue</div>{% endif %}
+</div>
