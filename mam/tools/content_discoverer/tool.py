@@ -202,9 +202,9 @@ def write_content(
     live: bool = False,
     overwrite: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
-    """Fill the media row's themes, description and youtube_desc. Runs follow the "Baserow
-    writes" switch; an approval (`live`) always writes. Only empty fields are filled; a field
-    in `overwrite` was chosen by a person."""
+    """Fill the media row's themes, description and youtube_desc. Everything follows the "Baserow
+    writes" switch (decided 2026-11-25), approvals included; `live` forces a write. Only
+    empty fields are filled; a field in `overwrite` was chosen by a person."""
     from mam.helpers.baserow import BaserowClient
     from mam.helpers.local_db.app_settings import baserow_writes_enabled
 
@@ -522,7 +522,7 @@ def save_content_edit(
         values,
         settings,
         dry_run=False,
-        live=True,
+        live=False,
         overwrite=frozenset(k for k, v in changed.items() if v),
     )
     return f"Themes and description: {baserow_summary(baserow)}"
@@ -571,7 +571,7 @@ def decide_review(
         values,
         settings,
         dry_run=False,
-        live=True,
+        live=False,
         overwrite=overwrite,
     )
     meta = dict(record.meta or {})
