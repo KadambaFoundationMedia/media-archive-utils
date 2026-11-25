@@ -51,6 +51,9 @@ def test_unusable_place_country_rows_are_reported():
 
 
 def test_saving_a_place_and_country_adds_a_place_country_row(client, imported, no_baserow):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
     file_id = imported["R09_0004.MP3"]
     response = client.post(
         f"/files/{file_id}/edit",
@@ -75,6 +78,9 @@ def test_saving_a_place_and_country_adds_a_place_country_row(client, imported, n
 def test_saving_fills_an_empty_row_and_never_changes_another_country(
     client, imported, no_baserow, reference
 ):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
     reference.place_rows["lutotin"] = {
         "id": 7,
         "place": "Lutotin",

@@ -16,7 +16,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 - The CPU and copy workers scale automatically with the computer's load (Settings: "Scale CPU and copy workers automatically", on by default): one more worker while there is spare CPU and memory and jobs wait, one fewer when it is busy. The worker counts are the maximum.
 
 ### Changed
-- Content discoverer: approving a review and saving the themes or description now follow the Baserow writes switch. With the switch off nothing is written to Baserow (it is only logged and kept with the file); before, they wrote live and could replace existing values.
+- Nothing is written to Baserow while the Baserow writes switch is off: this now also holds for saves and approvals on the file page (Renamer, Content discoverer, and adding a place to place_country). They are only logged and the values are kept in the local database. Before, a person's save or approval wrote live and could replace existing values.
 - Content discoverer: "Results checked first" is 0 by default, so no result is forced into review (a reset started the count again).
 - Content discoverer titles: 6 words at most, a 7th only when the grammar needs it (a 7-word title no longer goes to review). New prompt version, so earlier answers are asked again.
 - A tool no longer starts on a file while an earlier tool's review of that file is still open (for example the Content discoverer on a file the Kirtan splitter flagged). The Action menu says how many files were not queued.
