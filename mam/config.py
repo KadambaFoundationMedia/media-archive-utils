@@ -91,7 +91,7 @@ class Settings(BaseSettings):
     llm_timeout_s: float = 300.0
     # Content discoverer: its first N results are reviewed before it works on its own, and
     # the YouTube footer comes from this file ({year} is the current year).
-    content_review_first: int = 20
+    content_review_first: int = 0
     content_footer_path: Path = REPO_ROOT / "docs" / "references" / "youtube-footer.txt"
     # Settings page, block "Content discoverer": a footer typed there wins over the file; themes
     # that are too broad are never used; prices (USD per million tokens) only for the cost shown.
