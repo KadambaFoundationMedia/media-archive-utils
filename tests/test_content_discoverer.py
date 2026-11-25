@@ -300,11 +300,26 @@ def test_review_page_through_the_portal(prepared, monkeypatch):
         assert done.status_code == 303
         assert client.get("/settings").status_code == 200
         after = client.get(f"/details/{rid}").text
-        assert "Themes, title and description" in after
-        assert "Use time well" in after and "A." in after and "Time" in after
+        assert 'name="topics" value="Time"' in after
+        assert "<textarea" in after and "A.\n\nB." in after
+        assert "<current year>" not in after
     with session_scope() as s:
         assert s.get(m.Review, review_id).outcome == "edited"
         assert s.get(m.MediaFile, rid).status == "Content discoverer Done"
+
+
+def test_edit_on_the_file_page_is_kept_with_the_results(prepared):
+    from mam.tools.content_discoverer.tool import save_content_edit, stored_results
+
+    rid, _ = prepared()
+    run(rid)
+    with session_scope() as s:
+        record = s.get(m.MediaFile, rid)
+        msg = save_content_edit(record, "Time, Service", "New text.", "Edwin", write=False)
+        assert "Baserow not changed" in msg
+        shown = stored_results(record)
+        assert shown["topics"] == ["Time", "Service"] and shown["description"] == "New text."
+        assert save_content_edit(record, "Time, Service", "New text.", "Edwin", write=False) is None
 
 
 # ------------------------------------------------------- review remarks of 2026-11-24

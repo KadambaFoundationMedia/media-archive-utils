@@ -6,7 +6,7 @@ import logging
 import re
 import shutil
 from contextlib import asynccontextmanager
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -271,6 +271,7 @@ def create_app(start_queue: bool = True) -> FastAPI:
         from mam.helpers.local_db.app_settings import baserow_writes_enabled
 
         context["baserow_on"] = baserow_writes_enabled()
+        context["now_year"] = str(datetime.now().year)
         context["code_changed"] = stale.code_changed()
         with session_scope() as session:
             context.setdefault("counts", queries.counts(session))

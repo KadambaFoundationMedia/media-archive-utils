@@ -471,6 +471,63 @@ def stored_results(record: m.MediaFile) -> dict[str, Any] | None:
     return shown
 
 
+def save_content_edit(
+    record: m.MediaFile, topics: str, description: str, operator: str, write: bool = True
+) -> str | None:
+    """A person's edit of the themes or description on the file details page: stored with the
+    results and written to the media row live (a person's decision, like an approval). Returns
+    a short message, or None when nothing changed or there are no results. With `write` false
+    (the form's "Do not create row") only the stored results change."""
+    from mam.config import get_settings
+    from mam.helpers.local_db.app_settings import tuned
+
+    shown = stored_results(record)
+    if not shown:
+        return None
+    new_topics = [t.strip() for t in topics.replace("\n", ",").split(",") if t.strip()]
+    body = description.strip()
+    old_topics = list(shown.get("topics") or [])
+    old_body = (shown.get("description") or "").strip()
+    changed = {
+        "themes": new_topics != old_topics and bool(new_topics),
+        "media_description": body != old_body and bool(body),
+    }
+    if not any(changed.values()):
+        return None
+    settings = tuned(get_settings())
+    meta = dict(record.meta or {})
+    cd = dict(meta.get("content_discoverer") or {})
+    approved = dict(cd.get("approved") or {})
+    approved.update({"topics": new_topics or old_topics, "title": shown.get("title")})
+    approved["description"] = body or old_body
+    approved["not_replaced"] = []
+    cd["approved"] = approved
+    meta["content_discoverer"] = cd
+    record.meta = meta
+    values = {
+        "themes": ", ".join(approved["topics"]),
+        "media_description": youtube_description(
+            approved["description"],
+            settings.content_footer_path,
+            None,
+            settings.content_footer,
+        ),
+        "youtube_desc": True,
+        "notes": f"Content discoverer: edited by {operator}",
+    }
+    if not write:
+        return "Themes and description saved with the file, Baserow not changed"
+    baserow = write_content(
+        record,
+        values,
+        settings,
+        dry_run=False,
+        live=True,
+        overwrite=frozenset(k for k, v in changed.items() if v),
+    )
+    return f"Themes and description: {baserow_summary(baserow)}"
+
+
 # -------------------------------------------------------------------- reviews
 def decide_review(
     session: Session,
