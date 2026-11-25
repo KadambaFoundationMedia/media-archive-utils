@@ -1,4 +1,5 @@
 <div {% if active %}hx-get="/jobs/rows?state={{ state }}" hx-trigger="every 2s" hx-target="#job-table" hx-swap="innerHTML"{% endif %}>
+{% if active %}<form method="post" action="/jobs/cancel" class="mb-2"><button class="btn-stop" type="submit" aria-label="Stop processing" data-bs-toggle="tooltip" data-bs-title="Stop processing"><i class="fa-solid fa-circle-stop"></i></button></form>{% endif %}
 <div class="table-responsive">
 <table class="table table-sm align-middle small">
   <thead><tr><th>#</th><th>Tool</th><th>File</th><th>State</th><th>Result</th><th>Created</th><th></th></tr></thead>

@@ -25,6 +25,7 @@ import numpy as np
 
 from mam.errors import MamError
 from mam.helpers.audio_optimizer.ffmpeg import binary
+from mam.helpers.progress import check_cancelled, kill_on_stop
 from mam.tools.kirtan_splitter.audio import parse_silences, silence_filter
 from mam.tools.kirtan_splitter.detect import (
     CLASS_CONFIRM_S,
@@ -89,6 +90,7 @@ def speech_profile(path: Path) -> list[float | None]:
     cmd = [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-i", str(path)]
     cmd += ["-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    kill_on_stop(proc.kill)  # the Stop button ends the decode at once
     assert proc.stdout is not None
     model = _Model()
     probs: list[float] = []
@@ -104,7 +106,9 @@ def speech_profile(path: Path) -> list[float | None]:
         probs.extend(model(samples[i : i + CHUNK]) for i in range(0, len(samples), CHUNK))
         pending = pending[usable:]
     err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
-    if proc.wait() != 0:
+    code = proc.wait()
+    check_cancelled()
+    if code != 0:
         raise MamError(f"ffmpeg could not decode {path.name}: {err[-500:]}")
     return probabilities_to_profile(probs)
 
@@ -145,6 +149,7 @@ def sound_profile(path: Path) -> Sound:
     cmd = [binary("ffmpeg"), "-hide_banner", "-loglevel", "error", "-i", str(path)]
     cmd += ["-map", "0:a:0", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    kill_on_stop(proc.kill)  # the Stop button ends the decode at once
     assert proc.stdout is not None
     level: list[float] = []
     high: list[float] = []
@@ -161,7 +166,9 @@ def sound_profile(path: Path) -> Sound:
         high.extend(part.high)
         pending = pending[usable:]
     err = proc.stderr.read().decode(errors="replace") if proc.stderr else ""
-    if proc.wait() != 0:
+    code = proc.wait()
+    check_cancelled()
+    if code != 0:
         raise MamError(f"ffmpeg could not decode {path.name}: {err[-500:]}")
     return Sound(level, high)
 
@@ -200,6 +207,7 @@ def analyse_audio(path: Path, duration: float | None = None, early_stop: bool = 
     stopped = False
     with tempfile.TemporaryFile() as log:  # silencedetect writes its report to stderr
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=log)
+        kill_on_stop(proc.kill)
         assert proc.stdout is not None
         vad_pending = sec_pending = b""
         while raw := proc.stdout.read(vad_step * 2000):  # about a minute at a time
@@ -223,6 +231,7 @@ def analyse_audio(path: Path, duration: float | None = None, early_stop: bool = 
                 proc.kill()
                 break
         code = proc.wait()
+        check_cancelled()
         proc.stdout.close()
         log.seek(0)
         text = log.read().decode(errors="replace")

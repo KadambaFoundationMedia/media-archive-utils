@@ -270,3 +270,15 @@
 .mam-res .progress { width: 3.5rem; height: .5rem; }
 .mam-res-value { min-width: 2.6rem; font-variant-numeric: tabular-nums; }
 .mam-res-label { min-width: 2.2rem; font-weight: 600; letter-spacing: .02em; }
+
+/* Stop processing: a red circle-stop icon, no button frame (file list, live message, Jobs page) */
+.btn-stop {
+  background: none;
+  border: 0;
+  padding: 0 0.15rem;
+  line-height: 1;
+  font-size: 1.15rem;
+  color: var(--bs-danger);
+  cursor: pointer;
+}
+.btn-stop:hover, .btn-stop:focus-visible { color: var(--bs-danger-text-emphasis, var(--bs-danger)); transform: scale(1.12); }

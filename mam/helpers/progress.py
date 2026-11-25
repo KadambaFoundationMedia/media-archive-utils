@@ -8,9 +8,13 @@ the operator stopped ends: the reporter raises `JobCancelled` there (queue.py).
 
 from __future__ import annotations
 
+import contextlib
+import threading
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+
+from mam.errors import JobCancelled
 
 Reporter = Callable[[str, float | None], None]
 
@@ -31,3 +35,90 @@ def reporting(reporter: Reporter) -> Iterator[None]:
         yield
     finally:
         _reporter.reset(token)
+
+
+# ---------------------------------------------------------------- stopping a running job
+# The operator's Stop button asks a running job to end. Work that waits on an outside program
+# (ffmpeg, whisper, the transcription child process) registers how to kill it with `killable`,
+# so Stop does not have to wait for the step to finish. The program is killed, the job ends with
+# `JobCancelled`, and every writer works on a temporary file first (renamed only when complete),
+# so no half-written file is left behind.
+
+_job_id: ContextVar[int | None] = ContextVar("mam_job_id", default=None)
+_cancelled: set[int] = set()
+_kill_hooks: dict[int, set[Callable[[], None]]] = {}
+_lock = threading.Lock()
+
+
+@contextmanager
+def bound_job(job_id: int) -> Iterator[None]:
+    """Mark the current thread as running job `job_id` (the queue does this)."""
+    token = _job_id.set(job_id)
+    try:
+        yield
+    finally:
+        _job_id.reset(token)
+
+
+def request_cancel(job_id: int) -> None:
+    """Ask job `job_id` to stop and kill the outside programs it is waiting for."""
+    with _lock:
+        _cancelled.add(job_id)
+        hooks = list(_kill_hooks.get(job_id, ()))
+    for hook in hooks:
+        with contextlib.suppress(Exception):  # the program may already be gone
+            hook()
+
+
+def is_cancelled(job_id: int) -> bool:
+    return job_id in _cancelled
+
+
+def clear_cancel(job_id: int) -> None:
+    with _lock:
+        _cancelled.discard(job_id)
+        _kill_hooks.pop(job_id, None)
+
+
+def check_cancelled() -> None:
+    """Raise `JobCancelled` when the running job was stopped (does nothing outside a job)."""
+    job_id = _job_id.get()
+    if job_id is not None and job_id in _cancelled:
+        raise JobCancelled("Stopped by the operator")
+
+
+def kill_on_stop(kill: Callable[[], None]) -> None:
+    """Like `killable`, without a block: `kill` stays registered until the job ends (killing a
+    program that has already finished does nothing). Pair it with `check_cancelled()`."""
+    job_id = _job_id.get()
+    if job_id is None:
+        return
+    with _lock:
+        _kill_hooks.setdefault(job_id, set()).add(kill)
+        already = job_id in _cancelled
+    if already:
+        kill()
+
+
+@contextmanager
+def killable(kill: Callable[[], None]) -> Iterator[None]:
+    """While the block runs, Stop calls `kill` (it must end the program the block waits for).
+
+    When the job was stopped, leaving the block raises `JobCancelled`, so a program that was
+    killed never passes for one that failed or finished.
+    """
+    job_id = _job_id.get()
+    if job_id is None:
+        yield
+        return
+    with _lock:
+        _kill_hooks.setdefault(job_id, set()).add(kill)
+        already = job_id in _cancelled
+    try:
+        if already:
+            kill()
+        yield
+    finally:
+        with _lock:
+            _kill_hooks.get(job_id, set()).discard(kill)
+    check_cancelled()

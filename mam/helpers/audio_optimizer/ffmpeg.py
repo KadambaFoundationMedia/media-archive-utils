@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mam.errors import CorruptedMedia, MamError
+from mam.helpers.progress import killable
 
 
 def binary(name: str) -> str:
@@ -21,7 +22,17 @@ def binary(name: str) -> str:
 
 
 def run(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    popen = subprocess.Popen(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    with killable(popen.kill):  # the Stop button ends the program at once
+        out, err = popen.communicate()
+    proc = subprocess.CompletedProcess(args, popen.returncode, out, err)
     if check and proc.returncode != 0:
         raise MamError(
             f"{Path(args[0]).name} failed ({proc.returncode}): {proc.stderr.strip()[-2000:]}"

@@ -15,14 +15,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mam.config import Settings, get_settings
-from mam.errors import MamError
+from mam.errors import JobCancelled, MamError
 from mam.helpers.audio_optimizer import probe, stream_cut
 from mam.helpers.file_organizer import FileOrganizer
 from mam.helpers.file_organizer.organizer import assert_writable
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.hashing import fingerprint, sha256
 from mam.helpers.local_db.repo import record_event, register_derived, set_status
-from mam.helpers.progress import report
+from mam.helpers.progress import check_cancelled, report
 from mam.manager.tools import JobContext, ToolOutcome
 from mam.statuses import SPLITTER_CLASS, SPLITTER_KIRTAN, SPLITTER_NOT_SPLIT, SPLITTER_SPLIT
 from mam.tools.kirtan_splitter import phrases
@@ -88,7 +88,16 @@ def run_analysis(
         _executor = ProcessPoolExecutor(
             max_workers=max(1, settings.workers_cpu), mp_context=get_context("spawn")
         )
-    return _executor.submit(analyse_audio, audio, duration, early_stop).result()
+    future = _executor.submit(analyse_audio, audio, duration, early_stop)
+    while True:
+        try:
+            return future.result(timeout=0.5)
+        except TimeoutError:
+            try:
+                check_cancelled()  # the Stop button: leave at once (the other process finishes)
+            except JobCancelled:
+                future.cancel()
+                raise
 
 
 def analyse(
