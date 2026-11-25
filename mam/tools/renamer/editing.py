@@ -5,7 +5,7 @@ The editable **filename** and the media table fields share their values:
   holds the suggested text) from it;
 - editing Date, Place or Country rewrites that part of the filename.
 
-Saving renames the processed copy, writes the media row live (a person's decision) and
+Saving renames the processed copy, writes the media row when the Baserow writes switch is on and
 records the values as *confirmed*, so later Renamer runs keep them and only fill gaps.
 """
 
@@ -196,7 +196,9 @@ def check(values: dict[str, Any], ext: str, ref: Reference | None = None) -> dic
     }
 
 
-def remember_place_country(place: Place | None, cc: str | None, ref: Reference) -> dict[str, Any]:
+def remember_place_country(
+    place: Place | None, cc: str | None, ref: Reference, write: bool = True
+) -> dict[str, Any]:
     """Add a place and its country to the Baserow place_country table (a person's save).
 
     No row yet: create it. A row without a country: fill it in. A row with another country
@@ -217,6 +219,8 @@ def remember_place_country(place: Place | None, cc: str | None, ref: Reference) 
     if row and row.get("cc"):
         return {"action": "none" if row["cc"] == cc else "kept", "row_id": row["id"]}
     values = {"place_location": place.name, "country": country, "ccTLD": cc}
+    if not write:
+        return {"action": "none", "reason": "Baserow writes are off", **values}
     try:
         with BaserowClient() as client:
             table = client.place_country_table
@@ -279,7 +283,7 @@ def save(
     operator: str,
     review: m.Review | None = None,
 ) -> dict[str, Any]:
-    """Rename the copy, write the media row live, and confirm the values."""
+    """Rename the copy, write the media row (if the switch is on), and confirm the values."""
     from mam.tools.renamer.tool import (
         _apply_display,
         _learn_alias,
@@ -344,15 +348,18 @@ def save(
         "flags": [],
         "dry_run": False,
     }
-    # A person's decision: write the media row live, also when the Baserow switch is off,
-    # unless they chose not to create or change a row.
+    # Baserow is written only when the "Baserow writes" switch is on (decided 2026-11-25), and
+    # not when the person chose not to create or change a row. A person's own values win then.
+    from mam.helpers.local_db.app_settings import baserow_writes_enabled
+
+    writes = baserow_writes_enabled()
     if skip_row:
         data["baserow"] = {"action": "skip", "row_id": None, "dry_run": True, "skipped": True}
     else:
         data["baserow"] = write_baserow(
-            record, data, placed.dst, settings, dry_run=False, live=True
+            record, data, placed.dst, settings, dry_run=False, live=writes
         )
-    data["place_country"] = remember_place_country(place, cc, ref)
+    data["place_country"] = remember_place_country(place, cc, ref, write=writes)
     tagged = apply_tags(
         placed.dst, data, ref, dry_run=False, media_file_id=record.id, tool="manual-edit"
     )

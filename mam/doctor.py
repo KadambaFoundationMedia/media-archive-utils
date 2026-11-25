@@ -140,7 +140,9 @@ def _baserow_switch_check() -> Check:
     return Check(
         "Baserow writes switch",
         True,
-        "ON: runs write to the live table" if on else "off: runs only log rows (approvals write)",
+        "ON: runs write to the live table"
+        if on
+        else "off: nothing is written, rows are only logged",
         required=False,
     )
 

@@ -56,12 +56,25 @@ def test_saving_renames_writes_baserow_and_confirms(client, imported, no_baserow
         settings.media_processed_files_path / "Kirtan" / "2012-07-12_KKS_Kirtan_Fruska-Gora-rs.mp3"
     )
     assert copy.exists()
-    assert no_baserow[-1]["live"] is True  # a person's save always writes
+    assert no_baserow[-1]["live"] is False  # the Baserow writes switch is off
     assert no_baserow[-1]["values"]["place_name"] == "Fruska-Gora"
     with session_scope() as s:
         rec = s.get(m.MediaFile, file_id)
         assert rec.status == "Renamer Done" and rec.current_name == copy.name
         assert rec.meta["confirmed"]["by"] == "tester"
+
+
+def test_saving_writes_baserow_when_the_switch_is_on(client, imported, no_baserow):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
+    file_id = imported["R09_0004.MP3"]
+    client.post(
+        f"/files/{file_id}/edit",
+        data=save_form("2012-07-12_KKS_Kirtan_Fruska-Gora-rs.mp3", place="Fruska-Gora"),
+        follow_redirects=False,
+    )
+    assert no_baserow[-1]["live"] is True
 
 
 def test_saving_closes_an_open_review(client, imported, no_baserow):
@@ -212,6 +225,9 @@ def test_resaving_updates_the_linked_row_with_the_persons_values(
     settings,
     monkeypatch,  # noqa: F811
 ):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
     """A person's save replaces the row's values and the file location; tools only fill gaps."""
     calls = []
 
