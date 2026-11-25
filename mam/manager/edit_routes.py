@@ -72,7 +72,19 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
                 record = session.get(m.MediaFile, file_id)
                 if record is None:
                     raise HTTPException(404)
-                data = save(session, record, form_values(form), operator_name())
+                values = form_values(form)
+                data = save(session, record, values, operator_name())
+                content_msg = None
+                if "topics" in form:
+                    from mam.tools.content_discoverer.tool import save_content_edit
+
+                    content_msg = save_content_edit(
+                        record,
+                        form.get("topics", ""),
+                        form.get("description", ""),
+                        operator_name(),
+                        write=values.get("baserow_row_id") != "skip",
+                    )
         except MamError as exc:
             return RedirectResponse(f"/details/{file_id}?error={exc}", status_code=303)
         notify(request)
@@ -80,4 +92,6 @@ def register_edit_routes(app: FastAPI, render, notify) -> None:
         added = data.get("place_country") or {}
         if added.get("action") in ("create", "update"):
             msg += f"; {added['place_location']} is now in {added['country']} (place_country)"
+        if content_msg:
+            msg += f"; {content_msg}"
         return RedirectResponse(f"/details/{file_id}?msg={msg}", status_code=303)
