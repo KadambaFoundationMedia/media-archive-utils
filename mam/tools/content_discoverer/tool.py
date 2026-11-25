@@ -471,6 +471,7 @@ def decide_review(
         "approved": {
             "topics": new_topics,
             "title": new_title,
+            "description": body,
         },
     }
     record.meta = meta
