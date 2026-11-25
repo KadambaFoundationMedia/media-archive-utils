@@ -11,7 +11,7 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from mam.helpers.audio_optimizer.ffmpeg import binary, run
+from mam.helpers.audio_optimizer.ffmpeg import binary, keep_id3_comment, run
 from mam.helpers.file_organizer.organizer import assert_writable
 
 Range = tuple[float, float | None]  # seconds; None end = until the end of the file
@@ -65,6 +65,7 @@ def stream_cut(src: Path, dst: Path, keep: Sequence[Range], *, dry_run: bool = T
         try:
             for cmd in commands:
                 run(cmd)
+            keep_id3_comment(src, tmp)
             os.replace(tmp, dst)
         finally:
             tmp.unlink(missing_ok=True)

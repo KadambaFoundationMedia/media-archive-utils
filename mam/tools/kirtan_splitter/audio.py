@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from mam.helpers.audio_optimizer.ffmpeg import binary, probe, run
+from mam.helpers.audio_optimizer.ffmpeg import binary, keep_id3_comment, probe, run
 from mam.helpers.file_organizer.organizer import assert_writable
 
 SILENCE_DB = -40
@@ -66,6 +66,7 @@ def extract_audio(video: Path, dst_stem: Path, *, dry_run: bool = True) -> Path:
             [binary("ffmpeg"), "-hide_banner", "-nostats", "-y", "-i", str(video), "-vn"]
             + ["-map", "0:a:0", "-map_metadata", "0", *codec, str(tmp)]
         )
+        keep_id3_comment(video, tmp)
         tmp.replace(dst)
     finally:
         tmp.unlink(missing_ok=True)

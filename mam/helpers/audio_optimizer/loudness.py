@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from mam.errors import MamError
-from mam.helpers.audio_optimizer.ffmpeg import AudioInfo, binary, probe, run
+from mam.helpers.audio_optimizer.ffmpeg import AudioInfo, binary, keep_id3_comment, probe, run
 from mam.helpers.file_organizer.organizer import assert_writable
 
 log = logging.getLogger(__name__)
@@ -111,6 +111,7 @@ def _encode(src: Path, dst: Path, audio_filter: str, enc_args: list[str]) -> Non
                 str(tmp),
             ]
         )
+        keep_id3_comment(src, tmp)
         os.replace(tmp, dst)
     finally:
         tmp.unlink(missing_ok=True)
