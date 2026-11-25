@@ -455,13 +455,25 @@ def test_trial_review_shows_the_values_already_in_baserow(in_review):
         assert review.proposal["conflicts"]["media_description"][0] == "Old text."
 
 
+def test_approval_with_the_switch_off_writes_nothing(in_review):
+    msg, _ = approve(use_new={"themes", "description"})
+    assert "logged only" in msg
+    assert RowClient.row["themes"] == "Old theme"
+
+
 def test_approval_says_what_baserow_kept(in_review):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
     msg, _ = approve()
     assert "keeps its own themes and description" in msg and "written" not in msg
     assert RowClient.row["themes"] == "Old theme"
 
 
 def test_approval_says_what_was_written_and_what_kept(in_review):
+    from mam.helpers.local_db.app_settings import set_baserow_writes
+
+    set_baserow_writes(True)
     msg, _ = approve(use_new={"themes"})
     assert "themes written (row 5)" in msg and "keeps its own description" in msg
     assert RowClient.row["themes"] == "Krishna Prema, Kali Yuga, Humility"
