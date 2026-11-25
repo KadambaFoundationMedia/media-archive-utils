@@ -8,6 +8,7 @@ breaks stored data or commands raises the major number. Each entry names the com
 ## [Unreleased]
 
 ### Added
+- Stop icon ("Stop processing") in the top bar, in the live message about queued work and next to each file in the list that has a queued or running job (also on the file page): queued jobs are cancelled at once, a running job ends at the start of its next step, and the file gets its earlier status back. The Jobs page's cancel button now stops running jobs too.
 - File details page: after the Content discoverer ran, the themes and the YouTube description are editable fields in the Name and media table form (growing textarea, footer with the current year); Save stores them and writes them to the Baserow row.
 - Renamer: the ID3 tags also get Publisher and Copyright (Kadamba Foundation) and the Language code (`en`).
 - Renamer: writes ID3 tags (title, artist, album, genre, album artist, composer, year, comment) to the processed copy of mp3, m4a and wma files, and updates them whenever the file is renamed again. The genre comes from the new `idv3_genre` column of `category_terms_folder`.

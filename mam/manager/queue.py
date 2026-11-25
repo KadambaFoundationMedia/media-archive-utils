@@ -18,6 +18,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from mam.config import Settings, get_settings
+from mam.errors import JobCancelled
 from mam.helpers.local_db import models as m
 from mam.helpers.local_db.app_settings import tuned
 from mam.helpers.local_db.db import session_scope
@@ -156,6 +157,7 @@ class JobQueue:
         self._claim_lock = threading.Lock()
         self.limits: dict[str, int] = {}  # workers allowed to run now, per scaled pool
         self.maximums: dict[str, int] = {}
+        self.stop_requested: set[int] = set()  # running jobs the operator stopped
 
     # ------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -263,6 +265,30 @@ class JobQueue:
         self.wakeup.set()
         self.wakeup.clear()
 
+    def cancel_jobs(self, file_id: int | None = None) -> tuple[int, int]:
+        """Stop processing: all jobs, or only those of one file (the Stop buttons).
+
+        Queued jobs are cancelled at once. A running job cannot be killed safely, so it is asked
+        to stop and ends at its next report (the start of its next step); a step that is
+        already running finishes first, so no file is left half written. Returns
+        (queued jobs cancelled, running jobs asked to stop).
+        """
+        with session_scope() as session:
+            where = [m.Job.state.in_(("queued", "running"))]
+            if file_id is not None:
+                where.append(m.Job.media_file_id == file_id)
+            cancelled = asking = 0
+            for job in session.scalars(select(m.Job).where(*where)):
+                if job.state == "queued":
+                    job.state, job.finished_at = "cancelled", now()
+                    _restore_status(session, job)
+                    cancelled += 1
+                else:
+                    self.stop_requested.add(job.id)
+                    job.step = "Stopping"
+                    asking += 1
+        return cancelled, asking
+
     # ----------------------------------------------------------------- jobs
     def claim(self, pool: str) -> int | None:
         with self._claim_lock, session_scope() as session:
@@ -303,7 +329,19 @@ class JobQueue:
                 with reporting(self._reporter(job_id)):
                     outcome = spec.run(ctx)
                 self._finish(session, job_id, record, outcome)
+        except JobCancelled:
+            log.info("Job %s (%s) stopped by the operator", job_id, tool)
+            self.stop_requested.discard(job_id)
+            with session_scope() as session:
+                job = session.get(m.Job, job_id)
+                job.state, job.finished_at = "cancelled", now()
+                job.step = job.progress = None
+                _restore_status(session, job)
+                # a step that queued its follower before it was stopped
+                self._cancel_followers(session, job)
+            return
         except Exception as exc:
+            self.stop_requested.discard(job_id)
             log.exception("Job %s (%s) failed", job_id, tool)
             with session_scope() as session:
                 job = session.get(m.Job, job_id)
@@ -313,6 +351,13 @@ class JobQueue:
                 if job.media_file_id and spec.sets_status and not dry_run:
                     record = session.get(m.MediaFile, job.media_file_id)
                     set_status(session, record, status_for(spec.label, "failed"), tool, str(exc))
+            return
+
+        if job_id in self.stop_requested:
+            # stopped, but the job had no step left to stop at: it finished, nothing follows
+            self.stop_requested.discard(job_id)
+            with session_scope() as session:
+                self._cancel_followers(session, session.get(m.Job, job_id))
             return
 
         if (
@@ -326,6 +371,16 @@ class JobQueue:
                     enqueue(session, following, [job.media_file_id], dry_run=False, pipeline=True)
                 self.notify()
 
+    def _cancel_followers(self, session: Session, job: m.Job) -> None:
+        """Cancel the queued jobs the stopped job's file still has."""
+        if job.media_file_id is None:
+            return
+        for follower in session.scalars(
+            select(m.Job).where(m.Job.media_file_id == job.media_file_id, m.Job.state == "queued")
+        ):
+            follower.state, follower.finished_at = "cancelled", now()
+            _restore_status(session, follower)
+
     def _reporter(self, job_id: int):
         """Writes what the running job is doing to the job row, a few times a second at most.
 
@@ -335,6 +390,8 @@ class JobQueue:
         last = [0.0]
 
         def write(step: str, fraction: float | None) -> None:
+            if job_id in self.stop_requested:
+                raise JobCancelled("Stopped by the operator")
             moment = time.monotonic()
             if moment - last[0] < 0.3:
                 return
@@ -381,6 +438,17 @@ class JobQueue:
         elif spec.sets_status and is_busy(record.status):
             # The tool changed nothing (e.g. kept an approved name): restore the earlier status.
             set_status(session, record, stable_status(session, record), job.tool, outcome.summary)
+
+
+def _restore_status(session: Session, job: m.Job) -> None:
+    """Give the file the status it had before a stopped job queued or started it."""
+    if not job.media_file_id or job.dry_run or job.tool not in TOOLS:
+        return
+    if not TOOLS[job.tool].sets_status:
+        return
+    record = session.get(m.MediaFile, job.media_file_id)
+    if record is not None and is_busy(record.status):
+        set_status(session, record, stable_status(session, record), job.tool, "stopped")
 
 
 def stable_status(session: Session, record: m.MediaFile) -> str:

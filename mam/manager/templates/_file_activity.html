@@ -5,5 +5,5 @@
     <span>{{ tools[j.tool].label if j.tool in tools else j.tool }}{% if j.dry_run %} (preview){% endif %} is {{ 'running' if j.state == 'running' else 'waiting in the queue' }}…
       {% if j.state == 'running' and j.step %}<strong>{{ j.step }}</strong>{% if j.progress is not none %} ({{ (j.progress * 100) | round | int }}%){% endif %}{% endif %}</span>
   {% endfor %}
-  <span class="small text-body-secondary ms-auto">This page updates by itself.</span>
+  <button type="button" class="btn btn-sm btn-outline-danger ms-auto py-0" hx-post="/files/{{ f_id }}/stop" hx-swap="none" aria-label="Stop processing" data-bs-toggle="tooltip" data-bs-title="Stop processing"><i class="fa-solid fa-stop"></i></button>
 </div>

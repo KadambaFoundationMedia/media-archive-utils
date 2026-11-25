@@ -19,3 +19,7 @@ class BaserowError(MamError):
 
 class VedabaseError(MamError):
     """Raised when vedabase.io cannot be reached or answers unexpectedly."""
+
+
+class JobCancelled(MamError):
+    """Raised inside a running job at a safe point when the operator pressed Stop."""
