@@ -126,7 +126,13 @@ function finishLiveFlash() {
   if (!flash || !poll || poll.dataset.active !== "0") return;
   flash.classList.replace("alert-info", "alert-success");
   flash.querySelector(".flash-spinner")?.setAttribute("hidden", "");
+  // the icon goes away under the pointer: take its tooltip with it
+  flash.querySelectorAll('.flash-stop [data-bs-toggle="tooltip"]').forEach((el) => {
+    window.bootstrap?.Tooltip.getInstance(el)?.dispose();
+  });
   flash.querySelector(".flash-stop")?.setAttribute("hidden", "");
+  flash.querySelector("#flash-activity")?.setAttribute("hidden", "");
+  flash.querySelector(".flash-text")?.classList.remove("small", "text-body-secondary");
   flash.querySelectorAll(".flash-done, .flash-hint").forEach((el) => el.removeAttribute("hidden"));
 }
 document.body.addEventListener("htmx:oobAfterSwap", (event) => {

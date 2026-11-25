@@ -57,12 +57,17 @@
   {% endif %}
   {% if request.query_params.get('msg') %}
   {% set live = request.query_params.get('live') and counts.jobs %}
-  <div class="alert {{ 'alert-info' if live or not request.query_params.get('live') else 'alert-success' }} alert-dismissible fade show" role="alert"
+  <div class="alert {{ 'alert-info' if live or not request.query_params.get('live') else 'alert-success' }} alert-dismissible fade show{% if request.query_params.get('live') %} d-flex align-items-center gap-2{% endif %}" role="alert"
        {% if request.query_params.get('live') %}id="flash-live"{% endif %}>
-    <span class="flash-spinner spinner-border spinner-border-sm me-2" aria-hidden="true" {% if not live %}hidden{% endif %}></span>
-    <span class="flash-done fw-semibold me-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}><i class="fa-solid fa-check me-1"></i>Finished:</span>
-    {{ request.query_params.get('msg') }}
-    <span class="flash-hint small text-body-secondary ms-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}>See the result in the job list.</span>
+    <span class="flash-spinner spinner-border spinner-border-sm flex-shrink-0" aria-hidden="true" {% if not live %}hidden{% endif %}></span>
+    <div>
+      {% if live %}{% include "_activity.html" %}{% endif %}
+      <div class="flash-text{% if live %} small text-body-secondary{% endif %}">
+        <span class="flash-done fw-semibold me-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}><i class="fa-solid fa-check me-1"></i>Finished:</span>
+        {{ request.query_params.get('msg') }}
+        <span class="flash-hint small text-body-secondary ms-1" {% if live or not request.query_params.get('live') %}hidden{% endif %}>See the result in the job list.</span>
+      </div>
+    </div>
     <span class="flash-stop ms-2" {% if not live %}hidden{% endif %}><button type="button" class="btn-stop" hx-post="/jobs/cancel" hx-swap="none" aria-label="Stop processing" data-bs-toggle="tooltip" data-bs-title="Stop processing"><i class="fa-solid fa-circle-stop"></i></button></span>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>

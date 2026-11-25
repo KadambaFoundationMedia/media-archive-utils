@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Select, func, or_, select
@@ -204,6 +205,12 @@ _SHORT_STEPS = (
     ("Looking for the verse", "Verse check"),
     ("Listening", "Listening"),
     ("Cutting", "Cutting"),
+    ("Reading the name", "Reading"),
+    ("Copying", "Copying"),
+    ("Moving", "Moving"),
+    ("Working out", "Naming"),
+    ("Writing the ID3", "Tags"),
+    ("Writing the Baserow", "Baserow"),
 )
 
 
@@ -249,6 +256,41 @@ def active_jobs(session: Session) -> dict[int, dict[str, Any]]:
             "short": short,
         }
     return out
+
+
+ACTIVITY_LINES = 3  # running jobs named in the live message; the rest is counted
+
+
+def activity(session: Session) -> dict[str, Any]:
+    """What the queue is doing now, for the live message: "<Tool>: <step>" for the running
+    jobs, and how many wait."""
+    from mam.manager.tools import TOOLS
+
+    jobs = session.scalars(
+        select(m.Job)
+        .where(m.Job.state.in_(("queued", "running")))
+        .order_by(m.Job.started_at, m.Job.id)
+    ).all()
+    running = [job for job in jobs if job.state == "running"]
+    lines = []
+    for job in running[:ACTIVITY_LINES]:
+        label = TOOLS[job.tool].label if job.tool in TOOLS else job.tool
+        step = job.step or "Working"
+        if not step[1:2].isupper():  # "Writing the tags" reads on after the tool's name
+            step = step[0].lower() + step[1:]
+        text = f"{label}{' (preview)' if job.dry_run else ''}: {step}"
+        if job.progress is not None:
+            text += f" ({round(job.progress * 100)}%)"
+        record = session.get(m.MediaFile, job.media_file_id) if job.media_file_id else None
+        name = None
+        if record is not None:
+            name = record.current_name or Path(record.original_path or "").name
+        lines.append({"text": text, "file": name})
+    return {
+        "running": lines,
+        "more": len(running) - len(lines),
+        "waiting": len(jobs) - len(running),
+    }
 
 
 VIEW_LABELS = {"__all": "All files", "__review": "Review", "__failed": "Failed"}

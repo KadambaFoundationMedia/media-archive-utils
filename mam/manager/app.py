@@ -274,6 +274,8 @@ def create_app(start_queue: bool = True) -> FastAPI:
         context["code_changed"] = stale.code_changed()
         with session_scope() as session:
             context.setdefault("counts", queries.counts(session))
+            if request.query_params.get("live"):
+                context.setdefault("activity", queries.activity(session))
             if "rows" in context:
                 context["running"] = queries.active_jobs(session)
         if "rows" in context and "active" not in context:
@@ -659,6 +661,13 @@ def create_app(start_queue: bool = True) -> FastAPI:
     @app.get("/jobs", response_class=HTMLResponse)
     def jobs_page(request: Request):
         return render(request, "jobs.html", **_jobs_context(request))
+
+    @app.get("/jobs/activity", response_class=HTMLResponse)
+    def jobs_activity(request: Request):
+        """Polled by the live message: which tool is doing what."""
+        with session_scope() as session:
+            data = queries.activity(session)
+        return render(request, "_activity.html", activity=data)
 
     @app.get("/jobs/rows", response_class=HTMLResponse)
     def jobs_rows(request: Request):

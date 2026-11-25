@@ -129,7 +129,7 @@ def run_kirtan_splitter(ctx: JobContext) -> ToolOutcome:
         stem = (settings.work_dir / "split" if ctx.dry_run else src.parent) / src.stem
         work_audio = extract_audio(src, stem, dry_run=False)
     ctx.session.commit()  # the analysis takes a while; do not hold the database
-    report("Listening to the recording: music or speech", 0.1)
+    report("Listening to the recording (music or speech)", 0.1)
     try:
         decision, duration = analyse(record, work_audio, settings)
     finally:
